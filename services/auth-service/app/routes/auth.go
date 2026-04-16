@@ -5,35 +5,12 @@ import (
 )
 
 func RegisterRoutes(r *gin.Engine) {
-	auth := r.Group("/api/auth")
-	{
-		auth.GET("/login", Login)
-		auth.GET("/callback", Callback)
-		auth.GET("/user", GetUser)
-		auth.POST("/refresh", RefreshToken)
-	}
-}
+	r.GET("/api/auth/login", Login)
+	r.GET("/api/auth/callback", OAuthCallback)
+	r.GET("/api/auth/user", GetCurrentUser)
+	r.POST("/api/auth/refresh", RefreshToken)
+	r.POST("/api/auth/logout", Logout)
 
-func Login(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "Login endpoint - TODO: Implement Dex OAuth2 flow",
-	})
-}
-
-func Callback(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "Callback endpoint - TODO: Handle OAuth callback",
-	})
-}
-
-func GetUser(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "Get user endpoint - TODO: Return current user",
-	})
-}
-
-func RefreshToken(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "Refresh token endpoint - TODO: Implement token refresh",
-	})
+	r.GET("/api/auth/mock-login-page", MockLoginPage)
+	r.POST("/api/auth/mock-callback", MockCallback)
 }
