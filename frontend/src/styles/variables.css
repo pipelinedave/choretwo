@@ -1,0 +1,73 @@
+/* Material You Theme Variables */
+:root {
+  /* Primary colors */
+  --md-sys-color-primary: #673AB7;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #EADDFF;
+  --md-sys-color-on-primary-container: #21005D;
+
+  /* Secondary colors */
+  --md-sys-color-secondary: #625B71;
+  --md-sys-color-on-secondary: #FFFFFF;
+  --md-sys-color-secondary-container: #E8DEF8;
+  --md-sys-color-on-secondary-container: #1D192B;
+
+  /* Tertiary colors */
+  --md-sys-color-tertiary: #7D5260;
+  --md-sys-color-on-tertiary: #FFFFFF;
+  --md-sys-color-tertiary-container: #FFD8E4;
+  --md-sys-color-on-tertiary-container: #31111D;
+
+  /* Background */
+  --md-sys-color-background: #FEF7FF;
+  --md-sys-color-on-background: #1D1B20;
+  --md-sys-color-surface: #FEF7FF;
+  --md-sys-color-on-surface: #1D1B20;
+  --md-sys-color-surface-variant: #E7E0EC;
+  --md-sys-color-on-surface-variant: #49454F;
+
+  /* Outline */
+  --md-sys-color-outline: #79747E;
+  --md-sys-color-outline-variant: #CAC4D0;
+
+  /* Error */
+  --md-sys-color-error: #B3261E;
+  --md-sys-color-on-error: #FFFFFF;
+
+  /* Typography */
+  --md-sys-typescale-display-large: 3rem;
+  --md-sys-typescale-headline-large: 2rem;
+  --md-sys-typescale-title-large: 1.25rem;
+  --md-sys-typescale-body-large: 1rem;
+  --md-sys-typescale-body-medium: 0.875rem;
+
+  /* Spacing */
+  --md-sys-spacing-xs: 0.25rem;
+  --md-sys-spacing-sm: 0.5rem;
+  --md-sys-spacing-md: 1rem;
+  --md-sys-spacing-lg: 1.5rem;
+  --md-sys-spacing-xl: 2rem;
+
+  /* Border radius */
+  --md-sys-radius-sm: 4px;
+  --md-sys-radius-md: 8px;
+  --md-sys-radius-lg: 12px;
+  --md-sys-radius-xl: 16px;
+
+  /* Elevation */
+  --md-sys-elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --md-sys-elevation-2: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --md-sys-elevation-3: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --md-sys-color-background: #1D1B20;
+    --md-sys-color-on-background: #E6E1E5;
+    --md-sys-color-surface: #1D1B20;
+    --md-sys-color-on-surface: #E6E1E5;
+    --md-sys-color-surface-variant: #49454F;
+    --md-sys-color-on-surface-variant: #CAC4D0;
+  }
+}

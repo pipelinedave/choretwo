@@ -1,0 +1,30 @@
+{
+  "name": "choretwo-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix",
+    "test": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5",
+    "pinia": "^2.1.7",
+    "axios": "^1.6.5",
+    "hammerjs": "^2.0.8",
+    "@mdi/font": "^10.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.3",
+    "vite": "^5.0.11",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.20.0",
+    "vitest": "^1.2.1",
+    "@playwright/test": "^1.41.0"
+  }
+}
