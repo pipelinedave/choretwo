@@ -1,22 +1,124 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { authApi, getToken, setToken, removeToken, getUser, setUser } from '@/api'
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref(null)
-  const token = ref(null)
+  const user = ref(getUser())
+  const token = ref(getToken())
+  const loading = ref(false)
+  const error = ref(null)
 
-  function setUser(userData) {
-    user.value = userData
+  const isAuthenticated = computed(() => !!token.value && !!user.value)
+
+  async function login(redirectUrl = '/') {
+    window.location.href = `${import.meta.env.VITE_AUTH_URL}/api/auth/login?redirect=${encodeURIComponent(redirectUrl)}`
   }
 
-  function setToken(newToken) {
-    token.value = newToken
+  async function handleCallback() {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const tokenFromUrl = urlParams.get('token')
+      
+      if (!tokenFromUrl) {
+        throw new Error('No token in callback URL')
+      }
+      
+      setToken(tokenFromUrl)
+      token.value = tokenFromUrl
+      
+      // Fetch user data
+      const response = await authApi.get('/user')
+      user.value = response.data
+      setUser(response.data)
+      
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname)
+      
+      return true
+    } catch (err) {
+      error.value = err.message || 'Authentication failed'
+      removeToken()
+      token.value = null
+      user.value = null
+      return false
+    } finally {
+      loading.value = false
+    }
   }
 
-  function logout() {
-    user.value = null
-    token.value = null
+  async function fetchUser() {
+    if (!token.value) return
+    
+    try {
+      const response = await authApi.get('/user')
+      user.value = response.data
+      setUser(response.data)
+    } catch (err) {
+      console.error('Failed to fetch user:', err)
+      logout()
+    }
   }
 
-  return { user, token, setUser, setToken, logout }
+  async function logout() {
+    loading.value = true
+    
+    try {
+      // Call logout endpoint if exists
+      await authApi.post('/logout').catch(() => {})
+    } catch (err) {
+      console.error('Logout error:', err)
+    } finally {
+      removeToken()
+      token.value = null
+      user.value = null
+      loading.value = false
+      
+      // Redirect to login
+      window.location.href = '/login'
+    }
+  }
+
+  async function restoreAuth() {
+    if (!token.value || !user.value) {
+      const storedToken = getToken()
+      const storedUser = getUser()
+      
+      if (storedToken && storedUser) {
+        token.value = storedToken
+        user.value = storedUser
+        
+        // Verify token is still valid
+        try {
+          await fetchUser()
+          return true
+        } catch {
+          logout()
+          return false
+        }
+      }
+      return false
+    }
+    return true
+  }
+
+  function clearError() {
+    error.value = null
+  }
+
+  return {
+    user,
+    token,
+    loading,
+    error,
+    isAuthenticated,
+    login,
+    handleCallback,
+    fetchUser,
+    logout,
+    restoreAuth,
+    clearError
+  }
 })

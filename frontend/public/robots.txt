@@ -1,0 +1,16 @@
+{
+  "name": "choretwo",
+  "version": "1.0.0",
+  "description": "Modern chore management with Material You design",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix",
+    "test": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "keywords": ["chore", "management", "vue", "pwa"],
+  "author": "",
+  "license": "MIT"
+}

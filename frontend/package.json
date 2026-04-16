@@ -12,19 +12,21 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "vue": "^3.4.15",
-    "vue-router": "^4.2.5",
-    "pinia": "^2.1.7",
+    "@mdi/font": "^7.4.47",
     "axios": "^1.6.5",
     "hammerjs": "^2.0.8",
-    "@mdi/font": "^10.0.0"
+    "pinia": "^2.1.7",
+    "vite-plugin-pwa": "^1.2.0",
+    "vue": "^3.4.15",
+    "vue-router": "^4.2.5",
+    "workbox-window": "^7.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.41.0",
     "@vitejs/plugin-vue": "^5.0.3",
-    "vite": "^5.0.11",
     "eslint": "^8.56.0",
     "eslint-plugin-vue": "^9.20.0",
-    "vitest": "^1.2.1",
-    "@playwright/test": "^1.41.0"
+    "vite": "^5.0.11",
+    "vitest": "^1.2.1"
   }
 }
