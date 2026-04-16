@@ -1,7 +1,10 @@
-"""Log Service - FastAPI application"""
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends
+
+from app.database import run_migrations
+from app.routes.logs import router as logs_router
+from app.middleware.auth import auth_middleware
 
 app = FastAPI(
     title="Log Service",
@@ -17,14 +20,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(auth_middleware)
+
+
+@app.on_event("startup")
+async def startup_event():
+    run_migrations()
+
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
     return {"status": "ok", "service": "log-service"}
 
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {"message": "Log Service", "version": "1.0.0"}
+
+
+app.include_router(logs_router)
