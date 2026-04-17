@@ -61,7 +61,7 @@ jobs:
           cd k3s-config
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add kustomize/choretwo/overlays/staging/
+          git add kustomize/choretwo/base/
           
           if ! git diff --staged --quiet; then
             git commit -m "chore(staging): update choretwo images to ${{ steps.get-sha.outputs.sha }}"
