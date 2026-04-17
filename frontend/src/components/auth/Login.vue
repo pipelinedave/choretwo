@@ -42,17 +42,6 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-onMounted(async () => {
-  // Handle callback from Dex
-  if (route.path === '/callback') {
-    const success = await authStore.handleCallback()
-    if (success) {
-      const redirect = route.query.redirect || '/'
-      router.push(redirect)
-    }
-  }
-})
-
 function handleLogin() {
   const redirect = route.query.redirect || '/'
   authStore.login(redirect)

@@ -39,8 +39,8 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/callback',
-    name: 'Callback',
+    path: '/auth-callback',
+    name: 'AuthCallback',
     component: () => import('@/views/CallbackView.vue'),
     meta: { requiresGuest: true }
   }
