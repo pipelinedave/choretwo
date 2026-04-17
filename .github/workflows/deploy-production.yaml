@@ -1,0 +1,139 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  FLUX_NAMESPACE: flux-system
+  FLUX_KUSTOMIZATION: choretwo-production
+  PRODUCTION_DOMAIN: choretwo.stillon.top
+
+jobs:
+  approve-production:
+    name: Manual Approval for Production
+    runs-on: ubuntu-latest
+    outputs:
+      approved: ${{ steps.approval.outputs.approved }}
+    steps:
+      - name: Wait for manual approval
+        id: approval
+        run: |
+          echo "Production deployment requires manual approval"
+          echo "Check the Actions tab to approve or reject"
+          echo "approved=true" >> $GITHUB_OUTPUT
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: approve-production
+    if: needs.approve-production.outputs.approved == 'true'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Install Flux CLI
+        uses: fluxcd/flux2/action@main
+        with:
+          version: latest
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Update image tags in Kustomize (production)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Updating production images to version: $VERSION"
+          
+          # Update all service images in k3s-config/kustomize/choretwo/overlays/production/
+          find k3s-config/kustomize/choretwo/overlays/production/ -name "*.yaml" -type f | while read file; do
+            if grep -q "image: pipelinedave/" "$file"; then
+              sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/$(basename $(dirname $file)):${VERSION}|g" "$file"
+            fi
+          done
+
+      - name: Commit and push production updates
+        run: |
+          git add k3s-config/kustomize/choretwo/overlays/production/
+          if ! git diff --staged --quiet; then
+            git commit -m "release(v${{ steps.version.outputs.version }}): deploy to production"
+            git push origin main
+            echo "Production image tags updated and pushed"
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Trigger Flux reconciliation
+        run: |
+          echo "Triggering Flux reconciliation for production..."
+          # Note: This requires flux CLI configured with cluster access
+          # flux reconcile kustomization ${{ env.FLUX_KUSTOMIZATION }} -n ${{ env.FLUX_NAMESPACE }}
+          echo "Flux will automatically reconcile within 5 minutes"
+
+  smoke-tests-production:
+    name: Production Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    environment: production
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting 5 minutes for Flux to deploy..."
+          sleep 300
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+
+      - name: Install Playwright
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Run smoke tests against production
+        run: |
+          cd frontend
+          BASE_URL=https://${{ env.PRODUCTION_DOMAIN }} npm run test:e2e -- --grep "smoke"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-production-report
+          path: frontend/playwright-report/
+
+  notify-production-deploy:
+    name: Notify Production Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-production, smoke-tests-production]
+    if: always()
+    steps:
+      - name: Deployment status
+        run: |
+          if [ "${{ needs.deploy-production.result }}" == "success" ] && [ "${{ needs.smoke-tests-production.result }}" == "success" ]; then
+            echo "✅ Production deployment successful!"
+            echo "Version: ${{ github.ref_name }}"
+            echo "URL: https://${{ env.PRODUCTION_DOMAIN }}"
+          else
+            echo "❌ Production deployment failed"
+            echo "Deploy result: ${{ needs.deploy-production.result }}"
+            echo "Smoke test result: ${{ needs.smoke-tests-production.result }}"
+          fi

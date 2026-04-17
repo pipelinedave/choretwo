@@ -1,0 +1,207 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  DOCKER_REGISTRY: pipelinedave
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  GO_VERSION: "1.22"
+
+jobs:
+  lint:
+    name: Lint Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth, chore, log, notify, ai, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go (auth-service)
+        if: matrix.service == 'auth'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Python (Python services)
+        if: matrix.service == 'chore' || matrix.service == 'log' || matrix.service == 'ai'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Set up Node.js (notification-service & frontend)
+        if: matrix.service == 'notify' || matrix.service == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Go dependencies (auth-service)
+        if: matrix.service == 'auth'
+        run: |
+          cd services/auth-service
+          go mod download
+
+      - name: Install Python dependencies (Python services)
+        if: matrix.service == 'chore' || matrix.service == 'log' || matrix.service == 'ai'
+        run: |
+          cd services/${{ matrix.service }}-service
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Install Node dependencies (notification-service)
+        if: matrix.service == 'notify'
+        run: |
+          cd services/notification-service
+          npm ci
+
+      - name: Install Node dependencies (frontend)
+        if: matrix.service == 'frontend'
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run linter (auth-service)
+        if: matrix.service == 'auth'
+        run: |
+          cd services/auth-service
+          golangci-lint run
+
+      - name: Run linter (Python services)
+        if: matrix.service == 'chore' || matrix.service == 'log' || matrix.service == 'ai'
+        run: |
+          cd services/${{ matrix.service }}-service
+          ruff check app/ tests/
+
+      - name: Run linter (notification-service)
+        if: matrix.service == 'notify'
+        run: |
+          cd services/notification-service
+          npm run lint
+
+      - name: Run linter (frontend)
+        if: matrix.service == 'frontend'
+        run: |
+          cd frontend
+          npm run lint
+
+  test:
+    name: Test Services
+    runs-on: ubuntu-latest
+    needs: lint
+    strategy:
+      matrix:
+        service: [auth, chore, log, notify, ai]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go (auth-service)
+        if: matrix.service == 'auth'
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set up Python (Python services)
+        if: matrix.service == 'chore' || matrix.service == 'log' || matrix.service == 'ai'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Set up Node.js (notification-service)
+        if: matrix.service == 'notify'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Run tests (auth-service)
+        if: matrix.service == 'auth'
+        run: |
+          cd services/auth-service
+          go test ./... -v -coverprofile=coverage.out
+
+      - name: Run tests (Python services)
+        if: matrix.service == 'chore' || matrix.service == 'log' || matrix.service == 'ai'
+        run: |
+          cd services/${{ matrix.service }}-service
+          python -m pytest tests/ -v --cov=app --cov-report=xml
+
+      - name: Run tests (notification-service)
+        if: matrix.service == 'notify'
+        run: |
+          cd services/notification-service
+          npm test -- --coverage
+
+      - name: Upload coverage (Python services)
+        if: matrix.service == 'chore' || matrix.service == 'log' || matrix.service == 'ai'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./services/${{ matrix.service }}-service/coverage.xml
+          flags: ${{ matrix.service }}-service
+
+      - name: Upload coverage (auth-service)
+        if: matrix.service == 'auth'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./services/auth-service/coverage.out
+          flags: auth-service
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Playwright
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Run E2E tests
+        run: |
+          cd frontend
+          npm run test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'

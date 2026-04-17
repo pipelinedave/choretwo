@@ -1,0 +1,114 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main]
+
+env:
+  FLUX_NAMESPACE: flux-system
+  FLUX_KUSTOMIZATION: choretwo-staging
+  STAGING_DOMAIN: choretwo-staging.stillon.top
+
+jobs:
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Flux CLI
+        uses: fluxcd/flux2/action@main
+        with:
+          version: latest
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Update image tags in Kustomize
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          echo "Updating images to tag: $IMAGE_TAG"
+          
+          # Update all service images in k3s-config/kustomize/choretwo/overlays/staging/
+          find k3s-config/kustomize/choretwo/overlays/staging/ -name "*.yaml" -type f | while read file; do
+            if grep -q "image: pipelinedave/" "$file"; then
+              sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/$(basename $(dirname $file)):${IMAGE_TAG}|g" "$file"
+            fi
+          done
+
+      - name: Commit and push image updates
+        run: |
+          git add k3s-config/kustomize/choretwo/overlays/staging/
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(staging): update images to ${IMAGE_TAG:0:7}"
+            git push origin main
+            echo "Image tags updated and pushed"
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Trigger Flux reconciliation
+        run: |
+          echo "Flux will automatically reconcile within 5 minutes"
+          echo "To force immediate reconciliation, run:"
+          echo "  flux reconcile kustomization ${{ env.FLUX_KUSTOMIZATION }} -n ${{ env.FLUX_NAMESPACE }}"
+
+  e2e-staging:
+    name: E2E Tests on Staging
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment: staging
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment
+        run: |
+          echo "Waiting 5 minutes for Flux to deploy..."
+          sleep 300
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: 'npm'
+
+      - name: Install Playwright
+        run: |
+          cd frontend
+          npm ci
+          npx playwright install --with-deps
+
+      - name: Run E2E tests against staging
+        run: |
+          cd frontend
+          BASE_URL=https://${{ env.STAGING_DOMAIN }} npm run test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-staging-report
+          path: frontend/playwright-report/
+
+  notify-staging-deploy:
+    name: Notify Staging Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, e2e-staging]
+    if: always()
+    steps:
+      - name: Deployment status
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ] && [ "${{ needs.e2e-staging.result }}" == "success" ]; then
+            echo "✅ Staging deployment successful!"
+            echo "URL: https://${{ env.STAGING_DOMAIN }}"
+          else
+            echo "❌ Staging deployment failed"
+            echo "Deploy result: ${{ needs.deploy-staging.result }}"
+            echo "E2E result: ${{ needs.e2e-staging.result }}"
+          fi

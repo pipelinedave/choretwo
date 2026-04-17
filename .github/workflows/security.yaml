@@ -1,0 +1,158 @@
+name: Security Scanning
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sundays
+  push:
+    branches: [main]
+    paths:
+      - '**/Dockerfile'
+      - '**/package*.json'
+      - '**/requirements*.txt'
+      - '**/go.mod'
+      - '**/go.sum'
+  pull_request:
+    branches: [main]
+
+jobs:
+  trivy-scan:
+    name: Trivy Container Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - services/auth-service
+          - services/chore-service
+          - services/log-service
+          - services/notification-service
+          - services/ai-copilot-service
+          - frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ matrix.service }}:latest ./${{ matrix.service }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          scan-ref: '${{ matrix.service }}:latest'
+          format: 'sarif'
+          output: 'trivy-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-${{ matrix.service }}.sarif'
+
+  dependency-check:
+    name: Dependency Scanning
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: auth-service
+            type: go
+            file: go.mod
+          - name: chore-service
+            type: python
+            file: requirements.txt
+          - name: log-service
+            type: python
+            file: requirements.txt
+          - name: notification-service
+            type: node
+            file: package.json
+          - name: ai-copilot-service
+            type: python
+            file: requirements.txt
+          - name: frontend
+            type: node
+            file: package.json
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.service.type == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        if: matrix.service.type == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Go
+        if: matrix.service.type == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run pip-audit (Python)
+        if: matrix.service.type == 'python'
+        run: |
+          pip install pip-audit
+          cd ${{ matrix.service.name }}-service
+          pip-audit -r ${{ matrix.service.file }}
+
+      - name: Run npm audit (Node)
+        if: matrix.service.type == 'node'
+        run: |
+          cd ${{ matrix.service.name }}
+          npm audit --audit-level=high
+
+      - name: Run govulncheck (Go)
+        if: matrix.service.type == 'go'
+        run: |
+          cd ${{ matrix.service.name }}-service
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript', 'python', 'go']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,30 @@
+# Default code owner - all changes
+* @pipelinedave
+
+# Auth Service
+services/auth-service/ @pipelinedave
+
+# Chore Service
+services/chore-service/ @pipelinedave
+
+# Log Service
+services/log-service/ @pipelinedave
+
+# Notification Service
+services/notification-service/ @pipelinedave
+
+# AI Copilot Service
+services/ai-copilot-service/ @pipelinedave
+
+# Frontend
+frontend/ @pipelinedave
+
+# Infrastructure & Deployment
+k3s-config/ @pipelinedave
+.github/workflows/ @pipelinedave
+docker-compose.yml @pipelinedave
+Makefile @pipelinedave
+
+# Documentation
+docs/ @pipelinedave
+*.md @pipelinedave
