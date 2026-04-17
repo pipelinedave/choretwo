@@ -22,9 +22,37 @@ export const useAuthStore = defineStore('auth', () => {
       const urlParams = new URLSearchParams(window.location.search)
       const tokenFromUrl = urlParams.get('token')
       
+      console.log('Callback: tokenFromUrl', tokenFromUrl ? 'present' : 'missing')
+      
       if (!tokenFromUrl) {
         throw new Error('No token in callback URL')
       }
+      
+      setToken(tokenFromUrl)
+      token.value = tokenFromUrl
+      
+      console.log('Callback: fetching user data')
+      
+      const response = await authApi.get('/user')
+      user.value = response.data
+      setUser(response.data)
+      
+      console.log('Callback: success, user:', user.value)
+      
+      window.history.replaceState({}, '', window.location.pathname)
+      
+      return true
+    } catch (err) {
+      console.error('Callback error:', err)
+      error.value = err.message || 'Authentication failed'
+      removeToken()
+      token.value = null
+      user.value = null
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
       
       setToken(tokenFromUrl)
       token.value = tokenFromUrl

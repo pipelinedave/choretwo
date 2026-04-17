@@ -28,9 +28,11 @@ onMounted(async () => {
       router.push(redirect)
     } else {
       error.value = authStore.error || 'Authentication failed'
+      console.error('Callback failed:', authStore.error)
     }
   } catch (err) {
     error.value = err.message || 'Authentication failed'
+    console.error('Callback error:', err)
   }
 })
 </script>
