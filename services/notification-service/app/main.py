@@ -1,10 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Depends
+from fastapi.responses import JSONResponse
 
 from app.database import run_migrations
 from app.routes.preferences import router as notify_router
-from app.middleware.auth import auth_middleware
 
 app = FastAPI(
     title="Notification Service",
@@ -20,7 +19,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(auth_middleware)
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    user_email = request.headers.get("X-User-Email")
+
+    if not user_email and not request.url.path.startswith("/health"):
+        return JSONResponse(
+            status_code=401, content={"error": "X-User-Email header required"}
+        )
+
+    request.state.user_email = user_email
+    response = await call_next(request)
+    return response
 
 
 @app.on_event("startup")
