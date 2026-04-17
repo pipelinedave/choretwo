@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-choretwo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-choretwo_dev}
       POSTGRES_DB: ${POSTGRES_DB:-choretwo}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
@@ -42,15 +40,15 @@ services:
     ports:
       - "8001:8000"
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?schema=auth
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:-choretwo-dev-jwt-secret-change-in-production}
-      - JWT_EXPIRY=${JWT_EXPIRY:-24h}
-      - DEX_ISSUER_URL=${DEX_ISSUER_URL:-https://dex.stillon.top}
-      - DEX_CLIENT_ID=${DEX_CLIENT_ID:-choretwo}
-      - DEX_CLIENT_SECRET=${DEX_CLIENT_SECRET:-choretwo-secret-d236d2961f60b149a49b97b018f08d34}
-      - USE_MOCK_AUTH=${USE_MOCK_AUTH:-true}
-      - SERVER_URL=http://localhost:8001
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: ${JWT_SECRET:-choretwo-dev-jwt-secret-change-in-production}
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+      DEX_ISSUER_URL: ${DEX_ISSUER_URL:-https://dex.stillon.top}
+      DEX_CLIENT_ID: ${DEX_CLIENT_ID:-choretwo}
+      DEX_CLIENT_SECRET: ${DEX_CLIENT_SECRET:-choretwo-secret-d236d2961f60b149a49b97b018f08d34}
+      USE_MOCK_AUTH: ${USE_MOCK_AUTH:-true}
+      SERVER_URL: http://localhost:8001
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,10 +65,10 @@ services:
     ports:
       - "8002:8000"
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?schema=chores
-      - REDIS_URL=redis://redis:6379
-      - AUTH_SERVICE_URL=http://auth-service:8000
-      - SERVER_URL=http://localhost:8002
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      AUTH_SERVICE_URL: http://auth-service:8000
+      SERVER_URL: http://localhost:8002
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,10 +85,10 @@ services:
     ports:
       - "8003:8000"
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?schema=logs
-      - REDIS_URL=redis://redis:6379
-      - AUTH_SERVICE_URL=http://auth-service:8000
-      - SERVER_URL=http://localhost:8003
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      AUTH_SERVICE_URL: http://auth-service:8000
+      SERVER_URL: http://localhost:8003
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,10 +105,10 @@ services:
     ports:
       - "8004:8000"
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?schema=notifications
-      - REDIS_URL=redis://redis:6379
-      - GATWAY_URL=${GATWAY_URL:-http://gotify.stillon.top}
-      - SERVER_URL=http://localhost:8004
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      GATWAY_URL: ${GATWAY_URL:-http://gotify.stillon.top}
+      SERVER_URL: http://localhost:8004
     depends_on:
       postgres:
         condition: service_healthy
@@ -127,10 +125,10 @@ services:
     ports:
       - "8005:8000"
     environment:
-      - DATABASE_URL=postgres://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?schema=ai
-      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
-      - OPENWEBUI_URL=${OPENWEBUI_URL:-http://open-webui:8080}
-      - SERVER_URL=http://localhost:8005
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      OPENWEBUI_URL: ${OPENWEBUI_URL:-http://open-webui:8080}
+      SERVER_URL: http://localhost:8005
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,11 +143,11 @@ services:
     ports:
       - "3000:80"
     environment:
-      - VITE_AUTH_SERVICE_URL=${VITE_AUTH_SERVICE_URL:-http://localhost:8001}
-      - VITE_CHORE_SERVICE_URL=${VITE_CHORE_SERVICE_URL:-http://localhost:8002}
-      - VITE_LOG_SERVICE_URL=${VITE_LOG_SERVICE_URL:-http://localhost:8003}
-      - VITE_NOTIFICATION_SERVICE_URL=${VITE_NOTIFICATION_SERVICE_URL:-http://localhost:8004}
-      - VITE_AI_SERVICE_URL=${VITE_AI_SERVICE_URL:-http://localhost:8005}
+      VITE_AUTH_SERVICE_URL: ${VITE_AUTH_SERVICE_URL:-http://localhost:8001}
+      VITE_CHORE_SERVICE_URL: ${VITE_CHORE_SERVICE_URL:-http://localhost:8002}
+      VITE_LOG_SERVICE_URL: ${VITE_LOG_SERVICE_URL:-http://localhost:8003}
+      VITE_NOTIFICATION_SERVICE_URL: ${VITE_NOTIFICATION_SERVICE_URL:-http://localhost:8004}
+      VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8005}
     depends_on:
       - auth-service
       - chore-service
