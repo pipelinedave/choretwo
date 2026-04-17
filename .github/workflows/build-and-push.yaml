@@ -57,8 +57,9 @@ jobs:
           tags: |
             ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:${{ github.sha }}
             ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:latest
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: BUILDKIT_INLINE_CACHE=1
 
   notify-build-complete:
     name: Notify Build Complete
