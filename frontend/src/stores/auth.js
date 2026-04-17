@@ -53,29 +53,6 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = false
     }
   }
-      
-      setToken(tokenFromUrl)
-      token.value = tokenFromUrl
-      
-      // Fetch user data
-      const response = await authApi.get('/user')
-      user.value = response.data
-      setUser(response.data)
-      
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname)
-      
-      return true
-    } catch (err) {
-      error.value = err.message || 'Authentication failed'
-      removeToken()
-      token.value = null
-      user.value = null
-      return false
-    } finally {
-      loading.value = false
-    }
-  }
 
   async function fetchUser() {
     if (!token.value) return
