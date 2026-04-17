@@ -1,5 +1,13 @@
 # choretwo - Agent Instructions
 
+## Current Status
+
+✅ **All services running successfully** (as of latest session)
+- Frontend authentication flow working with mock auth
+- All 6 services operational: auth, chore, log, notification, ai-copilot, frontend
+- E2E tests created (9 Playwright tests)
+- PWA assets generated
+
 ## Architecture Overview
 
 **Microservices:** 5 services + frontend
@@ -235,6 +243,24 @@ All ingresses follow: `<app>.stillon.top`
 6. **Schema isolation**: Each service uses `DATABASE_URL?schema=<name>`
 7. **Flux dependencies**: Always add `dependsOn: dex` for auth-dependent services
 
+## Recent Fixes (Important Context)
+
+### Authentication Flow (Fixed)
+- **Issue**: Callback page hung showing spinner
+- **Root cause**: Login.vue had callback logic checking for `/callback`, but router used `/auth-callback` and CallbackView.vue had no auth logic
+- **Solution**: Moved `handleCallback()` from Login.vue to CallbackView.vue
+- **Files changed**: `frontend/src/views/CallbackView.vue`, `frontend/src/components/auth/Login.vue`, `frontend/src/router/index.js`
+
+### Backend Compilation Errors (Fixed)
+- **auth-service**: Missing AuthMiddleware on protected routes, unused import in dex/client.go
+- **chore-service**: Missing `Depends` import in routes
+- **ai-copilot-service**: Missing `Optional` import
+- **log-service**: Missing `python-multipart` dependency
+
+### Database Connection (Fixed)
+- **Issue**: PostgreSQL connection failures
+- **Solution**: Use format `postgresql://user:pass@host:5432/dbname?sslmode=disable`
+
 ## Skills Available
 - `caveman` - Ultra-terse communication (active)
 - `caveman-commit` - Compressed commit messages
@@ -243,7 +269,8 @@ All ingresses follow: `<app>.stillon.top`
 - `mcp-protocol-builder` - MCP server development
 
 ## References
-- PRD: `docs/PRD_base.md`
+- PRD: `docs/PRD.md`
 - Choremane PRD: `/home/dhallmann/projects/choremane/prd.md`
 - K3s docs: `/home/dhallmann/projects/k3s-config/docs/`
 - Workflow: `/home/dhallmann/projects/k3s-config/docs/concepts/workflow.md`
+- Documentation: `docs/` directory (GETTING_STARTED.md, ARCHITECTURE.md, etc.)
