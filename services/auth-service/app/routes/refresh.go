@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 
 	"auth-service/app/dex"
 	"auth-service/app/database"
@@ -32,6 +31,7 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	ctx := context.Background()
+	_ = ctx
 	claims, err := jwt.ValidateToken(req.RefreshToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{

@@ -22,13 +22,19 @@ func SetupRouter() *gin.Engine {
 	{
 		auth.GET("/login", routes.Login)
 		auth.GET("/callback", routes.OAuthCallback)
-		auth.GET("/user", routes.GetCurrentUser)
-		auth.POST("/refresh", routes.RefreshToken)
-		auth.POST("/logout", routes.Logout)
-
-		auth.GET("/mock-login-page", routes.MockLoginPage)
-		auth.POST("/mock-callback", routes.MockCallback)
 	}
+
+	// Protected routes requiring JWT authentication
+	protected := r.Group("/api/auth")
+	protected.Use(middleware.AuthMiddleware())
+	{
+		protected.GET("/user", routes.GetCurrentUser)
+		protected.POST("/refresh", routes.RefreshToken)
+		protected.POST("/logout", routes.Logout)
+	}
+
+	auth.GET("/mock-login-page", routes.MockLoginPage)
+	auth.POST("/mock-callback", routes.MockCallback)
 
 	return r
 }

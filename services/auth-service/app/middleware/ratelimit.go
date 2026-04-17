@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -70,7 +71,7 @@ func DefaultRateLimit() gin.HandlerFunc {
 }
 
 func getenv(key, defaultValue string) string {
-	if value := c.GetString(key); value != "" {
+	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return defaultValue

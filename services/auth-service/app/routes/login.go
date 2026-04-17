@@ -3,7 +3,6 @@ package routes
 import (
 	"log"
 	"net/http"
-	"os"
 
 	"auth-service/app/dex"
 
@@ -76,13 +75,18 @@ func OAuthCallback(c *gin.Context) {
 		return
 	}
 
-	email := userInfo.Email
-	name := email
+	email, ok := userInfo["email"].(string)
+	if !ok || email == "" {
+		log.Printf("Email not found in user info")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Email not found in user info",
+		})
+		return
+	}
 
-	if claims, ok := userInfo.Claims.(map[string]interface{}); ok {
-		if n, exists := claims["name"]; exists {
-			name = n.(string)
-		}
+	name, ok := userInfo["name"].(string)
+	if !ok || name == "" {
+		name = email
 	}
 
 	session["user_email"] = email

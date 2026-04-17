@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"auth-service/app/database"
 	"auth-service/app/jwt"
