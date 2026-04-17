@@ -5,8 +5,11 @@
 ✅ **All services running successfully** (as of latest session)
 - Frontend authentication flow working with mock auth
 - All 6 services operational: auth, chore, log, notification, ai-copilot, frontend
-- E2E tests created (9 Playwright tests)
+- E2E tests created (28 Playwright tests - 14 Chromium + 14 Firefox)
 - PWA assets generated
+- Local dev: Vite on port 3000, Docker services on 8001-8005
+
+**See `SESSION_STATE.md` for detailed current session state**
 
 ## Architecture Overview
 
@@ -74,9 +77,21 @@ Each service connects to its schema via `DATABASE_URL=postgres://.../choretwo?sc
 
 ## Development Commands
 
-### Local Development (docker-compose)
+### Local Development (Vite + Docker)
 ```bash
-# Start all services
+# 1. Stop frontend container (to free port 3000)
+docker-compose stop frontend
+
+# 2. Start Vite dev server
+cd frontend && npm run dev
+
+# 3. Access app at http://localhost:3000
+# API calls proxied to Docker services (8001-8005)
+```
+
+### Docker Compose (Full Stack)
+```bash
+# Start all services including frontend container
 docker-compose up
 
 # Single service
@@ -119,6 +134,8 @@ make test-chore
 
 # E2E
 make test-e2e
+# or
+cd frontend && npm run test:e2e
 
 # Coverage
 make coverage-check
@@ -258,11 +275,23 @@ All ingresses follow: `<app>.stillon.top`
 
 ## Recent Fixes (Important Context)
 
+### E2E Test Suite (Completed)
+- **Issue:** No comprehensive E2E test coverage
+- **Solution:** 28 Playwright tests covering auth + chore CRUD
+- **Files:** `frontend/tests/e2e/` (auth-login, auth-logout, chore-crud)
+- **Note:** WebKit disabled due to missing system libraries
+
 ### Authentication Flow (Fixed)
 - **Issue**: Callback page hung showing spinner
 - **Root cause**: Login.vue had callback logic checking for `/callback`, but router used `/auth-callback` and CallbackView.vue had no auth logic
 - **Solution**: Moved `handleCallback()` from Login.vue to CallbackView.vue
 - **Files changed**: `frontend/src/views/CallbackView.vue`, `frontend/src/components/auth/Login.vue`, `frontend/src/router/index.js`
+
+### Local Development Setup (Fixed)
+- **Issue:** CORS errors when running production build locally
+- **Root cause:** Frontend container using production env vars
+- **Solution:** Use Vite dev server (`npm run dev`) for local development
+- **Config:** `vite.config.js` proxies `/api/*` to Docker services
 
 ### Backend Compilation Errors (Fixed)
 - **auth-service**: Missing AuthMiddleware on protected routes, unused import in dex/client.go
