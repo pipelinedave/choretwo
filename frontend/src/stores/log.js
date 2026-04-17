@@ -56,7 +56,6 @@ export const useLogStore = defineStore('logs', () => {
       throw err
     }
   }
-  }
 
   function mapActionType(actionType) {
     const mapping = {
@@ -68,26 +67,6 @@ export const useLogStore = defineStore('logs', () => {
       'undo': 'undo'
     }
     return mapping[actionType] || actionType
-  }
-
-  async function undo(logId) {
-    const log = logs.value.find(l => l.id === logId)
-    if (!log) throw new Error('Log not found')
-
-    try {
-      const response = await logApi.post('/undo', { log_id: logId })
-
-      const index = logs.value.findIndex(l => l.id === logId)
-      if (index !== -1) {
-        logs.value.splice(index, 1)
-      }
-
-      lastAction.value = { type: 'undo', logId }
-      return response.data
-    } catch (err) {
-      error.value = err.message || 'Failed to undo action'
-      throw err
-    }
   }
 
   function setLastAction(action) {

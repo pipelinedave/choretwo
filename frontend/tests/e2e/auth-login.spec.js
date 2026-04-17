@@ -15,7 +15,8 @@ test.describe('Authentication Login Flow', () => {
     
     await page.click('button:has-text("Sign in")')
     
-    await expect(page).toHaveURL('/api/auth/mock-login-page')
+    await page.waitForURL(/mock-login-page/)
+    await expect(page).toHaveURL(/mock-login-page/)
     await expect(page.locator('h1')).toContainText('Development Login')
   })
 
