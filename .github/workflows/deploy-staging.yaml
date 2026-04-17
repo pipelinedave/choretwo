@@ -47,13 +47,12 @@ jobs:
           SHA=${{ steps.get-sha.outputs.sha }}
           echo "Updating staging images to sha: $SHA"
           
-          find k3s-config/kustomize/choretwo/overlays/staging/ -name "deployment.yaml" -type f | while read file; do
+          # Update base deployments (referenced by overlays)
+          find k3s-config/kustomize/choretwo/base/ -name "deployment.yaml" -type f | while read file; do
             if grep -q "image: pipelinedave/" "$file"; then
               SERVICE_DIR=$(dirname "$file" | xargs basename)
-              if [ "$SERVICE_DIR" != "overlays" ] && [ "$SERVICE_DIR" != "staging" ]; then
-                sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${SHA}|g" "$file"
-                echo "Updated $file"
-              fi
+              sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${SHA}|g" "$file"
+              echo "Updated $file"
             fi
           done
 
