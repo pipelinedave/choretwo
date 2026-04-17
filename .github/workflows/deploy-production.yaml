@@ -75,12 +75,11 @@ jobs:
           cd k3s-config
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add kustomize/choretwo/overlays/production/
+          git add kustomize/choretwo/base/
           
           if ! git diff --staged --quiet; then
             git commit -m "release: update choretwo images to ${{ steps.version.outputs.version }}"
-            git remote set-url origin "https://x-access-token:${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git"
-            git push origin main
+            git push https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git main
             echo "Image tags updated and pushed"
           else
             echo "No changes to commit"

@@ -65,8 +65,7 @@ jobs:
           
           if ! git diff --staged --quiet; then
             git commit -m "chore(staging): update choretwo images to ${{ steps.get-sha.outputs.sha }}"
-            git remote set-url origin "https://x-access-token:${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git"
-            git push origin main
+            git push https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git main
             echo "Image tags updated and pushed"
           else
             echo "No changes to commit"

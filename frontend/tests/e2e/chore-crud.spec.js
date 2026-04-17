@@ -19,26 +19,20 @@ test.describe('Chore CRUD + Undo Flow', () => {
     // Wait for page to stabilize
     await page.waitForTimeout(1000)
     
-    // Instead of clicking the FAB, directly set the Vue state
-    // This bypasses potential Vue reactivity issues in tests
+    // Instead of clicking the FAB, directly trigger the click event
     await page.evaluate(() => {
-      // Find the ChoresView component and set showAddForm to true
-      const app = document.getElementById('app')
-      if (app) {
-        // Trigger the click event manually
-        const fab = document.querySelector('[aria-label="Add chore"]')
-        if (fab) {
-          fab.dispatchEvent(new Event('click', { bubbles: true }))
-        }
+      const fab = document.querySelector('[aria-label="Add chore"]')
+      if (fab) {
+        fab.dispatchEvent(new Event('click', { bubbles: true }))
       }
     })
     
     // Wait for form
     await page.waitForSelector('.add-chore-form-overlay', { timeout: 10000 })
     
-    // Fill form
-    await page.fill('input[id="name"]', 'E2E Test Chore')
-    await page.selectOption('select[id="interval"]', '7 days')
+    // Fill form - use correct selectors (no id attributes)
+    await page.fill('input[placeholder*="dish"]', 'E2E Test Chore')
+    await page.selectOption('.add-chore-form-overlay select', '7 days')
     await page.click('button[type="submit"]')
     
     // Wait for form to close
