@@ -35,8 +35,7 @@ jobs:
         with:
           overlay: "staging"
           version_tag: ${{ steps.get-sha.outputs.sha }}
-        secrets:
-          K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+        secrets: inherit
 
   e2e-staging:
     name: E2E Tests on Staging

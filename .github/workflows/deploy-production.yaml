@@ -44,8 +44,7 @@ jobs:
         with:
           overlay: "production"
           version_tag: ${{ github.ref_name || github.sha }}
-        secrets:
-          K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+        secrets: inherit
 
   smoke-tests-production:
     name: Production Smoke Tests
