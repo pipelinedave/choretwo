@@ -139,49 +139,62 @@ make lint-frontend # eslint
 
 ### Build Images
 ```bash
-make build-all          # Build all images
-make build-auth         # Single service
-make push-all           # Push to DockerHub
+make build-all          # Build all service images
+make build-auth         # Build single service image
+make push-all           # Push all images to DockerHub
 ```
 
 ### Deploy Flow
-1. Push to main → GitHub Actions builds
-2. Flux reconciles (5min) → staging
-3. E2E tests on staging
-4. Manual approval
-5. Deploy production (tag-based)
+1. Push to main → GitHub Actions builds and pushes images to DockerHub
+2. GitHub Actions calls update-kubernetes-deployment workflow
+3. Workflow updates k3s-config repo (pipelinedave/k3s-config) with new image tags
+4. Flux reconciles from k3s-config repo (5min interval) → staging
+5. E2E tests run automatically on staging
+6. Manual approval required for production
+7. Deploy production via tag push (v*)
+
+### GitHub Secrets Required
+```
+DOCKERHUB_USERNAME=pipelinedave
+DOCKERHUB_TOKEN=<DockerHub token>
+K3S_CONFIG_TOKEN=<Personal Access Token with write access to k3s-config repo>
+```
 
 ### Flux Commands
 ```bash
-# Check status
+# Check Flux status (in k3s-config repo context)
 flux get kustomizations -n flux-system
 
-# Force reconcile
+# Force reconcile (in k3s-config repo context)
 flux reconcile kustomization choretwo-staging -n flux-system
 
 # Trace issues
 flux trace kustomization choretwo-staging -n flux-system
 ```
 
-## Kustomize Structure
+## Kustomize Structure (in k3s-config repo)
 ```
-k3s-config/kustomize/choretwo/
-├── base/
-│   ├── auth-service/
-│   ├── chore-service/
-│   ├── log-service/
-│   ├── notification-service/
-│   ├── ai-copilot-service/
-│   ├── frontend/
-│   ├── postgres/
-│   ├── redis/
-│   └── kustomization.yaml
-├── overlays/
-│   ├── staging/
-│   └── production/
-└── namespaces/
-    ├── choretwo-staging.yaml
-    └── choretwo-production.yaml
+k3s-config/ (https://github.com/pipelinedave/k3s-config)
+├── apps/
+│   ├── choretwo-staging.yaml      # Flux Kustomization for staging
+│   └── choretwo-production.yaml   # Flux Kustomization for production
+└── kustomize/choretwo/
+    ├── base/
+    │   ├── auth-service/
+    │   ├── chore-service/
+    │   ├── log-service/
+    │   ├── notification-service/
+    │   ├── ai-copilot-service/
+    │   ├── frontend/
+    │   ├── postgres/
+    │   ├── redis/
+    │   └── kustomization.yaml
+    ├── overlays/
+    │   ├── staging/
+    │   └── production/
+    └── namespaces/
+        ├── choretwo-staging.yaml
+        └── choretwo-production.yaml
 ```
 
 ## SealedSecrets

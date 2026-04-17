@@ -1,0 +1,71 @@
+name: Update Kubernetes Deployment Manifests
+on:
+  workflow_call:
+    inputs:
+      overlay:
+        description: 'Overlay to update (staging or production)'
+        required: true
+        type: string
+      version_tag:
+        description: 'Version tag for the deployment'
+        required: true
+        type: string
+    secrets:
+      K3S_CONFIG_TOKEN:
+        required: true
+
+jobs:
+  update-kubernetes-deployment:
+    runs-on: ubuntu-24.04
+    env:
+      K3S_REPO: "pipelinedave/k3s-config"
+      VERSION_TAG: ${{ inputs.version_tag }}
+      OVERLAY: ${{ inputs.overlay }}
+    steps:
+      - name: 📥 Checkout k3s-config Repo
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ env.K3S_REPO }}
+          token: ${{ secrets.K3S_CONFIG_TOKEN }}
+          ref: main
+          fetch-depth: 0
+
+      - name: 🔧 Ensure Up-to-date Main
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git pull --rebase origin main
+
+      - name: 🔧 Update All Service Image Tags
+        run: |
+          echo "Updating all choretwo service images to tag: ${VERSION_TAG}"
+          
+          # Update all service deployments in the overlay
+          find "kustomize/choretwo/overlays/${OVERLAY}/" -name "deployment.yaml" -type f | while read file; do
+            if grep -q "image: pipelinedave/" "$file"; then
+              # Extract service name from directory name
+              SERVICE_DIR=$(dirname "$file" | xargs basename)
+              if [ "$SERVICE_DIR" != "overlays" ]; then
+                sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${VERSION_TAG}|g" "$file"
+                echo "Updated $file"
+              fi
+            fi
+          done
+
+      - name: 💾 Commit & Push Changes
+        run: |
+          git remote set-url origin "https://x-access-token:${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git"
+          git add kustomize/choretwo/overlays/${OVERLAY}/
+          
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore(${OVERLAY}): update choretwo images to ${VERSION_TAG:0:7}"
+            git push origin HEAD:main
+            echo "Image tags updated and pushed to k3s-config repo"
+          fi
+
+      - name: 🏷️ Tag in k3s-config Repo
+        run: |
+          git tag "choretwo/${OVERLAY}/${{ env.VERSION_TAG }}"
+          git push origin "choretwo/${OVERLAY}/${{ env.VERSION_TAG }}" || echo "Tag may already exist"

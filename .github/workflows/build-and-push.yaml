@@ -14,23 +14,29 @@ env:
 
 jobs:
   build-and-push:
-    name: Build and Push ${{ matrix.service }}
+    name: Build and Push ${{ matrix.service.name }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         service:
           - name: auth-service
             context: ./services/auth-service
+            dockerfile: ./services/auth-service/Dockerfile
           - name: chore-service
             context: ./services/chore-service
+            dockerfile: ./services/chore-service/Dockerfile
           - name: log-service
             context: ./services/log-service
+            dockerfile: ./services/log-service/Dockerfile
           - name: notification-service
             context: ./services/notification-service
+            dockerfile: ./services/notification-service/Dockerfile
           - name: ai-copilot-service
             context: ./services/ai-copilot-service
-          - name: choretwo-frontend
+            dockerfile: ./services/ai-copilot-service/Dockerfile
+          - name: frontend
             context: ./frontend
+            dockerfile: ./frontend/Dockerfile.prod
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,33 +50,17 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
-
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
           context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:${{ github.sha }}
+            ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:latest
           cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:buildcache
           cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:buildcache,mode=max
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            BUILD_VERSION=${{ github.sha }}
-
-      - name: Image digest
-        run: echo ${{ steps.build.outputs.digest }}
 
   notify-build-complete:
     name: Notify Build Complete
@@ -87,4 +77,4 @@ jobs:
           echo "  - ${{ env.DOCKER_REGISTRY }}/log-service:${{ github.sha }}"
           echo "  - ${{ env.DOCKER_REGISTRY }}/notification-service:${{ github.sha }}"
           echo "  - ${{ env.DOCKER_REGISTRY }}/ai-copilot-service:${{ github.sha }}"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/choretwo-frontend:${{ github.sha }}"
+          echo "  - ${{ env.DOCKER_REGISTRY }}/frontend:${{ github.sha }}"

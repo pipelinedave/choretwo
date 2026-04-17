@@ -277,8 +277,9 @@ git push origin v1.0.1-rollback
 vim k3s-config/kustomize/choretwo/overlays/production/*.yaml
 
 # Update image tags to previous version
-# Commit and push
-git add k3s-config/
+# Commit and push to k3s-config repo
+cd /path/to/k3s-config
+git add kustomize/choretwo/
 git commit -m "chore: rollback to v1.0.0"
 git push origin main
 ```

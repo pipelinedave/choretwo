@@ -4,16 +4,63 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 env:
-  FLUX_NAMESPACE: flux-system
-  FLUX_KUSTOMIZATION: choretwo-production
   PRODUCTION_DOMAIN: choretwo.stillon.top
 
 jobs:
+  build-and-push:
+    name: Build and Push All Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: auth-service
+            context: ./services/auth-service
+            dockerfile: ./services/auth-service/Dockerfile
+          - name: chore-service
+            context: ./services/chore-service
+            dockerfile: ./services/chore-service/Dockerfile
+          - name: log-service
+            context: ./services/log-service
+            dockerfile: ./services/log-service/Dockerfile
+          - name: notification-service
+            context: ./services/notification-service
+            dockerfile: ./services/notification-service/Dockerfile
+          - name: ai-copilot-service
+            context: ./services/ai-copilot-service
+            dockerfile: ./services/ai-copilot-service/Dockerfile
+          - name: frontend
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile.prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: |
+            pipelinedave/${{ matrix.service.name }}:${{ github.ref_name }}
+            pipelinedave/${{ matrix.service.name }}:latest
+
   approve-production:
     name: Manual Approval for Production
     runs-on: ubuntu-latest
+    needs: build-and-push
     outputs:
       approved: ${{ steps.approval.outputs.approved }}
     steps:
@@ -27,59 +74,25 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: approve-production
+    needs: [approve-production, build-and-push]
     if: needs.approve-production.outputs.approved == 'true'
     environment: production
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Deploying version: $VERSION"
-
       - name: Install Flux CLI
         uses: fluxcd/flux2/action@main
         with:
           version: latest
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Update image tags in Kustomize (production)
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          echo "Updating production images to version: $VERSION"
-          
-          # Update all service images in k3s-config/kustomize/choretwo/overlays/production/
-          find k3s-config/kustomize/choretwo/overlays/production/ -name "*.yaml" -type f | while read file; do
-            if grep -q "image: pipelinedave/" "$file"; then
-              sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/$(basename $(dirname $file)):${VERSION}|g" "$file"
-            fi
-          done
-
-      - name: Commit and push production updates
-        run: |
-          git add k3s-config/kustomize/choretwo/overlays/production/
-          if ! git diff --staged --quiet; then
-            git commit -m "release(v${{ steps.version.outputs.version }}): deploy to production"
-            git push origin main
-            echo "Production image tags updated and pushed"
-          else
-            echo "No changes to commit"
-          fi
-
-      - name: Trigger Flux reconciliation
-        run: |
-          echo "Triggering Flux reconciliation for production..."
-          # Note: This requires flux CLI configured with cluster access
-          # flux reconcile kustomization ${{ env.FLUX_KUSTOMIZATION }} -n ${{ env.FLUX_NAMESPACE }}
-          echo "Flux will automatically reconcile within 5 minutes"
+      - name: Deploy to k3s-config
+        uses: ./.github/workflows/update-kubernetes-deployment.yml
+        with:
+          overlay: "production"
+          version_tag: ${{ github.ref_name }}
+        secrets:
+          K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
 
   smoke-tests-production:
     name: Production Smoke Tests
@@ -97,7 +110,7 @@ jobs:
           sleep 300
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: setup-node@v4
         with:
           node-version: "20"
           cache: 'npm'
