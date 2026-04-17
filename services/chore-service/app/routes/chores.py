@@ -73,6 +73,28 @@ async def add_chore(
     }
 
 
+@router.get("/archived")
+async def list_archived_chores(request: Request, db: Session = Depends(get_db)):
+    user_email = request.state.user_email
+    chores = get_archived_chores(db, user_email)
+
+    return [
+        ChoreResponse(
+            id=c.id,
+            name=c.name,
+            interval_days=c.interval_days,
+            due_date=c.due_date,
+            done=c.done,
+            done_by=c.done_by,
+            last_done=c.last_done,
+            owner_email=c.owner_email,
+            is_private=c.is_private,
+            archived=c.archived,
+        )
+        for c in chores
+    ]
+
+
 @router.get("/{chore_id}")
 async def get_single_chore(
     request: Request, chore_id: int, db: Session = Depends(get_db)
@@ -115,12 +137,12 @@ async def update_single_chore(
 
 @router.put("/{chore_id}/done")
 async def mark_chore_as_done(
-    request: Request, chore_id: int, db: Session = Depends(get_db)
+    request: Request, chore_id: int, db: Session = Depends(get_db), done_by: str = None
 ):
     user_email = request.state.user_email
 
     try:
-        chore = mark_chore_done(db, chore_id, user_email)
+        chore = mark_chore_done(db, chore_id, user_email, done_by)
         if not chore:
             raise HTTPException(status_code=404, detail="Chore not found")
 
@@ -147,26 +169,23 @@ async def archive_chore_endpoint(
     return {"message": f"Chore {chore_id} archived successfully"}
 
 
-@router.get("/archived")
-async def list_archived_chores(request: Request, db: Session = Depends(get_db)):
+@router.put("/{chore_id}/unarchive")
+async def unarchive_chore_endpoint(
+    request: Request, chore_id: int, db: Session = Depends(get_db)
+):
     user_email = request.state.user_email
-    chores = get_archived_chores(db, user_email)
+    chore = get_chore(db, chore_id, user_email)
 
-    return [
-        ChoreResponse(
-            id=c.id,
-            name=c.name,
-            interval_days=c.interval_days,
-            due_date=c.due_date,
-            done=c.done,
-            done_by=c.done_by,
-            last_done=c.last_done,
-            owner_email=c.owner_email,
-            is_private=c.is_private,
-            archived=c.archived,
-        )
-        for c in chores
-    ]
+    if not chore:
+        raise HTTPException(status_code=404, detail="Chore not found")
+
+    chore.archived = False
+    db.commit()
+    db.refresh(chore)
+
+    log_action(chore_id, user_email, "unarchived", {"chore_id": chore_id})
+
+    return {"message": f"Chore {chore_id} unarchived successfully"}
 
 
 @router.get("/count")

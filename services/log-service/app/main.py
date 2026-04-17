@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Depends
 
 from app.database import run_migrations
 from app.routes.logs import router as logs_router
-from app.middleware.auth import auth_middleware
+from app.middleware.auth import AuthMiddleware
 
 app = FastAPI(
     title="Log Service",
@@ -20,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(auth_middleware)
+app.add_middleware(AuthMiddleware)
 
 
 @app.on_event("startup")

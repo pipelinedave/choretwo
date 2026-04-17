@@ -28,31 +28,16 @@ export const useLogStore = defineStore('logs', () => {
     const log = logs.value.find(l => l.id === logId)
     if (!log) throw new Error('Log not found')
 
-    const authStore = useAuthStore()
-    
     try {
-      // Call the appropriate endpoint based on action type
-      if (log.action === 'chore:completed') {
-        await choreApi.put(`/${log.resource_id}/undone`, {
-          undone_by: authStore.user.email
-        })
-      } else if (log.action === 'chore:created') {
-        await choreApi.delete(`/${log.resource_id}`)
-      } else if (log.action === 'chore:updated') {
-        // Restore previous state
-        await choreApi.put(`/${log.resource_id}`, log.previous_state)
-      } else if (log.action === 'chore:archived') {
-        await choreApi.put(`/${log.resource_id}/unarchive`)
-      }
+      const response = await logApi.post('/undo', { log_id: logId })
 
-      // Remove log from list
       const index = logs.value.findIndex(l => l.id === logId)
       if (index !== -1) {
         logs.value.splice(index, 1)
       }
 
       lastAction.value = { type: 'undo', logId }
-      return true
+      return response.data
     } catch (err) {
       error.value = err.message || 'Failed to undo action'
       throw err

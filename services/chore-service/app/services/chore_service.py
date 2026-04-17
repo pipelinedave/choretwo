@@ -62,9 +62,11 @@ def create_chore(db: Session, chore_data: ChoreCreate, user_email: str) -> Chore
         user_email,
         "created",
         {
+            "id": chore.id,
             "name": chore.name,
             "interval_days": chore.interval_days,
             "due_date": chore.due_date.isoformat(),
+            "is_private": chore.is_private,
         },
     )
 
@@ -123,10 +125,19 @@ def update_chore(
     return chore
 
 
-def mark_chore_done(db: Session, chore_id: int, user_email: str) -> Optional[Chore]:
+def mark_chore_done(
+    db: Session, chore_id: int, user_email: str, done_by: str = None
+) -> Optional[Chore]:
     chore = get_chore(db, chore_id, user_email)
     if not chore:
         return None
+
+    if done_by == "undo":
+        chore.done = False
+        chore.done_by = None
+        db.commit()
+        db.refresh(chore)
+        return chore
 
     if chore.done:
         today = date.today()
@@ -139,7 +150,7 @@ def mark_chore_done(db: Session, chore_id: int, user_email: str) -> Optional[Cho
     new_due_date = calculate_next_due_date(chore, date.today())
 
     chore.done = True
-    chore.done_by = user_email
+    chore.done_by = done_by or user_email
     chore.due_date = new_due_date
     chore.last_done = date.today()
 
@@ -172,7 +183,7 @@ def archive_chore(db: Session, chore_id: int, user_email: str) -> Optional[Chore
     db.commit()
     db.refresh(chore)
 
-    log_action(chore.id, user_email, "archived", {"chore_id": chore.id})
+    log_action(chore.id, user_email, "archived", {"id": chore.id})
 
     return chore
 

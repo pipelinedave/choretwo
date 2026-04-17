@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, date
 from sqlalchemy import text
 
-from app.database import get_db
+from app.database import SessionLocal
 
 
 def log_action(chore_id, done_by, action_type, action_details=None):
@@ -17,19 +17,23 @@ def log_action(chore_id, done_by, action_type, action_details=None):
         f"Logging action for chore_id={chore_id}, action_type={action_type}, details={action_details_str}"
     )
 
+    db = SessionLocal()
     try:
-        db = next(get_db())
-        cur = db.cursor()
-        cur.execute(
-            """
-            INSERT INTO logs.chore_logs (chore_id, done_by, action_type, action_details)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (chore_id, done_by, action_type, action_details_str),
+        db.execute(
+            text(
+                "INSERT INTO logs.chore_logs (chore_id, done_by, action_type, action_details) VALUES (:chore_id, :done_by, :action_type, :action_details)"
+            ),
+            {
+                "chore_id": chore_id,
+                "done_by": done_by,
+                "action_type": action_type,
+                "action_details": action_details_str,
+            },
         )
         db.commit()
-        cur.close()
-        db.close()
         logging.info(f"Action logged successfully for action_type={action_type}")
     except Exception as e:
         logging.error(f"Error logging action for chore_id={chore_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
