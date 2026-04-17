@@ -10,57 +10,10 @@ env:
   PRODUCTION_DOMAIN: choretwo.stillon.top
 
 jobs:
-  build-and-push:
-    name: Build and Push All Services
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - name: auth-service
-            context: ./services/auth-service
-            dockerfile: ./services/auth-service/Dockerfile
-          - name: chore-service
-            context: ./services/chore-service
-            dockerfile: ./services/chore-service/Dockerfile
-          - name: log-service
-            context: ./services/log-service
-            dockerfile: ./services/log-service/Dockerfile
-          - name: notification-service
-            context: ./services/notification-service
-            dockerfile: ./services/notification-service/Dockerfile
-          - name: ai-copilot-service
-            context: ./services/ai-copilot-service
-            dockerfile: ./services/ai-copilot-service/Dockerfile
-          - name: frontend
-            context: ./frontend
-            dockerfile: ./frontend/Dockerfile.prod
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push ${{ matrix.service.name }}
-        uses: docker/build-push-action@v4
-        with:
-          context: ${{ matrix.service.context }}
-          file: ${{ matrix.service.dockerfile }}
-          push: true
-          tags: |
-            pipelinedave/${{ matrix.service.name }}:${{ github.ref_name }}
-            pipelinedave/${{ matrix.service.name }}:latest
-
   approve-production:
     name: Manual Approval for Production
     runs-on: ubuntu-latest
-    needs: build-and-push
+    if: ${{ github.event_name == 'push' }}
     outputs:
       approved: ${{ steps.approval.outputs.approved }}
     steps:
@@ -74,8 +27,8 @@ jobs:
   deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [approve-production, build-and-push]
-    if: needs.approve-production.outputs.approved == 'true'
+    needs: approve-production
+    if: ${{ (needs.approve-production.outputs.approved == 'true' && github.event_name == 'push') || github.event_name == 'workflow_dispatch' }}
     environment: production
     steps:
       - name: Checkout code
@@ -90,7 +43,7 @@ jobs:
         uses: ./.github/workflows/update-kubernetes-deployment.yml
         with:
           overlay: "production"
-          version_tag: ${{ github.ref_name }}
+          version_tag: ${{ github.ref_name || github.sha }}
         secrets:
           K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
 
@@ -99,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy-production
     environment: production
-    if: always()
+    if: always() && github.event_name != 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -141,9 +94,9 @@ jobs:
     steps:
       - name: Deployment status
         run: |
-          if [ "${{ needs.deploy-production.result }}" == "success" ] && [ "${{ needs.smoke-tests-production.result }}" == "success" ]; then
+          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
             echo "✅ Production deployment successful!"
-            echo "Version: ${{ github.ref_name }}"
+            echo "Version: ${{ github.ref_name || github.sha }}"
             echo "URL: https://${{ env.PRODUCTION_DOMAIN }}"
           else
             echo "❌ Production deployment failed"

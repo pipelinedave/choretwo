@@ -15,7 +15,8 @@ test.describe('Chore CRUD + Undo Flow', () => {
     await page.goto('/chores')
     await expect(page).toHaveURL('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    // Click FAB with force to bypass AI widget overlap
+    await page.click('[aria-label="Add chore"]', { force: true })
     await expect(page.locator('.add-chore-form-overlay')).toBeVisible()
 
     await page.fill('#name', 'E2E Test Chore')

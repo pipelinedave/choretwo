@@ -57,6 +57,8 @@ kubeconfig.yaml
 htmlcov/
 .pytest_cache/
 .tox/
+frontend/test-results/
+frontend/playwright-report/
 
 # Documentation
 docs/_build/

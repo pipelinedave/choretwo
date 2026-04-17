@@ -24,7 +24,7 @@ test.describe('Authentication Login Flow', () => {
     await page.goto('/login')
     await page.click('.btn-login')
     
-    await expect(page).toHaveURL('/api/auth/mock-login-page')
+    await page.waitForURL(/mock-login-page/)
     
     await page.click('button[type="submit"]')
     
@@ -37,7 +37,7 @@ test.describe('Authentication Login Flow', () => {
     await page.waitForURL('/', { timeout: 15000 })
     await expect(page).toHaveURL('/')
     
-    await expect(page.locator('.view-container h1')).toContainText('Welcome back')
+    await expect(page.locator('text=Welcome back')).toBeVisible()
   })
 
   test('should store token in localStorage after login', async ({ page }) => {
