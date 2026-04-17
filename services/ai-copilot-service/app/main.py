@@ -39,8 +39,6 @@ async def auth_middleware(request: Request, call_next):
 async def startup_event():
     run_migrations()
     # Initialize Ollama client
-    from app.routes.ai import ollama_client
-
     ollama_client._OllamaClient__client = OllamaClient()
 
 
