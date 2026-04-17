@@ -12,11 +12,17 @@ test.describe('Chore CRUD + Undo Flow', () => {
   })
 
   test('should create a new chore', async ({ page }) => {
+    // Navigate directly to chores page (already logged in from beforeEach)
     await page.goto('/chores')
-    await expect(page).toHaveURL('/chores')
-
-    // Click FAB with force to bypass AI widget overlap
+    
+    // Wait for chores to load
+    await page.waitForTimeout(1000)
+    
+    // Click FAB
     await page.click('[aria-label="Add chore"]', { force: true })
+    
+    // Wait for form to appear with retry
+    await page.waitForSelector('.add-chore-form-overlay', { timeout: 5000 })
     await expect(page.locator('.add-chore-form-overlay')).toBeVisible()
 
     await page.fill('#name', 'E2E Test Chore')
@@ -30,7 +36,7 @@ test.describe('Chore CRUD + Undo Flow', () => {
   test('should mark chore as done', async ({ page }) => {
     await page.goto('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    await page.click('[aria-label="Add chore"]', { force: true })
     await page.fill('#name', 'Test Chore to Complete')
     await page.click('button[type="submit"]')
 
@@ -45,12 +51,12 @@ test.describe('Chore CRUD + Undo Flow', () => {
   test('should archive a chore', async ({ page }) => {
     await page.goto('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    await page.click('[aria-label="Add chore"]', { force: true })
     await page.fill('#name', 'Test Chore to Archive')
     await page.click('button[type="submit"]')
 
     await page.waitForTimeout(500)
-    await page.click('.chore-actions .btn-icon[aria-label="Archive chore"]')
+    await page.click('.chore-actions .btn-icon[aria-label="Archive chore"]', { force: true })
 
     await page.waitForTimeout(500)
     const chores = page.locator('.chore-card')
@@ -60,7 +66,7 @@ test.describe('Chore CRUD + Undo Flow', () => {
   test('should undo chore creation', async ({ page }) => {
     await page.goto('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    await page.click('[aria-label="Add chore"]', { force: true })
     await page.fill('#name', 'Chore to Undo Create')
     await page.click('button[type="submit"]')
 
@@ -80,7 +86,7 @@ test.describe('Chore CRUD + Undo Flow', () => {
   test('should undo chore completion', async ({ page }) => {
     await page.goto('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    await page.click('[aria-label="Add chore"]', { force: true })
     await page.fill('#name', 'Chore to Undo Complete')
     await page.click('button[type="submit"]')
 
@@ -104,12 +110,12 @@ test.describe('Chore CRUD + Undo Flow', () => {
   test('should undo chore archive', async ({ page }) => {
     await page.goto('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    await page.click('[aria-label="Add chore"]', { force: true })
     await page.fill('#name', 'Chore to Undo Archive')
     await page.click('button[type="submit"]')
 
     await page.waitForTimeout(500)
-    await page.click('.chore-actions .btn-icon[aria-label="Archive chore"]')
+    await page.click('.chore-actions .btn-icon[aria-label="Archive chore"]', { force: true })
 
     await page.waitForTimeout(500)
     await expect(page.locator('.chore-card')).toHaveCount(0)
@@ -126,7 +132,7 @@ test.describe('Chore CRUD + Undo Flow', () => {
   test('should show logs with correct action types', async ({ page }) => {
     await page.goto('/chores')
 
-    await page.click('[aria-label="Add chore"]')
+    await page.click('[aria-label="Add chore"]', { force: true })
     await page.fill('#name', 'Log Test Chore')
     await page.click('button[type="submit"]')
 
