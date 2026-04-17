@@ -46,6 +46,7 @@ const logClass = computed(() => {
   if (action.includes('created')) return 'log-created'
   if (action.includes('updated')) return 'log-updated'
   if (action.includes('archived')) return 'log-archived'
+  if (action.includes('unarchived')) return 'log-unarchived'
   return ''
 })
 
@@ -55,6 +56,7 @@ const logIcon = computed(() => {
   if (action.includes('created')) return 'mdi-plus-circle'
   if (action.includes('updated')) return 'mdi-pencil-circle'
   if (action.includes('archived')) return 'mdi-archive'
+  if (action.includes('unarchived')) return 'mdi-archive-open'
   if (action.includes('deleted')) return 'mdi-delete'
   return 'mdi-history'
 })
@@ -65,7 +67,9 @@ const actionText = computed(() => {
   if (action.includes('created')) return 'created'
   if (action.includes('updated')) return 'updated'
   if (action.includes('archived')) return 'archived'
+  if (action.includes('unarchived')) return 'unarchived'
   if (action.includes('deleted')) return 'deleted'
+  if (action.includes('undo')) return 'undid'
   return 'did something to'
 })
 
@@ -132,6 +136,11 @@ function handleUndo() {
 .log-item-icon.log-archived {
   background-color: var(--md-sys-color-outline);
   color: white;
+}
+
+.log-item-icon.log-unarchived {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
 }
 
 .log-item-content {
