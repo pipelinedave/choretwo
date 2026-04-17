@@ -21,7 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Get commit SHA from build workflow
+      - name: Get commit SHA
         id: get-sha
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -30,12 +30,48 @@ jobs:
             echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Deploy to k3s-config
-        uses: ./.github/workflows/update-kubernetes-deployment.yml
+      - name: Install Flux CLI
+        uses: fluxcd/flux2/action@main
         with:
-          overlay: "staging"
-          version_tag: ${{ steps.get-sha.outputs.sha }}
-        secrets: inherit
+          version: latest
+
+      - name: Checkout k3s-config repo
+        uses: actions/checkout@v4
+        with:
+          repository: pipelinedave/k3s-config
+          token: ${{ secrets.K3S_CONFIG_TOKEN }}
+          path: k3s-config
+
+      - name: Update image tags
+        run: |
+          SHA=${{ steps.get-sha.outputs.sha }}
+          echo "Updating staging images to sha: $SHA"
+          
+          find k3s-config/kustomize/choretwo/overlays/staging/ -name "deployment.yaml" -type f | while read file; do
+            if grep -q "image: pipelinedave/" "$file"; then
+              SERVICE_DIR=$(dirname "$file" | xargs basename)
+              if [ "$SERVICE_DIR" != "overlays" ] && [ "$SERVICE_DIR" != "staging" ]; then
+                sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${SHA}|g" "$file"
+                echo "Updated $file"
+              fi
+            fi
+          done
+
+      - name: Commit and push
+        run: |
+          cd k3s-config
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add kustomize/choretwo/overlays/staging/
+          
+          if ! git diff --staged --quiet; then
+            git commit -m "chore(staging): update choretwo images to ${{ steps.get-sha.outputs.sha }}"
+            git remote set-url origin "https://x-access-token:${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git"
+            git push origin main
+            echo "Image tags updated and pushed"
+          else
+            echo "No changes to commit"
+          fi
 
   e2e-staging:
     name: E2E Tests on Staging

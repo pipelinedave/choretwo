@@ -39,12 +39,52 @@ jobs:
         with:
           version: latest
 
-      - name: Deploy to k3s-config
-        uses: ./.github/workflows/update-kubernetes-deployment.yml
+      - name: Checkout k3s-config repo
+        uses: actions/checkout@v4
         with:
-          overlay: "production"
-          version_tag: ${{ github.ref_name || github.sha }}
-        secrets: inherit
+          repository: pipelinedave/k3s-config
+          token: ${{ secrets.K3S_CONFIG_TOKEN }}
+          path: k3s-config
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update image tags
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          echo "Updating production images to version: $VERSION"
+          
+          find k3s-config/kustomize/choretwo/overlays/production/ -name "deployment.yaml" -type f | while read file; do
+            if grep -q "image: pipelinedave/" "$file"; then
+              SERVICE_DIR=$(dirname "$file" | xargs basename)
+              if [ "$SERVICE_DIR" != "overlays" ] && [ "$SERVICE_DIR" != "production" ]; then
+                sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${VERSION}|g" "$file"
+                echo "Updated $file"
+              fi
+            fi
+          done
+
+      - name: Commit and push
+        run: |
+          cd k3s-config
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add kustomize/choretwo/overlays/production/
+          
+          if ! git diff --staged --quiet; then
+            git commit -m "release: update choretwo images to ${{ steps.version.outputs.version }}"
+            git remote set-url origin "https://x-access-token:${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git"
+            git push origin main
+            echo "Image tags updated and pushed"
+          else
+            echo "No changes to commit"
+          fi
 
   smoke-tests-production:
     name: Production Smoke Tests
@@ -95,7 +135,7 @@ jobs:
         run: |
           if [ "${{ needs.deploy-production.result }}" == "success" ]; then
             echo "✅ Production deployment successful!"
-            echo "Version: ${{ github.ref_name || github.sha }}"
+            echo "Version: ${{ steps.version.outputs.version || github.ref_name }}"
             echo "URL: https://${{ env.PRODUCTION_DOMAIN }}"
           else
             echo "❌ Production deployment failed"
