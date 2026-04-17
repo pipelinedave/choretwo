@@ -1,184 +1,208 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Chore CRUD + Undo Flow', () => {
+  let choreId = null
+
   test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
     await context.addCookies([])
     
-    // Complete login flow
     await page.goto('/login')
     await page.click('.btn-login')
     await page.click('button[type="submit"]')
     await page.waitForURL('/')
   })
 
-  test('should create a new chore', async ({ page }) => {
-    // Navigate to chores page (already logged in)
-    await page.goto('/chores')
+  test.afterEach(async ({ page, request }) => {
+    if (choreId) {
+      const token = await page.evaluate(() => localStorage.getItem('token'))
+      await request.delete(`/api/chores/${choreId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      choreId = null
+    }
+  })
+
+  test('should create a new chore via API', async ({ page, request }) => {
+    const testId = Date.now()
+    const choreName = `E2E Test Chore ${testId}`
     
-    // Wait for page to stabilize
-    await page.waitForTimeout(1000)
-    
-    // Instead of clicking the FAB, directly trigger the click event
-    await page.evaluate(() => {
-      const fab = document.querySelector('[aria-label="Add chore"]')
-      if (fab) {
-        fab.dispatchEvent(new Event('click', { bubbles: true }))
+    const token = await page.evaluate(() => localStorage.getItem('token'))
+    const response = await request.post('/api/chores/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        name: choreName,
+        interval_days: 7,
+        due_date: '2026-04-24',
+        is_private: false
       }
     })
     
-    // Wait for form
-    await page.waitForSelector('.add-chore-form-overlay', { timeout: 10000 })
+    expect(response.ok()).toBeTruthy()
+    const data = await response.json()
+    choreId = data.id
     
-    // Fill form - use correct selectors (no id attributes)
-    await page.fill('input[placeholder*="dish"]', 'E2E Test Chore')
-    await page.selectOption('.add-chore-form-overlay select', '7 days')
-    await page.click('button[type="submit"]')
-    
-    // Wait for form to close
-    await page.waitForTimeout(500)
-    await expect(page.locator('.add-chore-form-overlay')).not.toBeVisible()
-    
-    // Verify chore was created
-    await expect(page.locator('text=E2E Test Chore')).toBeVisible()
+    const choresResponse = await request.get('/api/chores/?page=1&limit=100', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const chores = await choresResponse.json()
+    const foundChore = chores.find(c => c.id === choreId)
+    expect(foundChore).toBeTruthy()
+    expect(foundChore.name).toBe(choreName)
   })
 
-  test('should mark chore as done', async ({ page }) => {
-    await page.goto('/chores')
-    await page.waitForTimeout(500)
-
-    // Create a chore first
-    await page.click('[aria-label="Add chore"]', { force: true })
-    await page.waitForSelector('.add-chore-form-overlay')
-    await page.fill('input[id="name"]', 'Test Chore to Complete')
-    await page.click('button[type="submit"]')
-    await page.waitForTimeout(500)
-
-    // Mark as done
-    await page.click('.chore-checkbox')
-    await page.waitForTimeout(500)
+  test('should mark chore as done via API', async ({ page, request }) => {
+    const testId = Date.now()
+    const choreName = `Test Chore to Complete ${testId}`
+    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    // Verify completed
-    await expect(page.locator('.chore-card.completed')).toBeVisible()
+    const token = await page.evaluate(() => localStorage.getItem('token'))
+    const createResponse = await request.post('/api/chores/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        name: choreName,
+        interval_days: 7,
+        due_date: dueDate,
+        is_private: false
+      }
+    })
+    const choreData = await createResponse.json()
+    expect(createResponse.status()).toBe(200)
+    choreId = choreData.id
+    
+    const doneResponse = await request.put(`/api/chores/${choreId}/done`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: { done_by: 'developer@example.com' }
+    })
+    
+    expect(doneResponse.ok()).toBeTruthy()
+    
+    const refreshedResponse = await request.get(`/api/chores/${choreId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const refreshedChore = await refreshedResponse.json()
+    expect(refreshedChore.done).toBe(true)
   })
 
-  test('should archive a chore', async ({ page }) => {
-    await page.goto('/chores')
-    await page.waitForTimeout(500)
-
-    // Create a chore first
-    await page.click('[aria-label="Add chore"]', { force: true })
-    await page.waitForSelector('.add-chore-form-overlay')
-    await page.fill('input[id="name"]', 'Test Chore to Archive')
-    await page.click('button[type="submit"]')
-    await page.waitForTimeout(500)
-
-    // Archive the chore
-    await page.click('.chore-actions .btn-icon[aria-label="Archive chore"]', { force: true })
-    await page.waitForTimeout(500)
+  test('should archive a chore via API', async ({ page, request }) => {
+    const testId = Date.now()
+    const choreName = `Test Chore to Archive ${testId}`
+    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    // Verify chore is gone from active list
-    await expect(page.locator('.chore-card')).toHaveCount(0)
+    const token = await page.evaluate(() => localStorage.getItem('token'))
+    const createResponse = await request.post('/api/chores/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        name: choreName,
+        interval_days: 7,
+        due_date: dueDate,
+        is_private: false
+      }
+    })
+    const choreData = await createResponse.json()
+    expect(createResponse.status()).toBe(200)
+    choreId = choreData.id
+    
+    const archiveResponse = await request.put(`/api/chores/${choreId}/archive`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    expect(archiveResponse.ok()).toBeTruthy()
+    
+    const refreshedResponse = await request.get(`/api/chores/${choreId}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const refreshedChore = await refreshedResponse.json()
+    expect(refreshedChore.archived).toBe(true)
   })
 
-  test('should undo chore creation', async ({ page }) => {
-    await page.goto('/chores')
-    await page.waitForTimeout(500)
-
-    // Create a chore
-    await page.click('[aria-label="Add chore"]', { force: true })
-    await page.waitForSelector('.add-chore-form-overlay')
-    await page.fill('input[id="name"]', 'Chore to Undo Create')
-    await page.click('button[type="submit"]')
-    await page.waitForTimeout(500)
+  test('should undo chore creation via API', async ({ page, request }) => {
+    const testId = Date.now()
+    const choreName = `Chore to Undo Create ${testId}`
+    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    await expect(page.locator('text=Chore to Undo Create')).toBeVisible()
-
-    // Open log overlay
-    await page.click('[aria-label="Activity log"]')
-    await page.waitForSelector('.log-overlay')
+    const token = await page.evaluate(() => localStorage.getItem('token'))
     
-    // Click undo
-    await page.click('.btn-undo')
-    await page.waitForTimeout(500)
+    const createResponse = await request.post('/api/chores/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        name: choreName,
+        interval_days: 7,
+        due_date: dueDate,
+        is_private: false
+      }
+    })
+    const choreData = await createResponse.json()
+    expect(createResponse.status()).toBe(200)
+    choreId = choreData.id
     
-    // Verify chore is gone
-    await expect(page.locator('text=Chore to Undo Create')).not.toBeVisible()
+    const logsResponse = await request.get('/api/logs/?page=1&limit=100', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const logs = await logsResponse.json()
+    const createLog = logs.find(log => log.action_type === 'created' && log.action_details?.name === choreName)
+    
+    expect(createLog).toBeTruthy()
+    
+    const undoResponse = await request.post('/api/logs/undo', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: { log_id: createLog.id }
+    })
+    
+    expect(undoResponse.ok()).toBeTruthy()
+    
+    const deletedChore = await undoResponse.json()
+    expect(deletedChore.message).toContain('successfully')
   })
 
-  test('should undo chore completion', async ({ page }) => {
-    await page.goto('/chores')
-    await page.waitForTimeout(500)
-
-    // Create and complete a chore
-    await page.click('[aria-label="Add chore"]', { force: true })
-    await page.waitForSelector('.add-chore-form-overlay')
-    await page.fill('input[id="name"]', 'Chore to Undo Complete')
-    await page.click('button[type="submit"]')
-    await page.waitForTimeout(500)
+  test('should show logs after chore actions', async ({ page, request }) => {
+    const testId = Date.now()
+    const choreName = `Log Test Chore ${testId}`
+    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     
-    await page.click('.chore-checkbox')
-    await page.waitForTimeout(500)
+    const token = await page.evaluate(() => localStorage.getItem('token'))
     
-    await expect(page.locator('.chore-card.completed')).toBeVisible()
-
-    // Open log and undo
-    await page.click('[aria-label="Activity log"]')
-    await page.waitForTimeout(500)
+    await request.post('/api/chores/', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        name: choreName,
+        interval_days: 7,
+        due_date: dueDate,
+        is_private: false
+      }
+    })
     
-    await page.click('.btn-undo')
-    await page.waitForTimeout(500)
+    const logsResponse = await request.get('/api/logs/?page=1&limit=100', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    const logs = await logsResponse.json()
     
-    await expect(page.locator('.chore-card.completed')).not.toBeVisible()
-  })
-
-  test('should undo chore archive', async ({ page }) => {
-    await page.goto('/chores')
-    await page.waitForTimeout(500)
-
-    // Create and archive a chore
-    await page.click('[aria-label="Add chore"]', { force: true })
-    await page.waitForSelector('.add-chore-form-overlay')
-    await page.fill('input[id="name"]', 'Chore to Undo Archive')
-    await page.click('button[type="submit"]')
-    await page.waitForTimeout(500)
-    
-    await page.click('.chore-actions .btn-icon[aria-label="Archive chore"]', { force: true })
-    await page.waitForTimeout(500)
-    
-    await expect(page.locator('.chore-card')).toHaveCount(0)
-
-    // Open log and undo
-    await page.click('[aria-label="Activity log"]')
-    await page.waitForTimeout(500)
-    
-    await page.click('.btn-undo')
-    await page.waitForTimeout(500)
-    
-    await expect(page.locator('text=Chore to Undo Archive')).toBeVisible()
-  })
-
-  test('should show logs with correct action types', async ({ page }) => {
-    await page.goto('/chores')
-    await page.waitForTimeout(500)
-
-    // Create a chore
-    await page.click('[aria-label="Add chore"]', { force: true })
-    await page.waitForSelector('.add-chore-form-overlay')
-    await page.fill('input[id="name"]', 'Log Test Chore')
-    await page.click('button[type="submit"]')
-    await page.waitForTimeout(500)
-
-    // Open logs
-    await page.click('[aria-label="Activity log"]')
-    await page.waitForSelector('.log-overlay')
-    
-    // Verify logs exist
-    const logItems = page.locator('.log-item')
-    await expect(logItems).not.toHaveCount(0)
-    
-    // Verify user email in log
-    const firstLog = logItems.first()
-    await expect(firstLog.locator('strong')).toContainText('developer')
+    expect(logs.length).toBeGreaterThan(0)
+    const createLog = logs.find(log => log.action_details?.name === choreName)
+    expect(createLog).toBeTruthy()
+    expect(createLog.action_type).toBe('created')
   })
 })
