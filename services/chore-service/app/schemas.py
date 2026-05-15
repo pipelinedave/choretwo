@@ -18,6 +18,9 @@ class ChoreUpdate(BaseModel):
     name: Optional[str] = None
     interval_days: Optional[int] = Field(None, ge=1)
     due_date: Optional[date] = None
+    done: Optional[bool] = None
+    last_done: Optional[date] = None
+    done_by: Optional[str] = None
 
 
 class ChoreResponse(BaseModel):

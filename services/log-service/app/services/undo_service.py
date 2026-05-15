@@ -56,10 +56,14 @@ async def undo_action(log_id: int, user_email: str, db: Session) -> dict:
         chore_id = action_details.get("chore_id")
         if chore_id:
             async with httpx.AsyncClient(timeout=10.0) as client:
+                payload = {"done": False, "last_done": None, "done_by": None}
+                previous_due_date = action_details.get("previous_due_date")
+                if previous_due_date:
+                    payload["due_date"] = previous_due_date
                 await client.put(
-                    f"{chore_service_url}/chores/{chore_id}/done",
+                    f"{chore_service_url}/chores/{chore_id}",
                     headers={"X-User-Email": user_email},
-                    params={"done_by": "undo"},
+                    json=payload,
                 )
 
     elif action_type == "archived":
