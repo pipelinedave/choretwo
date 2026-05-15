@@ -5,19 +5,35 @@
     :class="{ 
       'completed': chore.done,
       'overdue': isOverdue,
-      'priority-high': chore.priority === 'high' && !chore.done,
-      'priority-medium': chore.priority === 'medium' && !chore.done,
-      'priority-low': chore.priority === 'low' && !chore.done
+      'swiping-right': swipeDirection === 'right',
+      'swiping-left': swipeDirection === 'left',
+      'swiping-down': swipeDirection === 'down'
     }"
+    :style="dragStyle"
   >
-    <!-- Swipe feedback overlay -->
-    <div class="swipe-feedback" :class="swipeDirection">
-      <span class="mdi" :class="swipeIcon"></span>
+    <!-- Swipe actions overlay -->
+    <div 
+      v-show="swipeDirection" 
+      class="swipe-actions-overlay"
+    >
+      <div class="swipe-action action-done" :class="{ active: swipeDirection === 'right' }" @click.stop="handleToggle">
+        <span class="mdi mdi-check-circle"></span>
+        <span>Mark Done</span>
+      </div>
+      <div class="swipe-action action-edit" :class="{ active: swipeDirection === 'left' }" @click.stop="handleEdit">
+        <span class="mdi mdi-pencil"></span>
+        <span>Edit</span>
+      </div>
+      <div class="swipe-action action-archive" :class="{ active: swipeDirection === 'down' }" @click.stop="handleArchive">
+        <span class="mdi mdi-archive"></span>
+        <span>Archive</span>
+      </div>
     </div>
     
     <!-- Card content -->
     <div class="chore-card-content" @click="handleClick">
-      <div class="chore-checkbox" 
+      <div 
+        class="chore-checkbox" 
         :class="{ checked: chore.done }"
         @click.stop="toggleDone"
       >
@@ -45,43 +61,51 @@
           </span>
         </div>
       </div>
-      
-      <div class="chore-actions">
-        <button 
-          @click.stop="handleEdit"
-          class="btn-icon"
-          aria-label="Edit chore"
-        >
-          <span class="mdi mdi-pencil"></span>
-        </button>
-        <button 
-          @click.stop="handleArchive"
-          class="btn-icon"
-          aria-label="Archive chore"
-        >
-          <span class="mdi mdi-archive"></span>
-        </button>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import Hammer from 'hammerjs'
 
 const props = defineProps({
-  chore: {
-    type: Object,
-    required: true
-  }
+  chore: { type: Object, required: true }
 })
 
 const emit = defineEmits(['edit', 'archive', 'toggle'])
 
 const cardRef = ref(null)
+const startX = ref(0)
+const startY = ref(0)
+const currentX = ref(0)
+const currentY = ref(0)
+const isPointerDown = ref(false)
 const swipeDirection = ref('')
-let hammerInstance = null
+
+const threshold = 80
+const minSwipeDistance = 50
+
+const dragStyle = computed(() => {
+  if (!swipeDirection.value) return {}
+  if (!isPointerDown.value) return {
+    transform: `translateX(${getTranslateX() * 1.5}px)`,
+    transition: 'transform 0.2s ease-out',
+    opacity: 0.7
+  }
+  
+  const rotation = Math.max(-15, Math.min(15, currentX.value * 0.01))
+  return {
+    transform: `translateX(${currentX.value}px) translateY(${currentY.value}px) rotate(${rotation}deg)`,
+    transition: 'none',
+    boxShadow: `0 8px 24px rgba(0,0,0,0.2)`
+  }
+})
+
+function getTranslateX() {
+  if (swipeDirection.value === 'right') return threshold
+  if (swipeDirection.value === 'left') return -threshold
+  return 0
+}
 
 const isOverdue = computed(() => {
   if (props.chore.done || !props.chore.dueDate) return false
@@ -96,55 +120,163 @@ const dueClass = computed(() => {
   return diffDays <= 2 ? 'due-soon' : 'due-later'
 })
 
-const swipeIcon = computed(() => {
-  switch (swipeDirection.value) {
-    case 'right': return 'mdi-check-circle'
-    case 'left': return 'mdi-pencil-circle'
-    case 'down': return 'mdi-archive-circle'
-    default: return ''
-  }
-})
-
-onMounted(() => {
-  if (cardRef.value) {
-    hammerInstance = new Hammer(cardRef.value)
-    hammerInstance.on('swiperight', handleSwipeRight)
-    hammerInstance.on('swipeleft', handleSwipeLeft)
-    hammerInstance.on('swipedown', handleSwipeDown)
-  }
-})
-
-onUnmounted(() => {
-  if (hammerInstance) {
-    hammerInstance.destroy()
-  }
-})
-
-function handleSwipeRight() {
-  swipeDirection.value = 'right'
-  setTimeout(() => {
-    swipeDirection.value = ''
-    emit('toggle', props.chore.id)
-  }, 200)
+function handleMouseDown(e) {
+  if (e.target.closest('.chore-checkbox')) return
+  if (e.target.closest('.swipe-action')) return
+  
+  isPointerDown.value = true
+  startX.value = e.clientX
+  startY.value = e.clientY
+  currentX.value = 0
+  currentY.value = 0
+  swipeDirection.value = ''
 }
 
-function handleSwipeLeft() {
-  swipeDirection.value = 'left'
-  setTimeout(() => {
-    swipeDirection.value = ''
-    emit('edit', props.chore.id)
-  }, 200)
+function handleMouseMove(e) {
+  if (!isPointerDown.value) return
+  
+  const deltaX = e.clientX - startX.value
+  const deltaY = e.clientY - startY.value
+  
+  currentX.value = deltaX
+  currentY.value = deltaY
+  
+  // Determine direction once we've moved enough
+  if (!swipeDirection.value) {
+    const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    if (totalDelta < 15) return
+    
+    if (Math.abs(deltaY) > Math.abs(deltaX) * 2.5 && deltaY > 20) {
+      swipeDirection.value = 'down'
+    } else if (Math.abs(deltaX) > Math.abs(deltaY) * 2.5) {
+      swipeDirection.value = deltaX > 0 ? 'right' : 'left'
+    } else {
+      // Too diagonal - wait for more movement
+      return
+    }
+  }
+  
+  if (swipeDirection.value) {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (swipeDirection.value === 'right' || swipeDirection.value === 'left') {
+      currentX.value = Math.max(Math.min(deltaX, threshold * 2), -threshold * 2)
+      currentY.value = 0
+    } else if (swipeDirection.value === 'down') {
+      currentY.value = Math.max(Math.min(deltaY, threshold * 2), 0)
+      currentX.value = 0
+    }
+  }
 }
 
-function handleSwipeDown() {
-  swipeDirection.value = 'down'
+function handleMouseUp(e) {
+  if (!isPointerDown.value) return
+  isPointerDown.value = false
+  
+  const totalDelta = Math.sqrt(currentX.value * currentX.value + currentY.value * currentY.value)
+  
+  if (totalDelta >= minSwipeDistance) {
+    commitSwipe()
+  } else {
+    swipeDirection.value = ''
+  }
+}
+
+function handleTouchStart(e) {
+  const target = e.target
+  if (target.closest('.chore-checkbox')) return
+  if (target.closest('.swipe-action')) return
+  
+  const touch = e.touches[0]
+  startX.value = touch.clientX
+  startY.value = touch.clientY
+  isPointerDown.value = true
+  currentX.value = 0
+  currentY.value = 0
+  swipeDirection.value = ''
+}
+
+function handleTouchMove(e) {
+  if (!isPointerDown.value) return
+  
+  const touch = e.touches[0]
+  const deltaX = touch.clientX - startX.value
+  const deltaY = touch.clientY - startY.value
+  
+  currentX.value = deltaX
+  currentY.value = deltaY
+  
+  if (!swipeDirection.value) {
+    const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    if (totalDelta < 15) return
+    
+    if (Math.abs(deltaY) > Math.abs(deltaX) * 2.5 && deltaY > 20) {
+      swipeDirection.value = 'down'
+    } else if (Math.abs(deltaX) > Math.abs(deltaY) * 2.5) {
+      swipeDirection.value = deltaX > 0 ? 'right' : 'left'
+    } else {
+      return
+    }
+  }
+  
+  if (swipeDirection.value) {
+    if (swipeDirection.value === 'down') {
+      e.preventDefault()
+    }
+    
+    if (swipeDirection.value === 'right' || swipeDirection.value === 'left') {
+      currentX.value = Math.max(Math.min(deltaX, threshold * 2), -threshold * 2)
+      currentY.value = 0
+    } else if (swipeDirection.value === 'down') {
+      currentY.value = Math.max(Math.min(deltaY, threshold * 2), 0)
+      currentX.value = 0
+    }
+  }
+}
+
+function handleTouchEnd(e) {
+  if (!isPointerDown.value) return
+  isPointerDown.value = false
+  
+  e.preventDefault()
+  e.stopPropagation()
+  
+  const totalDelta = Math.sqrt(currentX.value * currentX.value + currentY.value * currentY.value)
+  
+  if (totalDelta >= minSwipeDistance) {
+    commitSwipe()
+  } else {
+    swipeDirection.value = ''
+  }
+}
+
+function commitSwipe() {
+  const choreId = props.chore.id
+  
+  if (swipeDirection.value === 'right') {
+    currentX.value = 400
+    emit('toggle', choreId)
+  } else if (swipeDirection.value === 'left') {
+    currentX.value = -400
+    emit('edit', choreId)
+  } else if (swipeDirection.value === 'down') {
+    currentY.value = 400
+    emit('archive', choreId)
+  }
+  
   setTimeout(() => {
     swipeDirection.value = ''
-    emit('archive', props.chore.id)
-  }, 200)
+    currentX.value = 0
+    currentY.value = 0
+  }, 300)
 }
 
 function toggleDone() {
+  emit('toggle', props.chore.id)
+}
+
+function handleToggle() {
   emit('toggle', props.chore.id)
 }
 
@@ -156,49 +288,57 @@ function handleArchive() {
   emit('archive', props.chore.id)
 }
 
-function handleClick() {
-  // Optional: handle card click
+function handleClick(e) {
+  if (swipeDirection.value) {
+    e.stopPropagation()
+    return
+  }
+  // Normal click handling if needed
 }
 
 function formatInterval(interval) {
   if (!interval) return ''
+  const match = interval.match(/^(\d+)\s*days?$/)
+  if (!match) return interval
   
-  const units = {
-    days: 'day',
-    weeks: 'week',
-    months: 'month',
-    years: 'year'
-  }
-  
-  for (const [unit, singular] of Object.entries(units)) {
-    if (interval.includes(unit)) {
-      const value = interval.match(/\d+/)?.[0] || '1'
-      return `${value} ${singular}${value > 1 ? 's' : ''}`
-    }
-  }
-  
-  return interval
+  const days = parseInt(match[1])
+  if (days === 1) return 'Daily'
+  if (days === 7) return 'Weekly'
+  if (days === 14) return 'Bi-weekly'
+  if (days === 30) return 'Monthly'
+  return `Every ${days} days`
 }
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  
   const date = new Date(dateStr)
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
   
-  if (date.toDateString() === today.toDateString()) {
-    return 'Today'
-  } else if (date.toDateString() === tomorrow.toDateString()) {
-    return 'Tomorrow'
-  } else {
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    })
-  }
+  if (date.toDateString() === today.toDateString()) return 'Today'
+  if (date.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
+  
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
+
+onMounted(() => {
+  const el = cardRef.value
+  if (!el) return
+  
+  el.addEventListener('mousedown', handleMouseDown)
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseup', handleMouseUp)
+})
 </script>
 
 <style scoped>
@@ -208,8 +348,13 @@ function formatDate(dateStr) {
   border-radius: var(--md-sys-radius-medium);
   background-color: var(--md-sys-color-surface);
   box-shadow: var(--md-sys-elevation-1);
-  transition: transform var(--md-sys-transition-fast), box-shadow var(--md-sys-transition-fast);
-  touch-action: pan-y;
+  user-select: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.chore-card:active {
+  cursor: grabbing;
 }
 
 .chore-card.completed {
@@ -220,49 +365,51 @@ function formatDate(dateStr) {
   border-left: 4px solid var(--md-sys-color-overdue);
 }
 
-.chore-card.priority-high:not(.completed) {
-  border-left: 4px solid var(--md-sys-color-high-priority);
-}
-
-.chore-card.priority-medium:not(.completed) {
-  border-left: 4px solid var(--md-sys-color-medium-priority);
-}
-
-.chore-card.priority-low:not(.completed) {
-  border-left: 4px solid var(--md-sys-color-low-priority);
-}
-
-.swipe-feedback {
+.swipe-actions-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
+  display: flex;
+  z-index: 10;
+}
+
+.swipe-action {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48px;
-  opacity: 0;
-  transition: opacity var(--md-sys-transition-fast);
-  z-index: 1;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.swipe-feedback.right {
+.swipe-action .mdi {
+  font-size: 24px;
+}
+
+.swipe-action.action-done {
   background-color: var(--md-sys-color-completed);
-  color: white;
-  opacity: 0.3;
 }
 
-.swipe-feedback.left {
+.swipe-action.action-edit {
   background-color: var(--md-sys-color-primary);
-  color: white;
-  opacity: 0.3;
 }
 
-.swipe-feedback.down {
+.swipe-action.action-archive {
   background-color: var(--md-sys-color-secondary);
+}
+
+.swipe-action.active {
+  flex: 1.5;
   color: white;
-  opacity: 0.3;
+}
+
+.swipe-action.active:hover {
+  filter: brightness(1.1);
 }
 
 .chore-card-content {
@@ -347,19 +494,5 @@ function formatDate(dateStr) {
 
 .chore-due.due-later {
   color: var(--md-sys-color-due-later);
-}
-
-.chore-actions {
-  display: flex;
-  gap: var(--md-sys-spacing-xs);
-  flex-shrink: 0;
-}
-
-.btn-icon {
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.btn-icon:hover {
-  color: var(--md-sys-color-primary);
 }
 </style>
