@@ -1,20 +1,20 @@
 <template>
   <div class="chat-widget">
     <!-- Chat button -->
-    <button 
+    <button
       v-if="!isOpen"
       @click="toggleChat"
       class="chat-button shadow-elevation-3"
       aria-label="Open AI assistant"
     >
-      <span class="mdi mdi-robot-happy" style="font-size: 24px;"></span>
+      <span class="mdi mdi-robot-happy" style="font-size: 24px"></span>
     </button>
 
     <!-- Chat interface -->
     <div v-else class="chat-interface shadow-elevation-4">
       <div class="chat-header">
         <div class="chat-header-title">
-          <span class="mdi mdi-robot-happy" style="margin-right: 8px;"></span>
+          <span class="mdi mdi-robot-happy" style="margin-right: 8px"></span>
           AI Copilot
         </div>
         <button @click="toggleChat" class="btn-icon">
@@ -27,8 +27,8 @@
           <p>Hi! I'm your AI chore assistant.</p>
           <p>Try saying:</p>
           <div class="quick-commands">
-            <button 
-              v-for="cmd in quickCommands" 
+            <button
+              v-for="cmd in quickCommands"
               :key="cmd"
               @click="sendQuickCommand(cmd)"
               class="quick-command"
@@ -38,14 +38,17 @@
           </div>
         </div>
 
-        <div 
-          v-for="msg in messages" 
+        <div
+          v-for="msg in messages"
           :key="msg.id"
           class="chat-message"
           :class="msg.role"
         >
           <div class="message-avatar">
-            <span class="mdi" :class="msg.role === 'user' ? 'mdi-account' : 'mdi-robot-happy'"></span>
+            <span
+              class="mdi"
+              :class="msg.role === 'user' ? 'mdi-account' : 'mdi-robot-happy'"
+            ></span>
           </div>
           <div class="message-content">
             {{ msg.content }}
@@ -73,7 +76,7 @@
           placeholder="Type a message..."
           :disabled="loading"
         />
-        <button 
+        <button
           @click="sendMessage"
           :disabled="!inputMessage.trim() || loading"
           class="chat-send btn-icon"
@@ -86,78 +89,81 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
-import { aiApi } from '@/api'
-import { useAuthStore } from '@/stores/auth'
+import { ref, nextTick } from "vue";
+import { aiApi } from "@/api";
+import { useAuthStore } from "@/stores/auth";
 
-const authStore = useAuthStore()
-const isOpen = ref(false)
-const messages = ref([])
-const inputMessage = ref('')
-const loading = ref(false)
-const messagesRef = ref(null)
+const authStore = useAuthStore();
+const isOpen = ref(false);
+const messages = ref([]);
+const inputMessage = ref("");
+const loading = ref(false);
+const messagesRef = ref(null);
 
 const quickCommands = [
-  'What chores do I have?',
-  'Add a new chore',
+  "What chores do I have?",
+  "Add a new chore",
   'Mark "wash dishes" as done',
-  'Give me suggestions'
-]
+  "Give me suggestions",
+];
 
 function toggleChat() {
-  isOpen.value = !isOpen.value
+  isOpen.value = !isOpen.value;
 }
 
 async function sendMessage() {
-  if (!inputMessage.value.trim() || loading.value) return
+  if (!inputMessage.value.trim() || loading.value) return;
 
   const userMessage = {
     id: Date.now(),
-    role: 'user',
-    content: inputMessage.value
-  }
+    role: "user",
+    content: inputMessage.value,
+  };
 
-  messages.value.push(userMessage)
-  inputMessage.value = ''
-  await scrollToBottom()
+  messages.value.push(userMessage);
+  inputMessage.value = "";
+  await scrollToBottom();
 
-  loading.value = true
+  loading.value = true;
 
   try {
-    const response = await aiApi.post('/chat', {
+    const response = await aiApi.post("/chat", {
       message: userMessage.content,
-      user_id: authStore.user?.id
-    })
+      user_id: authStore.user?.id,
+    });
 
     const assistantMessage = {
       id: Date.now() + 1,
-      role: 'assistant',
-      content: response.data.response || response.data.message || 'I\'m not sure how to help with that.'
-    }
+      role: "assistant",
+      content:
+        response.data.response ||
+        response.data.message ||
+        "I'm not sure how to help with that.",
+    };
 
-    messages.value.push(assistantMessage)
-    await scrollToBottom()
+    messages.value.push(assistantMessage);
+    await scrollToBottom();
   } catch (err) {
-    console.error('Chat error:', err)
+    console.error("Chat error:", err);
     messages.value.push({
       id: Date.now() + 1,
-      role: 'assistant',
-      content: 'Sorry, I encountered an error. Please try again.'
-    })
+      role: "assistant",
+      content: "Sorry, I encountered an error. Please try again.",
+    });
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function sendQuickCommand(command) {
-  inputMessage.value = command
-  await sendMessage()
+  inputMessage.value = command;
+  await sendMessage();
 }
 
 async function scrollToBottom() {
-  await nextTick()
+  await nextTick();
   if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
   }
 }
 </script>
@@ -181,7 +187,9 @@ async function scrollToBottom() {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--md-sys-transition-fast), box-shadow var(--md-sys-transition-fast);
+  transition:
+    transform var(--md-sys-transition-fast),
+    box-shadow var(--md-sys-transition-fast);
 }
 
 .chat-button:hover {
@@ -312,12 +320,22 @@ async function scrollToBottom() {
   animation: bounce 1.4s infinite ease-in-out;
 }
 
-.dot:nth-child(1) { animation-delay: -0.32s; }
-.dot:nth-child(2) { animation-delay: -0.16s; }
+.dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+.dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
 
 @keyframes bounce {
-  0%, 80%, 100% { transform: scale(0); }
-  40% { transform: scale(1); }
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
 }
 
 .chat-input-area {

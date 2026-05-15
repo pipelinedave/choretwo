@@ -1,18 +1,17 @@
 <template>
   <div class="empty-state">
     <div class="empty-state-icon">
-      <span class="mdi mdi-clipboard-list-outline" style="font-size: 64px;"></span>
+      <span
+        class="mdi mdi-clipboard-list-outline"
+        style="font-size: 64px"
+      ></span>
     </div>
     <h3 class="empty-state-title">No chores yet</h3>
     <p class="empty-state-text">
       {{ message || "You don't have any chores to do. Time to relax!" }}
     </p>
-    <button 
-      v-if="showAddButton"
-      @click="emit('add')"
-      class="btn btn-filled"
-    >
-      <span class="mdi mdi-plus" style="margin-right: 8px;"></span>
+    <button v-if="showAddButton" @click="emit('add')" class="btn btn-filled">
+      <span class="mdi mdi-plus" style="margin-right: 8px"></span>
       Add Your First Chore
     </button>
   </div>
@@ -22,15 +21,15 @@
 defineProps({
   message: {
     type: String,
-    default: ''
+    default: "",
   },
   showAddButton: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const emit = defineEmits(['add'])
+const emit = defineEmits(["add"]);
 </script>
 
 <style scoped>

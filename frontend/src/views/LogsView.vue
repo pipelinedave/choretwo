@@ -2,14 +2,14 @@
   <div class="logs-view">
     <LoadingSpinner v-if="logStore.loading" />
 
-    <EmptyState 
+    <EmptyState
       v-else-if="logs.length === 0"
       message="No recent activity to show."
     />
 
     <div v-else class="log-list">
-      <LogItem 
-        v-for="log in logs" 
+      <LogItem
+        v-for="log in logs"
         :key="log.id"
         :log="log"
         @undo="handleUndo"
@@ -22,31 +22,35 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { useLogStore } from '@/stores/log'
-import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
-import EmptyState from '@/components/chores/EmptyState.vue'
-import LogItem from '@/components/logs/LogItem.vue'
-import UndoBanner from '@/components/logs/UndoBanner.vue'
+import { ref, onMounted, watch } from "vue";
+import { useLogStore } from "@/stores/log";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
+import EmptyState from "@/components/chores/EmptyState.vue";
+import LogItem from "@/components/logs/LogItem.vue";
+import UndoBanner from "@/components/logs/UndoBanner.vue";
 
-const logStore = useLogStore()
-const logs = ref([])
+const logStore = useLogStore();
+const logs = ref([]);
 
 onMounted(async () => {
-  await logStore.fetchLogs(100)
-  logs.value = logStore.logs
-})
+  await logStore.fetchLogs(100);
+  logs.value = logStore.logs;
+});
 
-watch(() => logStore.logs, (newLogs) => {
-  logs.value = newLogs
-}, { deep: true })
+watch(
+  () => logStore.logs,
+  (newLogs) => {
+    logs.value = newLogs;
+  },
+  { deep: true },
+);
 
 async function handleUndo(logId) {
   try {
-    await logStore.undo(logId)
-    logs.value = logStore.logs
+    await logStore.undo(logId);
+    logs.value = logStore.logs;
   } catch (err) {
-    console.error('Undo failed:', err)
+    console.error("Undo failed:", err);
   }
 }
 </script>

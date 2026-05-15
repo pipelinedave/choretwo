@@ -2,15 +2,14 @@
   <div class="home-view">
     <!-- Welcome section -->
     <div class="welcome-section">
-      <h1>Welcome back, {{ authStore.user?.email?.split('@')[0] || 'User' }}!</h1>
+      <h1>
+        Welcome back, {{ authStore.user?.email?.split("@")[0] || "User" }}!
+      </h1>
       <p>Here's what's happening with your chores today.</p>
     </div>
 
     <!-- Performance bar -->
-    <PerformanceBar 
-      :score="choreStore.householdHealth"
-      label="Health"
-    />
+    <PerformanceBar :score="choreStore.householdHealth" label="Health" />
 
     <!-- Stats cards -->
     <div class="stats-grid">
@@ -24,7 +23,10 @@
         </div>
       </div>
 
-      <div class="stat-card card" @click="navigateTo('/chores?filter=due-soon')">
+      <div
+        class="stat-card card"
+        @click="navigateTo('/chores?filter=due-soon')"
+      >
         <div class="stat-icon due-soon">
           <span class="mdi mdi-clock-outline"></span>
         </div>
@@ -34,7 +36,10 @@
         </div>
       </div>
 
-      <div class="stat-card card" @click="navigateTo('/chores?filter=completed')">
+      <div
+        class="stat-card card"
+        @click="navigateTo('/chores?filter=completed')"
+      >
         <div class="stat-icon completed">
           <span class="mdi mdi-check-circle"></span>
         </div>
@@ -48,11 +53,11 @@
     <!-- Quick actions -->
     <div class="quick-actions">
       <button @click="showAddForm = true" class="btn btn-filled">
-        <span class="mdi mdi-plus" style="margin-right: 8px;"></span>
+        <span class="mdi mdi-plus" style="margin-right: 8px"></span>
         Add Chore
       </button>
       <button @click="showLogs = true" class="btn btn-tonal">
-        <span class="mdi mdi-history" style="margin-right: 8px;"></span>
+        <span class="mdi mdi-history" style="margin-right: 8px"></span>
         View Logs
       </button>
     </div>
@@ -66,7 +71,7 @@
 
       <LoadingSpinner v-if="choreStore.loading" />
 
-      <EmptyState 
+      <EmptyState
         v-else-if="filteredChores.length === 0"
         message="No chores for today. Enjoy your free time!"
         show-add-button
@@ -86,14 +91,14 @@
     </div>
 
     <!-- Add chore form modal -->
-    <AddChoreForm 
+    <AddChoreForm
       v-if="showAddForm"
       @submit="handleAddChore"
       @close="showAddForm = false"
     />
 
     <!-- Edit chore form modal -->
-    <AddChoreForm 
+    <AddChoreForm
       v-if="showEditForm && editingChore"
       :chore="editingChore"
       @submit="handleUpdateChore"
@@ -109,84 +114,83 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { useChoreStore } from '@/stores/chore'
-import { useLogStore } from '@/stores/log'
-import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
-import EmptyState from '@/components/chores/EmptyState.vue'
-import ChoreCard from '@/components/chores/ChoreCard.vue'
-import AddChoreForm from '@/components/chores/AddChoreForm.vue'
-import FilterPills from '@/components/chores/FilterPills.vue'
-import PerformanceBar from '@/components/layout/PerformanceBar.vue'
-import LogOverlay from '@/components/logs/LogOverlay.vue'
-import UndoBanner from '@/components/logs/UndoBanner.vue'
+import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import { useChoreStore } from "@/stores/chore";
+import { useLogStore } from "@/stores/log";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
+import EmptyState from "@/components/chores/EmptyState.vue";
+import ChoreCard from "@/components/chores/ChoreCard.vue";
+import AddChoreForm from "@/components/chores/AddChoreForm.vue";
+// FilterPills - used via ChoreCard previews
+import PerformanceBar from "@/components/layout/PerformanceBar.vue";
+import LogOverlay from "@/components/logs/LogOverlay.vue";
+import UndoBanner from "@/components/logs/UndoBanner.vue";
 
-const router = useRouter()
-const route = useRoute()
-const authStore = useAuthStore()
-const choreStore = useChoreStore()
-const logStore = useLogStore()
+const router = useRouter();
+const authStore = useAuthStore();
+const choreStore = useChoreStore();
+const logStore = useLogStore();
 
-const showAddForm = ref(false)
-const showEditForm = ref(false)
-const showLogs = ref(false)
-const editingChore = ref(null)
+const showAddForm = ref(false);
+const showEditForm = ref(false);
+const showLogs = ref(false);
+const editingChore = ref(null);
 
 const filteredChores = computed(() => {
-  return choreStore.filteredChores
-})
+  return choreStore.filteredChores;
+});
 
 onMounted(async () => {
-  await choreStore.fetchChores()
-  await logStore.fetchLogs(20)
-})
+  await choreStore.fetchChores();
+  await logStore.fetchLogs(20);
+});
 
 function navigateTo(path) {
-  router.push(path)
+  router.push(path);
 }
 
 async function handleToggle(choreId) {
-  const chore = choreStore.chores.find(c => c.id === choreId)
+  const chore = choreStore.chores.find((c) => c.id === choreId);
   if (chore && !chore.done) {
     try {
-      await choreStore.markDone(choreId, authStore.user.email)
+      await choreStore.markDone(choreId, authStore.user.email);
     } catch (err) {
-      console.error('Failed to mark chore as done:', err)
+      console.error("Failed to mark chore as done:", err);
     }
   }
 }
 
 function handleEdit(choreId) {
-  editingChore.value = choreStore.chores.find(c => c.id === choreId)
-  showEditForm.value = true
+  editingChore.value = choreStore.chores.find((c) => c.id === choreId);
+  showEditForm.value = true;
 }
 
 async function handleArchive(choreId) {
   try {
-    await choreStore.archiveChore(choreId)
+    await choreStore.archiveChore(choreId);
   } catch (err) {
-    console.error('Failed to archive chore:', err)
+    console.error("Failed to archive chore:", err);
   }
 }
 
 async function handleAddChore(formData) {
   try {
-    await choreStore.addChore(formData)
-    showAddForm.value = false
+    await choreStore.addChore(formData);
+    showAddForm.value = false;
   } catch (err) {
-    console.error('Failed to add chore:', err)
+    console.error("Failed to add chore:", err);
   }
 }
 
 async function handleUpdateChore(formData) {
   try {
-    await choreStore.updateChore(formData.id, formData)
-    showEditForm.value = false
-    editingChore.value = null
+    await choreStore.updateChore(formData.id, formData);
+    showEditForm.value = false;
+    editingChore.value = null;
   } catch (err) {
-    console.error('Failed to update chore:', err)
+    console.error("Failed to update chore:", err);
   }
 }
 </script>

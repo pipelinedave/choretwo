@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db, run_migrations
 from app.routes.chores import router as chores_router
 from app.routes.export import router as export_router
+from app.routes.settings import router as settings_router
 from app.middleware.auth import AuthMiddleware
 
 app = FastAPI(
@@ -39,3 +40,4 @@ async def root():
 
 app.include_router(chores_router)
 app.include_router(export_router)
+app.include_router(settings_router)

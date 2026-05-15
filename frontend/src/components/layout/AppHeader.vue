@@ -4,37 +4,34 @@
       <div class="app-bar-start">
         <h1 class="app-bar-title">{{ title }}</h1>
       </div>
-      
+
       <div class="app-bar-end">
-        <button 
+        <button
           v-if="authStore.isAuthenticated"
           @click="showUserMenu = !showUserMenu"
           class="btn-icon touch-target"
           aria-label="User menu"
         >
-          <span class="mdi mdi-account-circle" style="font-size: 28px;"></span>
+          <span class="mdi mdi-account-circle" style="font-size: 28px"></span>
         </button>
-        
+
         <!-- User Menu Dropdown -->
         <div v-if="showUserMenu" class="user-menu">
           <div class="user-menu-header">
-            <span class="mdi mdi-account-circle" style="font-size: 32px;"></span>
+            <span class="mdi mdi-account-circle" style="font-size: 32px"></span>
             <span class="user-name">{{ authStore.user?.email }}</span>
           </div>
           <div class="user-menu-items">
-            <router-link 
-              to="/settings" 
+            <router-link
+              to="/settings"
               class="menu-item"
               @click="showUserMenu = false"
             >
-              <span class="mdi mdi-cog" style="margin-right: 8px;"></span>
+              <span class="mdi mdi-cog" style="margin-right: 8px"></span>
               Settings
             </router-link>
-            <button 
-              @click="handleLogout" 
-              class="menu-item logout"
-            >
-              <span class="mdi mdi-logout" style="margin-right: 8px;"></span>
+            <button @click="handleLogout" class="menu-item logout">
+              <span class="mdi mdi-logout" style="margin-right: 8px"></span>
               Logout
             </button>
           </div>
@@ -45,36 +42,34 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { ref, watch } from "vue";
+import { useAuthStore } from "@/stores/auth";
 
-const props = defineProps({
+defineProps({
   title: {
     type: String,
-    default: 'Choretwo'
-  }
-})
+    default: "Choretwo",
+  },
+});
 
-const authStore = useAuthStore()
-const router = useRouter()
-const showUserMenu = ref(false)
+const authStore = useAuthStore();
+const showUserMenu = ref(false);
 
 // Close menu when clicking outside
 watch(showUserMenu, (newValue) => {
   if (newValue) {
     const closeMenu = (e) => {
-      if (!e.target.closest('.app-bar')) {
-        showUserMenu.value = false
-        document.removeEventListener('click', closeMenu)
+      if (!e.target.closest(".app-bar")) {
+        showUserMenu.value = false;
+        document.removeEventListener("click", closeMenu);
       }
-    }
-    setTimeout(() => document.addEventListener('click', closeMenu), 0)
+    };
+    setTimeout(() => document.addEventListener("click", closeMenu), 0);
   }
-})
+});
 
 async function handleLogout() {
-  await authStore.logout()
+  await authStore.logout();
 }
 </script>
 

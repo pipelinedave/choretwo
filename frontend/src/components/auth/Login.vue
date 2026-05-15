@@ -2,27 +2,27 @@
   <div class="login-container">
     <div class="login-card card">
       <div class="login-header">
-        <span class="mdi mdi-checkbox-marked-circle" style="font-size: 64px; color: var(--md-sys-color-primary);"></span>
+        <span
+          class="mdi mdi-checkbox-marked-circle"
+          style="font-size: 64px; color: var(--md-sys-color-primary)"
+        ></span>
         <h1 class="login-title">Choretwo</h1>
         <p class="login-subtitle">Manage your chores with ease</p>
       </div>
-      
+
       <div class="login-content">
         <LoadingSpinner v-if="authStore.loading" message="Authenticating..." />
-        
+
         <div v-else class="login-actions">
           <p class="login-message" v-if="authStore.error">
             {{ authStore.error }}
           </p>
-          
-          <button 
-            @click="handleLogin"
-            class="btn btn-filled btn-login"
-          >
-            <span class="mdi mdi-google" style="margin-right: 8px;"></span>
+
+          <button @click="handleLogin" class="btn btn-filled btn-login">
+            <span class="mdi mdi-google" style="margin-right: 8px"></span>
             Sign in with Google
           </button>
-          
+
           <p class="login-note">
             By signing in, you agree to our Terms of Service
           </p>
@@ -33,18 +33,15 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
+import { useRoute } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
 
-const route = useRoute()
-const router = useRouter()
-const authStore = useAuthStore()
+const route = useRoute();
+const authStore = useAuthStore();
 
 function handleLogin() {
-  const redirect = route.query.redirect || '/'
-  authStore.login(redirect)
+  const redirect = route.query.redirect || "/";
+  authStore.login(redirect);
 }
 </script>
 

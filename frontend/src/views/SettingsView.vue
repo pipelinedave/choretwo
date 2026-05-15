@@ -2,242 +2,158 @@
   <div class="settings-view">
     <h1 class="page-title">Settings</h1>
 
-    <!-- Notification Settings -->
+    <NotificationSettings />
+    <AppearanceSettings />
+    <DataSettings />
+
+    <!-- AI Settings -->
     <section class="settings-section card">
-      <h2 class="section-title">Notifications</h2>
-      
+      <div class="section-header">
+        <div class="section-icon">
+          <span class="mdi mdi-brain"></span>
+        </div>
+        <div>
+          <h2 class="section-title">AI Copilot</h2>
+          <p class="section-subtitle">Configure AI-powered suggestions</p>
+        </div>
+      </div>
+
+      <!-- Learning toggle -->
       <div class="setting-item">
         <div class="setting-info">
-          <span class="setting-label">Enable notifications</span>
-          <span class="setting-description">Receive reminders for upcoming chores</span>
+          <span class="setting-label">AI learning enabled</span>
+          <span class="setting-description">Allow AI to learn your habits</span>
         </div>
         <label class="toggle">
-          <input 
-            v-model="notificationPrefs.enabled" 
+          <input
             type="checkbox"
-            @change="updateNotificationPrefs"
+            :checked="aiDraft.learning_enabled"
+            @change="toggleLearning"
           />
           <span class="toggle-slider"></span>
         </label>
       </div>
 
-      <div v-if="notificationPrefs.enabled" class="setting-group">
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-label">Reminder time</span>
-            <span class="setting-description">Daily reminder time</span>
-          </div>
-          <input 
-            v-model="notificationPrefs.reminderTime"
-            type="time"
-            class="input"
-            @change="updateNotificationPrefs"
-          />
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-label">Overdue alerts</span>
-            <span class="setting-description">Get notified about overdue chores</span>
-          </div>
-          <label class="toggle">
-            <input 
-              v-model="notificationPrefs.overdueAlerts" 
-              type="checkbox"
-              @change="updateNotificationPrefs"
-            />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-item">
-          <div class="setting-info">
-            <span class="setting-label">Weekly summary</span>
-            <span class="setting-description">Receive a weekly chore summary</span>
-          </div>
-          <label class="toggle">
-            <input 
-              v-model="notificationPrefs.weeklySummary" 
-              type="checkbox"
-              @change="updateNotificationPrefs"
-            />
-            <span class="toggle-slider"></span>
-          </label>
+      <!-- Suggestion types -->
+      <div class="suggestion-types">
+        <div
+          class="chip"
+          :class="{ active: aiDraft.suggestion_types.includes(t.value) }"
+          v-for="t in suggestionOptions"
+          :key="t.value"
+          @click="toggleSuggestionType(t.value)"
+        >
+          <span class="chip-text">{{ t.label }}</span>
         </div>
       </div>
 
-      <button 
-        @click="testNotification"
-        class="btn btn-tonal"
-        :disabled="notificationStore.loading"
-      >
-        Test Notification
-      </button>
-    </section>
-
-    <!-- Theme Settings -->
-    <section class="settings-section card">
-      <h2 class="section-title">Appearance</h2>
-      
-      <div class="setting-item">
-        <div class="setting-info">
-          <span class="setting-label">Theme</span>
-          <span class="setting-description">Choose light or dark mode</span>
-        </div>
-        <div class="theme-selector">
-          <button 
-            @click="setTheme('light')"
-            class="theme-option"
-            :class="{ active: currentTheme === 'light' }"
-          >
-            <span class="mdi mdi-white-balance-sunny"></span>
-            <span>Light</span>
+      <!-- Save bar -->
+      <div v-if="unsavedAi" class="save-bar">
+        <span class="save-bar-text">Unsaved AI changes</span>
+        <div class="save-bar-actions">
+          <button class="btn btn-text btn-sm" @click="discardAi">
+            Discard
           </button>
-          <button 
-            @click="setTheme('dark')"
-            class="theme-option"
-            :class="{ active: currentTheme === 'dark' }"
+          <button
+            class="btn btn-filled btn-sm"
+            @click="saveAi"
+            :disabled="s.loading"
           >
-            <span class="mdi mdi-moon-waning-crescent"></span>
-            <span>Dark</span>
+            <span v-if="s.loading" class="spinner"></span>
+            Save
           </button>
         </div>
       </div>
     </section>
 
-    <!-- Data Settings -->
-    <section class="settings-section card">
-      <h2 class="section-title">Data</h2>
-      
-      <div class="setting-actions">
-        <button @click="exportData" class="btn btn-tonal">
-          <span class="mdi mdi-download" style="margin-right: 8px;"></span>
-          Export Data
-        </button>
-        <button @click="importData" class="btn btn-tonal">
-          <span class="mdi mdi-upload" style="margin-right: 8px;"></span>
-          Import Data
-        </button>
-      </div>
-    </section>
-
-    <!-- About -->
-    <section class="settings-section card">
-      <h2 class="section-title">About</h2>
-      
-      <div class="about-info">
-        <p><strong>Version:</strong> 1.0.0</p>
-        <p>Built with Vue 3, Vite, and Material You design.</p>
-      </div>
-    </section>
+    <!-- Toast -->
+    <SettingsToast
+      :visible="toast.visible"
+      :message="toast.message"
+      :type="toast.type"
+      :icon="toast.icon"
+      :duration="3000"
+      @dismiss="dismissToast"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useNotificationStore } from '@/stores/notification'
-import { useChoreStore } from '@/stores/chore'
-import { useLogStore } from '@/stores/log'
+import { reactive, ref, onMounted, watch, computed } from "vue";
+import { useSettingsStore } from "@/stores/settings";
+import NotificationSettings from "@/components/settings/NotificationSettings.vue";
+import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
+import DataSettings from "@/components/settings/DataSettings.vue";
+import SettingsToast from "@/components/settings/SettingsToast.vue";
 
-const notificationStore = useNotificationStore()
-const choreStore = useChoreStore()
-const logStore = useLogStore()
+const s = useSettingsStore();
+const unsavedAi = ref(false);
+const toast = reactive({
+  visible: false,
+  message: "",
+  type: "default",
+  icon: "",
+});
 
-const notificationPrefs = ref({
-  enabled: true,
-  reminderTime: '08:00',
-  overdueAlerts: true,
-  weeklySummary: false
-})
+const aiDraft = computed({
+  get: () => ({
+    learning_enabled: s.ai.learning_enabled,
+    suggestion_types: [...s.ai.suggestion_types],
+  }),
+});
 
-const currentTheme = ref('light')
+const suggestionOptions = [
+  { label: "Recurrence", value: "recurrence" },
+  { label: "Timing", value: "timing" },
+  { label: "Assignment", value: "assignment" },
+];
 
 onMounted(async () => {
   try {
-    await notificationStore.fetchPreferences()
-    notificationPrefs.value = { ...notificationPrefs.value, ...notificationStore.preferences }
+    await s.fetchSettings();
+    s.applyTheme();
+    showToast("success", "Settings loaded", "check-circle");
   } catch (err) {
-    console.error('Failed to fetch preferences:', err)
+    console.error("Failed to load settings:", err);
+    showToast("error", "Failed to load settings");
   }
+});
 
-  // Load theme preference
-  const savedTheme = localStorage.getItem('theme') || 'light'
-  currentTheme.value = savedTheme
-  applyTheme(savedTheme)
-})
+watch(
+  () => ({ ...s.ai }),
+  () => {
+    unsavedAi.value = false;
+  },
+  { deep: true },
+);
 
-async function updateNotificationPrefs() {
-  try {
-    await notificationStore.updatePreferences(notificationPrefs.value)
-  } catch (err) {
-    console.error('Failed to update preferences:', err)
-  }
+function showToast(type, message, icon = "") {
+  toast.visible = true;
+  toast.type = type;
+  toast.message = message;
+  toast.icon = icon;
 }
 
-async function testNotification() {
-  try {
-    await notificationStore.testNotification()
-    alert('Test notification sent!')
-  } catch (err) {
-    alert('Failed to send test notification')
-  }
+function dismissToast() {
+  toast.visible = false;
 }
 
-function setTheme(theme) {
-  currentTheme.value = theme
-  localStorage.setItem('theme', theme)
-  applyTheme(theme)
+function toggleLearning() {
+  unsavedAi.value = true;
 }
 
-function applyTheme(theme) {
-  if (theme === 'dark') {
-    document.documentElement.classList.add('dark')
-  } else {
-    document.documentElement.classList.remove('dark')
-  }
+function toggleSuggestionType() {
+  unsavedAi.value = true;
 }
 
-async function exportData() {
-  const data = {
-    chores: choreStore.chores,
-    logs: logStore.logs,
-    exportedAt: new Date().toISOString()
-  }
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `choretwo-export-${new Date().toISOString().split('T')[0]}.json`
-  a.click()
-  URL.revokeObjectURL(url)
+function discardAi() {
+  unsavedAi.value = false;
 }
 
-function importData() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.json'
-  
-  input.onchange = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-
-    try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      
-      if (data.chores) {
-        // Import chores (you'll need to add import logic to the store)
-        console.log('Importing chores:', data.chores.length)
-      }
-      
-      alert('Import successful!')
-    } catch (err) {
-      alert('Failed to import data: ' + err.message)
-    }
-  }
-  
-  input.click()
+async function saveAi() {
+  await s.updateSettings({ ai: { ...aiDraft.value } });
+  unsavedAi.value = false;
+  showToast("success", "AI settings saved", "check-circle");
 }
 </script>
 
@@ -250,36 +166,58 @@ function importData() {
 .page-title {
   font-size: var(--md-sys-typescale-headline-large);
   font-weight: 500;
-  margin-bottom: var(--md-sys-spacing-lg);
+  margin: var(--md-sys-spacing-xl) 0 var(--md-sys-spacing-2xl);
 }
 
 .settings-section {
   margin-bottom: var(--md-sys-spacing-lg);
-  padding: var(--md-sys-spacing-lg);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--md-sys-spacing-md);
+  margin-bottom: var(--md-sys-spacing-md);
+}
+
+.section-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-sys-radius-full);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
 }
 
 .section-title {
   font-size: var(--md-sys-typescale-title-medium);
   font-weight: 500;
-  margin-bottom: var(--md-sys-spacing-md);
+  line-height: 1.3;
+}
+
+.section-subtitle {
+  font-size: var(--md-sys-typescale-body-small);
+  color: var(--md-sys-color-on-surface-variant);
+  margin-top: 2px;
 }
 
 .setting-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--md-sys-spacing-md) 0;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
-}
-
-.setting-item:last-child {
-  border-bottom: none;
+  padding: var(--md-sys-spacing-sm) 0;
+  gap: var(--md-sys-spacing-md);
 }
 
 .setting-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
 }
 
 .setting-label {
@@ -292,47 +230,19 @@ function importData() {
   color: var(--md-sys-color-on-surface-variant);
 }
 
-.setting-group {
-  margin: var(--md-sys-spacing-md) 0;
-  padding-left: var(--md-sys-spacing-md);
-  border-left: 2px solid var(--md-sys-color-outline-variant);
+.btn-sm {
+  font-size: var(--md-sys-typescale-label-medium);
+  padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-sm);
+  min-height: 32px;
 }
 
-.setting-actions {
-  display: flex;
-  gap: var(--md-sys-spacing-md);
-  margin-top: var(--md-sys-spacing-md);
-}
-
-.theme-selector {
-  display: flex;
-  gap: var(--md-sys-spacing-sm);
-}
-
-.theme-option {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md);
-  border: 2px solid var(--md-sys-color-outline);
-  border-radius: var(--md-sys-radius-medium);
-  background: transparent;
-  cursor: pointer;
-  min-width: 80px;
-}
-
-.theme-option.active {
-  border-color: var(--md-sys-color-primary);
-  background-color: var(--md-sys-color-primary-container);
-  color: var(--md-sys-color-on-primary-container);
-}
-
+/* Toggle (copied for consistency) */
 .toggle {
   position: relative;
   display: inline-block;
   width: 48px;
   height: 28px;
+  flex-shrink: 0;
 }
 
 .toggle input {
@@ -373,12 +283,90 @@ function importData() {
   transform: translateX(20px);
 }
 
-.about-info {
-  padding: var(--md-sys-spacing-md) 0;
-  color: var(--md-sys-color-on-surface-variant);
+/* Custom chip for AI suggestions */
+.suggestion-types {
+  display: flex;
+  gap: var(--md-sys-spacing-sm);
+  margin-top: var(--md-sys-spacing-md);
+  flex-wrap: wrap;
 }
 
-.about-info p {
-  margin-bottom: var(--md-sys-spacing-sm);
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: calc(var(--md-sys-spacing-sm) + 2px) var(--md-sys-spacing-md);
+  border-radius: var(--md-sys-radius-full);
+  font-size: var(--md-sys-typescale-label-medium);
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-transition-fast),
+    color var(--md-sys-transition-fast);
+  user-select: none;
+}
+
+.chip.active {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.chip-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-text::after {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity var(--md-sys-transition-fast);
+}
+
+/* Save bar */
+.save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md);
+  margin-top: var(--md-sys-spacing-md);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: var(--md-sys-radius-large);
+  gap: var(--md-sys-spacing-md);
+}
+
+.save-bar-text {
+  font-size: var(--md-sys-typescale-body-medium);
+  font-weight: 500;
+}
+
+.save-bar-actions {
+  display: flex;
+  gap: var(--md-sys-spacing-xs);
+  flex-shrink: 0;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

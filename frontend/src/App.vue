@@ -1,7 +1,7 @@
 <template>
   <div id="app">
     <AppHeader v-if="showHeader" :title="headerTitle" />
-    
+
     <main class="main-content" :class="{ 'has-bottom-nav': showBottomNav }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
@@ -9,47 +9,47 @@
         </transition>
       </router-view>
     </main>
-    
+
     <AppBottomNav v-if="showBottomNav" />
-    
+
     <!-- AI Chat Widget (always visible on auth pages) -->
     <ChatWidget v-if="showChatWidget && authStore.isAuthenticated" />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import AppHeader from '@/components/layout/AppHeader.vue'
-import AppBottomNav from '@/components/layout/AppBottomNav.vue'
-import ChatWidget from '@/components/ai/ChatWidget.vue'
+import { computed } from "vue";
+import { useRoute } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import AppHeader from "@/components/layout/AppHeader.vue";
+import AppBottomNav from "@/components/layout/AppBottomNav.vue";
+import ChatWidget from "@/components/ai/ChatWidget.vue";
 
-const route = useRoute()
-const authStore = useAuthStore()
+const route = useRoute();
+const authStore = useAuthStore();
 
 const showHeader = computed(() => {
-  return !route.meta.hideLayout
-})
+  return !route.meta.hideLayout;
+});
 
 const showBottomNav = computed(() => {
-  return authStore.isAuthenticated && !route.meta.hideBottomNav
-})
+  return authStore.isAuthenticated && !route.meta.hideBottomNav;
+});
 
 const showChatWidget = computed(() => {
-  return authStore.isAuthenticated && !route.meta.hideChat
-})
+  return authStore.isAuthenticated && !route.meta.hideChat;
+});
 
 const headerTitle = computed(() => {
   const titles = {
-    '/': 'Choretwo',
-    '/chores': 'My Chores',
-    '/logs': 'Activity Log',
-    '/settings': 'Settings',
-    '/ai': 'AI Copilot'
-  }
-  return titles[route.path] || 'Choretwo'
-})
+    "/": "Choretwo",
+    "/chores": "My Chores",
+    "/logs": "Activity Log",
+    "/settings": "Settings",
+    "/ai": "AI Copilot",
+  };
+  return titles[route.path] || "Choretwo";
+});
 </script>
 
 <style>
@@ -78,7 +78,7 @@ const headerTitle = computed(() => {
     padding-top: calc(var(--md-sys-spacing-lg) + 64px);
     padding-bottom: var(--md-sys-spacing-2xl);
   }
-  
+
   .main-content.has-bottom-nav {
     padding-bottom: var(--md-sys-spacing-2xl);
   }

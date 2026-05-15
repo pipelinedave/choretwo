@@ -1,40 +1,36 @@
 <template>
   <nav class="bottom-nav safe-bottom">
-    <router-link 
-      v-for="item in navItems" 
+    <router-link
+      v-for="item in navItems"
       :key="item.path"
       :to="item.path"
       class="nav-item"
       :class="{ active: isActive(item.path) }"
     >
-      <span 
-        class="nav-item-icon mdi" 
-        :class="item.icon"
-      ></span>
+      <span class="nav-item-icon mdi" :class="item.icon"></span>
       <span class="nav-item-label">{{ item.label }}</span>
     </router-link>
   </nav>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute } from "vue-router";
 
-const route = useRoute()
+const route = useRoute();
 
 const navItems = [
-  { path: '/', label: 'Home', icon: 'mdi-home' },
-  { path: '/chores', label: 'Chores', icon: 'mdi-checkbox-marked-circle' },
-  { path: '/logs', label: 'Logs', icon: 'mdi-history' },
-  { path: '/settings', label: 'Settings', icon: 'mdi-cog' }
-]
+  { path: "/", label: "Home", icon: "mdi-home" },
+  { path: "/chores", label: "Chores", icon: "mdi-checkbox-marked-circle" },
+  { path: "/logs", label: "Logs", icon: "mdi-history" },
+  { path: "/settings", label: "Settings", icon: "mdi-cog" },
+];
 
 const isActive = (path) => {
-  if (path === '/') {
-    return route.path === '/'
+  if (path === "/") {
+    return route.path === "/";
   }
-  return route.path.startsWith(path)
-}
+  return route.path.startsWith(path);
+};
 </script>
 
 <style scoped>

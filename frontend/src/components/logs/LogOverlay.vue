@@ -13,14 +13,14 @@
           <LoadingSpinner />
         </div>
 
-        <EmptyState 
+        <EmptyState
           v-else-if="logs.length === 0"
           message="No recent activity"
         />
 
         <div v-else class="log-list">
-          <LogItem 
-            v-for="log in logs" 
+          <LogItem
+            v-for="log in logs"
             :key="log.id"
             :log="log"
             @undo="handleUndo"
@@ -32,41 +32,44 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { useLogStore } from '@/stores/log'
-import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
-import EmptyState from '@/components/chores/EmptyState.vue'
-import LogItem from './LogItem.vue'
+import { ref, watch } from "vue";
+import { useLogStore } from "@/stores/log";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
+import EmptyState from "@/components/chores/EmptyState.vue";
+import LogItem from "./LogItem.vue";
 
 const props = defineProps({
   isOpen: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const emit = defineEmits(['close'])
-const logStore = useLogStore()
+const emit = defineEmits(["close"]);
+const logStore = useLogStore();
 
-const logs = ref([])
+const logs = ref([]);
 
-watch(() => props.isOpen, async (newOpen) => {
-  if (newOpen) {
-    await logStore.fetchLogs()
-    logs.value = logStore.logs
-  }
-})
+watch(
+  () => props.isOpen,
+  async (newOpen) => {
+    if (newOpen) {
+      await logStore.fetchLogs();
+      logs.value = logStore.logs;
+    }
+  },
+);
 
 function close() {
-  emit('close')
+  emit("close");
 }
 
 async function handleUndo(logId) {
   try {
-    await logStore.undo(logId)
-    logs.value = logStore.logs
+    await logStore.undo(logId);
+    logs.value = logStore.logs;
   } catch (err) {
-    console.error('Undo failed:', err)
+    console.error("Undo failed:", err);
   }
 }
 </script>
@@ -88,7 +91,8 @@ async function handleUndo(logId) {
   width: 100%;
   max-height: 80vh;
   background-color: var(--md-sys-color-surface);
-  border-radius: var(--md-sys-radius-extra-large) var(--md-sys-radius-extra-large) 0 0;
+  border-radius: var(--md-sys-radius-extra-large)
+    var(--md-sys-radius-extra-large) 0 0;
   display: flex;
   flex-direction: column;
 }

@@ -12,13 +12,13 @@
 defineProps({
   inline: {
     type: Boolean,
-    default: false
+    default: false,
   },
   message: {
     type: String,
-    default: ''
-  }
-})
+    default: "",
+  },
+});
 </script>
 
 <style scoped>

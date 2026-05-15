@@ -1,6 +1,9 @@
 <template>
   <div class="callback-container">
-    <LoadingSpinner v-if="authStore.loading" message="Completing authentication..." />
+    <LoadingSpinner
+      v-if="authStore.loading"
+      message="Completing authentication..."
+    />
     <div v-else-if="error" class="error-container">
       <p class="error-message">{{ error }}</p>
       <router-link to="/login" class="btn btn-filled">
@@ -11,30 +14,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 
-const router = useRouter()
-const authStore = useAuthStore()
-const error = ref(null)
+const router = useRouter();
+const authStore = useAuthStore();
+const error = ref(null);
 
 onMounted(async () => {
   try {
-    const success = await authStore.handleCallback()
+    const success = await authStore.handleCallback();
     if (success) {
-      const redirect = router.currentRoute.value.query.redirect || '/'
-      router.push(redirect)
+      const redirect = router.currentRoute.value.query.redirect || "/";
+      router.push(redirect);
     } else {
-      error.value = authStore.error || 'Authentication failed'
-      console.error('Callback failed:', authStore.error)
+      error.value = authStore.error || "Authentication failed";
+      console.error("Callback failed:", authStore.error);
     }
   } catch (err) {
-    error.value = err.message || 'Authentication failed'
-    console.error('Callback error:', err)
+    error.value = err.message || "Authentication failed";
+    console.error("Callback error:", err);
   }
-})
+});
 </script>
 
 <style scoped>

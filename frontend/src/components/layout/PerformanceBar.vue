@@ -1,6 +1,13 @@
 <template>
-  <div class="performance-bar" :class="`level-${colorLevel}`" :aria-label="`Hausgesundheit: ${score} von 100`">
-    <div class="score-label"><span>{{ score }}</span>/100</div>
+  <div
+    class="performance-bar"
+    :class="`level-${colorLevel}`"
+    :aria-label="`Hausgesundheit: ${score} von 100`"
+  >
+    <div class="score-label">
+      <span>{{ score }}</span
+      >/100
+    </div>
     <div class="bar-track">
       <div class="bar-fill" :style="{ width: score + '%' }"></div>
     </div>
@@ -9,24 +16,24 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed } from "vue";
 
 const props = defineProps({
   score: {
     type: Number,
-    default: 100
+    default: 100,
   },
   label: {
     type: String,
-    default: null
-  }
-})
+    default: null,
+  },
+});
 
 const colorLevel = computed(() => {
-  if (props.score >= 70) return 'good'
-  if (props.score >= 30) return 'warning'
-  return 'danger'
-})
+  if (props.score >= 70) return "good";
+  if (props.score >= 30) return "warning";
+  return "danger";
+});
 </script>
 
 <style scoped>

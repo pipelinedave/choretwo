@@ -2,14 +2,10 @@
   <transition name="slide-down">
     <div v-if="show" class="undo-banner shadow-elevation-3">
       <div class="undo-banner-content">
-        <span class="mdi mdi-undo" style="margin-right: 8px;"></span>
+        <span class="mdi mdi-undo" style="margin-right: 8px"></span>
         <span>Action undone</span>
       </div>
-      <button 
-        @click="handleDismiss"
-        class="btn-icon"
-        aria-label="Dismiss"
-      >
+      <button @click="handleDismiss" class="btn-icon" aria-label="Dismiss">
         <span class="mdi mdi-close"></span>
       </button>
     </div>
@@ -17,26 +13,29 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { useLogStore } from '@/stores/log'
+import { ref, watch } from "vue";
+import { useLogStore } from "@/stores/log";
 
-const logStore = useLogStore()
-const show = ref(false)
-let dismissTimer = null
+const logStore = useLogStore();
+const show = ref(false);
+let dismissTimer = null;
 
-watch(() => logStore.lastAction, (newAction) => {
-  if (newAction?.type === 'undo') {
-    show.value = true
-    clearTimeout(dismissTimer)
-    dismissTimer = setTimeout(() => {
-      show.value = false
-    }, 3000)
-  }
-})
+watch(
+  () => logStore.lastAction,
+  (newAction) => {
+    if (newAction?.type === "undo") {
+      show.value = true;
+      clearTimeout(dismissTimer);
+      dismissTimer = setTimeout(() => {
+        show.value = false;
+      }, 3000);
+    }
+  },
+);
 
 function handleDismiss() {
-  show.value = false
-  clearTimeout(dismissTimer)
+  show.value = false;
+  clearTimeout(dismissTimer);
 }
 </script>
 

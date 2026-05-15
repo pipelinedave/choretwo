@@ -2,12 +2,12 @@
   <div class="add-chore-form-overlay" @click="handleBackdropClick">
     <div class="add-chore-form card" @click.stop>
       <div class="form-header">
-        <h2>{{ editingChore ? 'Edit Chore' : 'Add Chore' }}</h2>
+        <h2>{{ editingChore ? "Edit Chore" : "Add Chore" }}</h2>
         <button @click="handleClose" class="btn-icon">
           <span class="mdi mdi-close"></span>
         </button>
       </div>
-      
+
       <form @submit.prevent="handleSubmit" class="form-content">
         <div class="form-group">
           <label for="name" class="form-label">Chore Name</label>
@@ -20,20 +20,21 @@
             required
           />
         </div>
-        
+
         <div class="form-group">
-          <label for="interval" class="form-label">Recurrence (optional)</label>
-          <select v-model="formData.interval" class="input">
-            <option value="">One-time</option>
-            <option value="1 day">Daily</option>
-            <option value="2 days">Every 2 days</option>
-            <option value="3 days">Every 3 days</option>
-            <option value="7 days">Weekly</option>
-            <option value="14 days">Every 2 weeks</option>
-            <option value="30 days">Monthly</option>
-          </select>
+          <label for="interval" class="form-label">Repeat every</label>
+          <input
+            id="interval"
+            v-model.number="formData.interval"
+            type="number"
+            class="input"
+            min="1"
+            step="1"
+            placeholder="7"
+          />
+          <span class="form-hint">(e.g., 1 for daily, 7 for weekly)</span>
         </div>
-        
+
         <div class="form-group">
           <label for="dueDate" class="form-label">Due Date (optional)</label>
           <input
@@ -43,7 +44,7 @@
             class="input"
           />
         </div>
-        
+
         <div class="form-group">
           <label for="priority" class="form-label">Priority</label>
           <select v-model="formData.priority" class="input">
@@ -52,23 +53,20 @@
             <option value="high">High</option>
           </select>
         </div>
-        
+
         <div class="form-group">
           <label class="form-checkbox">
-            <input
-              v-model="formData.private"
-              type="checkbox"
-            />
+            <input v-model="formData.private" type="checkbox" />
             <span class="checkbox-custom"></span>
             <span class="form-label">Private (only you can see)</span>
           </label>
         </div>
-        
+
         <div class="form-actions">
-          <button 
-            v-if="editingChore" 
-            type="button" 
-            @click="handleArchive" 
+          <button
+            v-if="editingChore"
+            type="button"
+            @click="handleArchive"
             class="btn btn-text btn-danger"
           >
             Archive
@@ -77,7 +75,7 @@
             Cancel
           </button>
           <button type="submit" class="btn btn-filled">
-            {{ editingChore ? 'Save Changes' : 'Add Chore' }}
+            {{ editingChore ? "Save Changes" : "Add Chore" }}
           </button>
         </div>
       </form>
@@ -86,68 +84,72 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch } from "vue";
 
 const props = defineProps({
   chore: {
     type: Object,
-    default: null
-  }
-})
+    default: null,
+  },
+});
 
-const emit = defineEmits(['submit', 'close'])
+const emit = defineEmits(["submit", "close"]);
 
 const formData = ref({
-  name: '',
-  interval: '',
-  dueDate: '',
-  priority: 'medium',
-  private: false
-})
+  name: "",
+  interval: 0,
+  dueDate: "",
+  priority: "medium",
+  private: false,
+});
 
-const editingChore = ref(false)
+const editingChore = ref(false);
 
-watch(() => props.chore, (newChore) => {
-  if (newChore) {
-    editingChore.value = true
-    formData.value = {
-      name: newChore.name || '',
-      interval: newChore.interval || '',
-      dueDate: newChore.dueDate || '',
-      priority: newChore.priority || 'medium',
-      private: newChore.private || false
+watch(
+  () => props.chore,
+  (newChore) => {
+    if (newChore) {
+      editingChore.value = true;
+      formData.value = {
+        name: newChore.name || "",
+        interval: newChore.interval || 0,
+        dueDate: newChore.dueDate || "",
+        priority: newChore.priority || "medium",
+        private: newChore.private || false,
+      };
+    } else {
+      editingChore.value = false;
+      resetForm();
     }
-  } else {
-    editingChore.value = false
-    resetForm()
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+);
 
 function resetForm() {
   formData.value = {
-    name: '',
-    interval: '',
-    dueDate: '',
-    priority: 'medium',
-    private: false
-  }
+    name: "",
+    interval: 0,
+    dueDate: "",
+    priority: "medium",
+    private: false,
+  };
 }
 
 function handleClose() {
-  resetForm()
-  emit('close')
+  resetForm();
+  emit("close");
 }
 
 function handleSubmit() {
-  emit('submit', {
+  emit("submit", {
     ...formData.value,
-    id: props.chore?.id
-  })
-  resetForm()
+    id: props.chore?.id,
+  });
+  resetForm();
 }
 
 function handleBackdropClick() {
-  handleClose()
+  handleClose();
 }
 </script>
 
@@ -220,7 +222,9 @@ function handleBackdropClick() {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--md-sys-transition-fast), border-color var(--md-sys-transition-fast);
+  transition:
+    background-color var(--md-sys-transition-fast),
+    border-color var(--md-sys-transition-fast);
 }
 
 input[type="checkbox"]:checked + .checkbox-custom {
@@ -229,7 +233,7 @@ input[type="checkbox"]:checked + .checkbox-custom {
 }
 
 input[type="checkbox"]:checked + .checkbox-custom::after {
-  content: '✓';
+  content: "✓";
   color: white;
   font-size: 14px;
 }

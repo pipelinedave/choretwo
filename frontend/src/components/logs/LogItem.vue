@@ -3,100 +3,101 @@
     <div class="log-item-icon" :class="logClass">
       <span class="mdi" :class="logIcon"></span>
     </div>
-    
+
     <div class="log-item-content">
       <p class="log-item-text">
-        <strong>{{ log.user_email?.split('@')[0] || 'Unknown' }}</strong>
+        <strong>{{ log.user_email?.split("@")[0] || "Unknown" }}</strong>
         {{ actionText }}
         <strong class="log-chore-title">{{ choreDisplayTitle }}</strong>
       </p>
       <p class="log-item-time">{{ formatTime(log.timestamp) }}</p>
     </div>
-    
-    <button 
-      v-if="canUndo"
-      @click="handleUndo"
-      class="btn btn-tonal btn-undo"
-    >
+
+    <button v-if="canUndo" @click="handleUndo" class="btn btn-tonal btn-undo">
       Undo
     </button>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed } from "vue";
 
 const props = defineProps({
   log: {
     type: Object,
-    required: true
-  }
-})
+    required: true,
+  },
+});
 
-const emit = defineEmits(['undo'])
+const emit = defineEmits(["undo"]);
 
 const canUndo = computed(() => {
-  const undoableActions = ['chore:completed', 'chore:created', 'chore:updated', 'chore:archived']
-  return undoableActions.includes(props.log.action)
-})
+  const undoableActions = [
+    "chore:completed",
+    "chore:created",
+    "chore:updated",
+    "chore:archived",
+  ];
+  return undoableActions.includes(props.log.action);
+});
 
 const logClass = computed(() => {
-  const action = props.log.action
-  if (action.includes('completed')) return 'log-completed'
-  if (action.includes('created')) return 'log-created'
-  if (action.includes('updated')) return 'log-updated'
-  if (action.includes('archived')) return 'log-archived'
-  if (action.includes('unarchived')) return 'log-unarchived'
-  return ''
-})
+  const action = props.log.action;
+  if (action.includes("completed")) return "log-completed";
+  if (action.includes("created")) return "log-created";
+  if (action.includes("updated")) return "log-updated";
+  if (action.includes("archived")) return "log-archived";
+  if (action.includes("unarchived")) return "log-unarchived";
+  return "";
+});
 
 const logIcon = computed(() => {
-  const action = props.log.action
-  if (action.includes('completed')) return 'mdi-check-circle'
-  if (action.includes('created')) return 'mdi-plus-circle'
-  if (action.includes('updated')) return 'mdi-pencil-circle'
-  if (action.includes('archived')) return 'mdi-archive'
-  if (action.includes('unarchived')) return 'mdi-archive-open'
-  if (action.includes('deleted')) return 'mdi-delete'
-  return 'mdi-history'
-})
+  const action = props.log.action;
+  if (action.includes("completed")) return "mdi-check-circle";
+  if (action.includes("created")) return "mdi-plus-circle";
+  if (action.includes("updated")) return "mdi-pencil-circle";
+  if (action.includes("archived")) return "mdi-archive";
+  if (action.includes("unarchived")) return "mdi-archive-open";
+  if (action.includes("deleted")) return "mdi-delete";
+  return "mdi-history";
+});
 
 const actionText = computed(() => {
-  const action = props.log.action
-  if (action.includes('completed')) return 'completed'
-  if (action.includes('created')) return 'created'
-  if (action.includes('updated')) return 'updated'
-  if (action.includes('archived')) return 'archived'
-  if (action.includes('unarchived')) return 'unarchived'
-  if (action.includes('deleted')) return 'deleted'
-  if (action.includes('undo')) return 'undid'
-  return 'did something to'
-})
+  const action = props.log.action;
+  if (action.includes("completed")) return "completed";
+  if (action.includes("created")) return "created";
+  if (action.includes("updated")) return "updated";
+  if (action.includes("archived")) return "archived";
+  if (action.includes("unarchived")) return "unarchived";
+  if (action.includes("deleted")) return "deleted";
+  if (action.includes("undo")) return "undid";
+  return "did something to";
+});
 
 const choreDisplayTitle = computed(() => {
-  if (props.log.chore_title) return props.log.chore_title
-  const resourceType = props.log.resource_type
-  if (resourceType === 'chore') return 'a chore'
-  return 'something'
-})
+  if (props.log.chore_title) return props.log.chore_title;
+  const resourceType = props.log.resource_type;
+  if (resourceType === "chore") return "a chore";
+  return "something";
+});
 
 function formatTime(timestamp) {
-  const date = new Date(timestamp)
-  const now = new Date()
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString()
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
 }
 
 function handleUndo() {
-  emit('undo', props.log.id)
+  emit("undo", props.log.id);
 }
 </script>
 
