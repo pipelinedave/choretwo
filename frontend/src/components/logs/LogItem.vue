@@ -8,7 +8,7 @@
       <p class="log-item-text">
         <strong>{{ log.user_email?.split('@')[0] || 'Unknown' }}</strong>
         {{ actionText }}
-        <strong>{{ resourceName }}</strong>
+        <strong class="log-chore-title">{{ choreDisplayTitle }}</strong>
       </p>
       <p class="log-item-time">{{ formatTime(log.timestamp) }}</p>
     </div>
@@ -73,7 +73,8 @@ const actionText = computed(() => {
   return 'did something to'
 })
 
-const resourceName = computed(() => {
+const choreDisplayTitle = computed(() => {
+  if (props.log.chore_title) return props.log.chore_title
   const resourceType = props.log.resource_type
   if (resourceType === 'chore') return 'a chore'
   return 'something'
@@ -153,6 +154,13 @@ function handleUndo() {
   color: var(--md-sys-color-on-surface);
   margin-bottom: 4px;
   word-break: break-word;
+}
+
+.log-chore-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
 }
 
 .log-item-time {

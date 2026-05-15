@@ -39,6 +39,7 @@ async def list_logs(
                 "done_at": row[3].isoformat() if row[3] else None,
                 "action_details": action_details,
                 "action_type": row[5],
+                "chore_title": row[6] if row[6] else None,
             }
         )
 
@@ -67,6 +68,7 @@ async def get_log(request: Request, log_id: int, db: Session = Depends(get_db)):
         "done_at": row[3].isoformat() if row[3] else None,
         "action_details": action_details,
         "action_type": row[5],
+        "chore_title": row[6] if row[6] else None,
     }
 
 

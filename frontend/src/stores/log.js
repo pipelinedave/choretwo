@@ -21,6 +21,7 @@ export const useLogStore = defineStore('logs', () => {
         action: mapActionType(log.action_type),
         resource_type: 'chore',
         resource_id: log.chore_id,
+        chore_title: log.chore_title,
         user_email: log.done_by,
         timestamp: log.done_at,
         previous_state: log.action_details?.previous_state,

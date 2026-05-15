@@ -31,7 +31,7 @@ def get_logs(db: Session, user_email: str, page: int = 1, limit: int = 50):
     offset = (page - 1) * limit
 
     query = text("""
-        SELECT l.id, l.chore_id, l.done_by, l.done_at, l.action_details, l.action_type
+        SELECT l.id, l.chore_id, l.done_by, l.done_at, l.action_details, l.action_type, c.name AS chore_title
         FROM logs.chore_logs l
         LEFT JOIN chores.chores c ON l.chore_id = c.id
         WHERE c.id IS NULL
