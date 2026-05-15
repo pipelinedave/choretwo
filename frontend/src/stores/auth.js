@@ -11,7 +11,8 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value && !!user.value)
 
   async function login(redirectUrl = '/') {
-    window.location.href = `${import.meta.env.VITE_AUTH_URL}/api/auth/login?redirect=${encodeURIComponent(redirectUrl)}`
+    const params = new URLSearchParams({ redirect: redirectUrl })
+    window.location.href = '/api/auth/login?' + params.toString()
   }
 
   async function handleCallback() {
