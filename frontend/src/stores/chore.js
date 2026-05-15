@@ -3,6 +3,16 @@ import { ref, computed } from 'vue'
 import { choreApi } from '@/api'
 import { bucketChores, normalizeToLocalDate } from '@/utils/choreBuckets'
 
+const normalizeChore = (chore) => ({
+  ...chore,
+  dueDate: chore.due_date,
+  doneBy: chore.done_by,
+  interval: chore.interval_days ? `${chore.interval_days} days` : '',
+  lastDone: chore.last_done,
+  ownerEmail: chore.owner_email,
+  isPrivate: chore.is_private,
+})
+
 export const useChoreStore = defineStore('chores', () => {
   const chores = ref([])
   const archivedChores = ref([])
@@ -16,16 +26,16 @@ export const useChoreStore = defineStore('chores', () => {
 
   const sortedByUrgency = computed(() => {
     return [...chores.value].sort((a, b) => {
-      const dateA = normalizeToLocalDate(a.due_date)
-      const dateB = normalizeToLocalDate(b.due_date)
+      const dateA = normalizeToLocalDate(a.dueDate)
+      const dateB = normalizeToLocalDate(b.dueDate)
       return (dateA?.getTime() ?? Infinity) - (dateB?.getTime() ?? Infinity)
     })
   })
 
   const sortedArchivedChores = computed(() => {
     return [...archivedChores.value].sort((a, b) => {
-      const dateA = normalizeToLocalDate(a.due_date)
-      const dateB = normalizeToLocalDate(b.due_date)
+      const dateA = normalizeToLocalDate(a.dueDate)
+      const dateB = normalizeToLocalDate(b.dueDate)
       return (dateA?.getTime() ?? Infinity) - (dateB?.getTime() ?? Infinity)
     })
   })
@@ -53,7 +63,7 @@ export const useChoreStore = defineStore('chores', () => {
 
     try {
       const response = await choreApi.get('/')
-      chores.value = response.data
+      chores.value = response.data.map(normalizeChore)
       await fetchChoreCounts()
     } catch (err) {
       error.value = err.message || 'Failed to fetch chores'
@@ -69,7 +79,7 @@ export const useChoreStore = defineStore('chores', () => {
 
     try {
       const response = await choreApi.get('/archived')
-      archivedChores.value = response.data
+      archivedChores.value = response.data.map(normalizeChore)
     } catch (err) {
       error.value = err.message || 'Failed to fetch archived chores'
       throw err
@@ -99,15 +109,25 @@ export const useChoreStore = defineStore('chores', () => {
 
   async function addChore(choreData) {
     try {
-      const response = await choreApi.post('/', choreData)
+      const payload = { name: choreData.name }
+      if (choreData.interval) {
+        const match = choreData.interval.match(/^(\d+)\s*days?$/)
+        if (match) {
+          payload.interval_days = parseInt(match[1], 10)
+        }
+      }
+      if (choreData.dueDate) payload.due_date = choreData.dueDate
+      payload.is_private = choreData.private
+      
+      const response = await choreApi.post('/', payload)
       const createdChore = {
         ...choreData,
         id: response.data.id,
         done: false,
-        done_by: null,
+        doneBy: null,
         archived: false
       }
-      chores.value.push(createdChore)
+      chores.value.push(normalizeChore(response.data))
       await fetchChoreCounts()
       return createdChore
     } catch (err) {
@@ -118,12 +138,26 @@ export const useChoreStore = defineStore('chores', () => {
 
   async function updateChore(id, updates) {
     try {
-      const response = await choreApi.put(`/${id}`, updates)
+      const payload = {}
+      if (updates.name) payload.name = updates.name
+      if (updates.interval) {
+        const match = updates.interval.match(/^(\d+)\s*days?$/)
+        if (match) {
+          payload.interval_days = parseInt(match[1], 10)
+        }
+      }
+      if (updates.dueDate) payload.due_date = updates.dueDate
+      if (updates.hasOwnProperty('private') && updates.private !== updates.isPrivate) {
+        payload.is_private = updates.private
+      }
+
+      const response = await choreApi.put(`/${id}`, payload)
+      const normalized = normalizeChore(response.data)
       const index = chores.value.findIndex(c => c.id === id)
       if (index !== -1) {
         chores.value[index] = {
           ...chores.value[index],
-          ...response.data,
+          ...normalized,
           ...updates
         }
       }
@@ -140,13 +174,14 @@ export const useChoreStore = defineStore('chores', () => {
       const response = await choreApi.put(`/${id}/done`, { done_by: doneBy })
       const index = chores.value.findIndex(c => c.id === id)
       if (index !== -1) {
-        chores.value[index] = {
+        const updated = normalizeChore({
           ...chores.value[index],
           done: true,
-          due_date: response.data.new_due_date,
-          last_done: response.data.last_done,
-          done_by: response.data.done_by
-        }
+          dueDate: response.data.new_due_date,
+          lastDone: response.data.last_done,
+          doneBy: response.data.done_by
+        })
+        chores.value[index] = updated
       }
       await fetchChoreCounts()
       return response.data
