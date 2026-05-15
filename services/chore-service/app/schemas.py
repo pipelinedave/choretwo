@@ -5,8 +5,12 @@ from pydantic import BaseModel, Field
 
 class ChoreCreate(BaseModel):
     name: str
-    interval_days: int = Field(..., ge=1, description="Interval in days")
-    due_date: date
+    interval_days: Optional[int] = Field(
+        default=1, ge=1, description="Interval in days"
+    )
+    due_date: Optional[date] = Field(
+        default=None, description="Due date (defaults to today)"
+    )
     is_private: bool = False
 
 

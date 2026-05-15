@@ -14,6 +14,7 @@ from app.services.chore_service import (
     update_chore,
     mark_chore_done,
     archive_chore,
+    delete_chore,
     get_chore_stats,
 )
 from app.utils import log_action
@@ -93,6 +94,13 @@ async def list_archived_chores(request: Request, db: Session = Depends(get_db)):
         )
         for c in chores
     ]
+
+
+@router.get("/stats")
+async def get_chores_stats(request: Request, db: Session = Depends(get_db)):
+    user_email = request.state.user_email
+    stats = get_chore_stats(db, user_email)
+    return stats
 
 
 @router.get("/{chore_id}")
@@ -188,9 +196,17 @@ async def unarchive_chore_endpoint(
     return {"message": f"Chore {chore_id} unarchived successfully"}
 
 
-@router.get("/count")
-async def get_chores_count(request: Request, db: Session = Depends(get_db)):
-    user_email = request.state.user_email
-    stats = get_chore_stats(db, user_email)
 
-    return stats
+
+
+@router.delete("/{chore_id}")
+async def delete_single_chore(
+    request: Request, chore_id: int, db: Session = Depends(get_db)
+):
+    user_email = request.state.user_email
+    chore = delete_chore(db, chore_id, user_email)
+
+    if not chore:
+        raise HTTPException(status_code=404, detail="Chore not found")
+
+    return {"message": f"Chore {chore_id} deleted successfully"}

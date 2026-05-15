@@ -46,7 +46,7 @@ def create_chore(db: Session, chore_data: ChoreCreate, user_email: str) -> Chore
     chore = Chore(
         name=chore_data.name,
         interval_days=chore_data.interval_days,
-        due_date=chore_data.due_date,
+        due_date=chore_data.due_date or date.today(),
         is_private=chore_data.is_private,
         owner_email=user_email if chore_data.is_private else None,
         done=False,
@@ -184,6 +184,28 @@ def archive_chore(db: Session, chore_id: int, user_email: str) -> Optional[Chore
     db.refresh(chore)
 
     log_action(chore.id, user_email, "archived", {"id": chore.id})
+
+    return chore
+
+
+def delete_chore(db: Session, chore_id: int, user_email: str) -> Optional[Chore]:
+    chore = (
+        db.query(Chore)
+        .filter(
+            Chore.id == chore_id,
+            (Chore.is_private == False)
+            | (Chore.is_private == True and Chore.owner_email == user_email),
+        )
+        .first()
+    )
+
+    if not chore:
+        return None
+
+    db.delete(chore)
+    db.commit()
+
+    log_action(chore.id, user_email, "deleted", {"id": chore.id, "name": chore.name})
 
     return chore
 
