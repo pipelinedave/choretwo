@@ -44,7 +44,7 @@ export const bucketChores = (chores, now = new Date()) => {
   chores.forEach((chore) => {
     if (!chore || chore.archived) return
 
-    const dueDate = normalizeToLocalDate(chore.due_date)
+    const dueDate = normalizeToLocalDate(chore.dueDate)
     if (!dueDate) return
 
     buckets.all.push(chore)
