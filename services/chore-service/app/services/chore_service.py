@@ -1,5 +1,5 @@
-from datetime import date, datetime
-from typing import List, Optional
+from datetime import date, datetime, timedelta
+from typing import List, Optional, Tuple
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -245,3 +245,131 @@ def get_chore_stats(db: Session, user_email: str) -> dict:
         "on_track": on_track,
         "total": len(chores),
     }
+
+
+def get_chore_bucket_counts(db: Session, user_email: str) -> dict:
+    """Get chore counts by urgency bucket (mirrors choremane /chores/count)."""
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    next_week = today + timedelta(days=7)
+
+    query = text("""
+        SELECT COUNT(*),
+               SUM(CASE WHEN due_date < :today THEN 1 ELSE 0 END),
+               SUM(CASE WHEN due_date = :today THEN 1 ELSE 0 END),
+               SUM(CASE WHEN due_date = :tomorrow THEN 1 ELSE 0 END),
+               SUM(CASE WHEN due_date > :tomorrow AND due_date <= :next_week THEN 1 ELSE 0 END),
+               SUM(CASE WHEN due_date > :next_week THEN 1 ELSE 0 END)
+        FROM chores.chores
+        WHERE archived = FALSE
+        AND (is_private = FALSE OR (is_private = TRUE AND owner_email = :email))
+    """)
+    row = db.execute(
+        query,
+        {
+            "email": user_email,
+            "today": today,
+            "tomorrow": tomorrow,
+            "next_week": next_week,
+        },
+    ).fetchone()
+
+    total = row[0] or 0
+    overdue = row[1] or 0
+    today_count = row[2] or 0
+    tomorrow_count = row[3] or 0
+    this_week_count = row[4] or 0
+    upcoming_count = row[5] or 0
+
+    return {
+        "all": total,
+        "overdue": overdue,
+        "today": today_count,
+        "tomorrow": tomorrow_count,
+        "thisWeek": this_week_count,
+        "upcoming": upcoming_count,
+    }
+
+
+def calculate_single_chore_score(
+    due_date: datetime, interval_days: int, now: Optional[datetime] = None
+) -> float:
+    """Calculate health score for a single chore (from choremane services.py)."""
+    if now is None:
+        now = datetime.now()
+
+    interval_ms = interval_days * 24 * 60 * 60 * 1000
+    diff = now - due_date
+    diff_ms = diff.total_seconds() * 1000
+
+    score = 100.0
+
+    if diff_ms > 0:
+        overdue_ratio = diff_ms / interval_ms
+        score = max(0, 80 - (overdue_ratio * 80))
+    else:
+        time_until_due = -diff_ms
+        fraction_elapsed = 1 - (time_until_due / interval_ms)
+        safe_fraction = max(0, min(1, fraction_elapsed))
+
+        if safe_fraction <= 0.5:
+            score = 100
+        else:
+            score = 100 + ((safe_fraction - 0.5) * -40)
+
+    return score
+
+
+def calculate_household_health_score(
+    chore_rows: List[Tuple], now: Optional[datetime] = None
+) -> int:
+    """Calculate overall household health score from chore rows (from choremane services.py)."""
+    if not chore_rows:
+        return 100
+
+    if now is None:
+        now = datetime.now()
+
+    total_score = 0.0
+    active_chore_count = 0
+
+    for row in chore_rows:
+        due_date = row[0]
+        interval_days = row[1]
+
+        if interval_days is None or interval_days <= 0:
+            continue
+
+        try:
+            if isinstance(due_date, str):
+                due_date = datetime.fromisoformat(due_date)
+            elif hasattr(due_date, "year") and not isinstance(due_date, datetime):
+                due_date = datetime.combine(due_date, datetime.min.time())
+
+            score = calculate_single_chore_score(due_date, interval_days, now)
+            total_score += score
+            active_chore_count += 1
+        except (ValueError, TypeError):
+            continue
+
+    if active_chore_count == 0:
+        return 100
+
+    return int(round(total_score / active_chore_count))
+
+
+def get_household_health(db: Session, user_email: str) -> dict:
+    """Get household health score 0-100 (mirrors choremane /chores/household-health)."""
+    query = text("""
+        SELECT due_date, interval_days
+        FROM chores.chores
+        WHERE archived = FALSE
+        AND interval_days IS NOT NULL
+        AND interval_days > 0
+        AND (is_private = FALSE OR (is_private = TRUE AND owner_email = :email))
+    """)
+    rows = db.execute(query, {"email": user_email}).fetchall()
+
+    chore_rows = [(row[0], row[1]) for row in rows]
+    score = calculate_household_health_score(chore_rows)
+    return {"score": score}

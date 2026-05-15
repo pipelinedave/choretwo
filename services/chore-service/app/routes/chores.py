@@ -16,6 +16,8 @@ from app.services.chore_service import (
     archive_chore,
     delete_chore,
     get_chore_stats,
+    get_household_health,
+    get_chore_bucket_counts,
 )
 from app.utils import log_action
 
@@ -196,9 +198,6 @@ async def unarchive_chore_endpoint(
     return {"message": f"Chore {chore_id} unarchived successfully"}
 
 
-
-
-
 @router.delete("/{chore_id}")
 async def delete_single_chore(
     request: Request, chore_id: int, db: Session = Depends(get_db)
@@ -210,3 +209,15 @@ async def delete_single_chore(
         raise HTTPException(status_code=404, detail="Chore not found")
 
     return {"message": f"Chore {chore_id} deleted successfully"}
+
+
+@router.get("/count")
+async def get_chore_counts(request: Request, db: Session = Depends(get_db)):
+    user_email = request.state.user_email
+    return get_chore_bucket_counts(db, user_email)
+
+
+@router.get("/household-health")
+async def get_household_health_score(request: Request, db: Session = Depends(get_db)):
+    user_email = request.state.user_email
+    return get_household_health(db, user_email)
