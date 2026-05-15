@@ -54,8 +54,8 @@ export const useChoreStore = defineStore('chores', () => {
   async function addChore(choreData) {
     try {
       const response = await choreApi.post('/', choreData)
-      chores.value.push(response.data)
-      return response.data
+      await fetchChores()
+      return response.data.chore || response.data
     } catch (err) {
       error.value = err.message || 'Failed to add chore'
       throw err

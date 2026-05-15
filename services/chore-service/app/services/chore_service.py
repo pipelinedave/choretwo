@@ -48,7 +48,7 @@ def create_chore(db: Session, chore_data: ChoreCreate, user_email: str) -> Chore
         interval_days=chore_data.interval_days,
         due_date=chore_data.due_date or date.today(),
         is_private=chore_data.is_private,
-        owner_email=user_email if chore_data.is_private else None,
+        owner_email=user_email,
         done=False,
         archived=False,
     )
