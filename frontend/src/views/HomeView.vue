@@ -6,6 +6,12 @@
       <p>Here's what's happening with your chores today.</p>
     </div>
 
+    <!-- Performance bar -->
+    <PerformanceBar 
+      :score="choreStore.householdHealth"
+      label="Health"
+    />
+
     <!-- Stats cards -->
     <div class="stats-grid">
       <div class="stat-card card" @click="navigateTo('/chores?filter=overdue')">
@@ -112,6 +118,8 @@ import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
 import EmptyState from '@/components/chores/EmptyState.vue'
 import ChoreCard from '@/components/chores/ChoreCard.vue'
 import AddChoreForm from '@/components/chores/AddChoreForm.vue'
+import FilterPills from '@/components/chores/FilterPills.vue'
+import PerformanceBar from '@/components/layout/PerformanceBar.vue'
 import LogOverlay from '@/components/logs/LogOverlay.vue'
 import UndoBanner from '@/components/logs/UndoBanner.vue'
 

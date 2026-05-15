@@ -6,6 +6,12 @@
       :stats="choreStore.stats"
     />
 
+    <!-- Performance bar -->
+    <PerformanceBar 
+      :score="choreStore.householdHealth"
+      label="Health"
+    />
+
     <!-- Add chore FAB -->
     <button 
       @click="showAddForm = true"
@@ -62,6 +68,7 @@ import { useAuthStore } from '@/stores/auth'
 import LoadingSpinner from '@/components/layout/LoadingSpinner.vue'
 import EmptyState from '@/components/chores/EmptyState.vue'
 import FilterPills from '@/components/chores/FilterPills.vue'
+import PerformanceBar from '@/components/layout/PerformanceBar.vue'
 import ChoreCard from '@/components/chores/ChoreCard.vue'
 import AddChoreForm from '@/components/chores/AddChoreForm.vue'
 import UndoBanner from '@/components/logs/UndoBanner.vue'
