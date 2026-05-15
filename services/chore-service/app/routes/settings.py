@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime
 from typing import Any
+from psycopg2.extras import Json
 
 from app.database import get_db
 from app.schemas import (
@@ -77,9 +78,11 @@ def _update_user_notifications(
     if enabled is not None:
         fields.append("enabled = :enabled")
         values["enabled"] = enabled
-    if data.notify_times is not None:
+    if notify_times is not None:
+        # Wrap jsonb list values with Json() so psycopg2 serialises as JSON
+        # instead of PostgreSQL ARRAY (which causes DatatypeMismatch).
         fields.append("notify_times = :notify_times")
-        values["notify_times"] = data.notify_times
+        values["notify_times"] = Json(notify_times)
     if notify_overdue is not None:
         fields.append("notify_overdue = :notify_overdue")
         values["notify_overdue"] = notify_overdue
@@ -91,14 +94,16 @@ def _update_user_notifications(
         values["updated_at"] = datetime.utcnow()
         fields.append("updated_at = :updated_at")
         db.execute(
-            text(f"""
+            text(
+                """
             INSERT INTO notifications.notification_preferences (user_email, updated_at)
             VALUES (:email, :updated_at)
             ON CONFLICT (user_email) DO UPDATE SET
-                {", ".join(fields)}
+                {set_clause}
             RETURNING enabled, notify_times, notify_overdue, notify_soon,
                       created_at, updated_at
-        """),
+        """.format(set_clause=", ".join(fields))
+            ),
             values,
         )
         db.commit()
@@ -157,22 +162,26 @@ def _update_user_ai_prefs(db: Session, email: str, data: AIUserPreferencesUpdate
     if learning_enabled is not None:
         fields.append("learning_enabled = :learning_enabled")
         values["learning_enabled"] = learning_enabled
-    if data.suggestion_types is not None:
+    if suggestion_types is not None:
+        # Wrap jsonb list values with Json() so psycopg2 serialises as JSON
+        # instead of PostgreSQL ARRAY (which causes DatatypeMismatch).
         fields.append("suggestion_types = :suggestion_types")
-        values["suggestion_types"] = data.suggestion_types
+        values["suggestion_types"] = Json(suggestion_types)
 
     if fields:
         values["updated_at"] = datetime.utcnow()
         fields.append("updated_at = :updated_at")
         db.execute(
-            text(f"""
+            text(
+                """
             INSERT INTO ai.ai_user_preferences (user_email, updated_at)
             VALUES (:email, :updated_at)
             ON CONFLICT (user_email) DO UPDATE SET
-                {", ".join(fields)}
+                {set_clause}
             RETURNING learning_enabled, suggestion_types,
                       created_at, updated_at
-        """),
+        """.format(set_clause=", ".join(fields))
+            ),
             values,
         )
         db.commit()
