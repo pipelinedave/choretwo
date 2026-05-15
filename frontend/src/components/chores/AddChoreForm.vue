@@ -65,6 +65,14 @@
         </div>
         
         <div class="form-actions">
+          <button 
+            v-if="editingChore" 
+            type="button" 
+            @click="handleArchive" 
+            class="btn btn-text btn-danger"
+          >
+            Archive
+          </button>
           <button type="button" @click="handleClose" class="btn btn-text">
             Cancel
           </button>
