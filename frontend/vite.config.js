@@ -91,7 +91,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            const token = req.headers.authorization || ''
+            const token = req.headers['authorization'] || req.headers['Authorization'] || ''
             if (token) proxyReq.setHeader('Authorization', token)
           })
         }
@@ -101,7 +101,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            const token = req.headers.authorization || ''
+            const token = req.headers['authorization'] || req.headers['Authorization'] || ''
             if (token) proxyReq.setHeader('Authorization', token)
           })
         }
@@ -111,7 +111,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            const token = req.headers.authorization || ''
+            const token = req.headers['authorization'] || req.headers['Authorization'] || ''
             if (token) proxyReq.setHeader('Authorization', token)
           })
         }
@@ -121,7 +121,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            const token = req.headers.authorization || ''
+            const token = req.headers['authorization'] || req.headers['Authorization'] || ''
             if (token) proxyReq.setHeader('Authorization', token)
           })
         }
@@ -131,7 +131,7 @@ export default defineConfig({
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq, req) => {
-            const token = req.headers.authorization || ''
+            const token = req.headers['authorization'] || req.headers['Authorization'] || ''
             if (token) proxyReq.setHeader('Authorization', token)
           })
         }
