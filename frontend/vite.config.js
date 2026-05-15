@@ -153,6 +153,10 @@ export default defineConfig({
           });
         },
       },
+      "/api/settings": {
+        target: "http://localhost:8002",
+        changeOrigin: true,
+      },
     },
   },
   resolve: {

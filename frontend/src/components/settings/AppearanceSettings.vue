@@ -16,13 +16,13 @@
         :key="opt.value"
         @click="selectTheme(opt.value)"
         class="theme-option"
-        :class="{ active: s.appearance.theme === opt.value }"
-        :aria-pressed="s.appearance.theme === opt.value"
+        :class="{ active: draft === opt.value }"
+        :aria-pressed="draft === opt.value"
       >
         <span class="theme-icon" :class="opt.icon"></span>
         <span class="theme-label">{{ opt.label }}</span>
         <span
-          v-if="s.appearance.theme === opt.value"
+          v-if="draft === opt.value"
           class="mdi mdi-check-circle theme-check"
         ></span>
       </button>
@@ -32,9 +32,7 @@
     <div class="theme-preview card-outlined">
       <div class="theme-preview-line theme-preview-primary">
         <span>{{
-          s.appearance.theme === "dark"
-            ? "Dark theme preview text"
-            : "Preview text"
+          draft === "dark" ? "Dark theme preview text" : "Preview text"
         }}</span>
       </div>
       <div class="theme-preview-line theme-preview-secondary">
@@ -52,9 +50,9 @@
         <button
           class="btn btn-filled btn-sm"
           @click="saveTheme"
-          :disabled="s.loading"
+          :disabled="saving"
         >
-          <span v-if="s.loading" class="spinner"></span>
+          <span v-if="saving" class="spinner"></span>
           Apply
         </button>
       </div>
@@ -63,12 +61,13 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, onMounted } from "vue";
 import { useSettingsStore } from "@/stores/settings";
 
 const s = useSettingsStore();
 const draft = ref(null);
 const unsavedChanges = ref(false);
+const saving = ref(false);
 
 const themes = [
   { value: "light", label: "Light", icon: "mdi-white-balance-sunny" },
@@ -76,39 +75,35 @@ const themes = [
   { value: "system", label: "System", icon: "mdi-monitor-dash" },
 ];
 
-// Watch for external changes
-watch(
-  () => s.appearance.theme,
-  () => {
-    draft.value = null;
-    unsavedChanges.value = false;
-  },
-);
-
-function getDraft() {
-  if (!draft.value) {
-    draft.value = s.appearance.theme;
-  }
-  return draft.value;
-}
+onMounted(() => {
+  draft.value = s.appearance.theme;
+});
 
 function selectTheme(value) {
   draft.value = value;
   unsavedChanges.value = true;
-  // Apply immediately for UX
   s.applyThemeImmediate(value);
 }
 
 function discardTheme() {
-  draft.value = null;
+  draft.value = s.appearance.theme;
   unsavedChanges.value = false;
 }
 
 async function saveTheme() {
-  const theme = getDraft();
-  await s.updateSettings({ appearance: { theme } });
-  draft.value = null;
-  unsavedChanges.value = false;
+  saving.value = true;
+  try {
+    await s.updateSettings({ appearance: { theme: draft.value } });
+    unsavedChanges.value = false;
+    s.clearError();
+  } catch (err) {
+    s.clearError();
+    const msg = err?.response?.data?.detail || err?.message || "Theme konnte nicht gespeichert werden";
+    s.error = msg;
+    console.error("[AppearanceSettings] save failed:", err);
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 

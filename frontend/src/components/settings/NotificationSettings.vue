@@ -20,20 +20,23 @@
       </div>
       <label class="toggle">
         <input
-          v-model="effectiveNotifications.enabled"
           type="checkbox"
-          @change="scheduleSave"
+          :checked="draft.enabled"
+          @change="
+            draft.enabled = !draft.enabled;
+            markChanged();
+          "
         />
         <span class="toggle-slider"></span>
       </label>
     </div>
 
     <transition name="fade">
-      <div v-if="effectiveNotifications.enabled" class="setting-group">
+      <div v-if="draft.enabled" class="setting-group">
         <!-- notify_times -->
         <div
           class="setting-item"
-          v-for="(time, idx) in effectiveNotifications.notify_times"
+          v-for="(time, idx) in draft.notify_times"
           :key="idx"
         >
           <div class="setting-info">
@@ -50,13 +53,16 @@
           </div>
           <div class="time-picker">
             <input
-              v-model="effectiveNotifications.notify_times[idx]"
               type="time"
-              class="input"
-              @change="scheduleSave"
+              :value="draft.notify_times[idx]"
+              @input="
+                draft.notify_times[idx] = $event.target.value;
+                markChanged();
+              "
+              class="time-input"
             />
             <button
-              v-if="effectiveNotifications.notify_times.length > 1"
+              v-if="draft.notify_times.length > 1"
               class="btn-icon time-remove-btn"
               title="Remove"
               @click="removeTime(idx)"
@@ -81,9 +87,12 @@
           </div>
           <label class="toggle">
             <input
-              v-model="effectiveNotifications.notify_overdue"
               type="checkbox"
-              @change="scheduleSave"
+              :checked="draft.notify_overdue"
+              @change="
+                draft.notify_overdue = !draft.notify_overdue;
+                markChanged();
+              "
             />
             <span class="toggle-slider"></span>
           </label>
@@ -99,9 +108,12 @@
           </div>
           <label class="toggle">
             <input
-              v-model="effectiveNotifications.notify_soon"
               type="checkbox"
-              @change="scheduleSave"
+              :checked="draft.notify_soon"
+              @change="
+                draft.notify_soon = !draft.notify_soon;
+                markChanged();
+              "
             />
             <span class="toggle-slider"></span>
           </label>
@@ -113,15 +125,13 @@
     <div v-if="unsavedChanges" class="save-bar">
       <span class="save-bar-text">Unsaved changes</span>
       <div class="save-bar-actions">
-        <button class="btn btn-text btn-sm" @click="discardChanges">
-          Discard
-        </button>
+        <button class="btn btn-text btn-sm" @click="resetDraft">Discard</button>
         <button
           class="btn btn-filled btn-sm"
-          @click="save"
-          :disabled="s.loading"
+          @click="saveChanges"
+          :disabled="saving"
         >
-          <span v-if="s.loading" class="spinner"></span>
+          <span v-if="saving" class="spinner"></span>
           Save
         </button>
       </div>
@@ -130,74 +140,84 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { useSettingsStore } from "@/stores/settings";
 
 const s = useSettingsStore();
-const draft = ref(null);
+const saving = ref(false);
 const unsavedChanges = ref(false);
 
-// Computed that returns the draft values when they exist, otherwise the store values
-const effectiveNotifications = computed(() => {
-  if (draft.value) {
-    return draft.value;
-  }
-  return s.notifications;
+const draft = reactive({
+  enabled: true,
+  notify_times: ["09:00", "18:00"],
+  notify_overdue: true,
+  notify_soon: true,
 });
 
-// Watch for external changes and reset draft
-watch(
-  () => s.notifications,
-  () => {
-    draft.value = null;
-    unsavedChanges.value = false;
-  },
-  { deep: true },
-);
+onMounted(() => {
+  const n = s.notifications;
+  draft.enabled = n.enabled;
+  draft.notify_times = [...n.notify_times];
+  draft.notify_overdue = n.notify_overdue;
+  draft.notify_soon = n.notify_soon;
+});
 
-function getDraft() {
-  if (!draft.value) {
-    draft.value = reactive({
-      enabled: s.notifications.enabled,
-      notify_times: [...s.notifications.notify_times],
-      notify_overdue: s.notifications.notify_overdue,
-      notify_soon: s.notifications.notify_soon,
-    });
-  }
-  return draft.value;
+function markChanged() {
+  unsavedChanges.value = true;
 }
 
-function scheduleSave() {
-  const d = getDraft();
-  s.updateSettings({ notifications: d });
-  draft.value = null;
+function cloneDraft() {
+  return {
+    enabled: draft.enabled,
+    notify_times: [...draft.notify_times],
+    notify_overdue: draft.notify_overdue,
+    notify_soon: draft.notify_soon,
+  };
+}
+
+function resetDraft() {
+  const n = s.notifications;
+  draft.enabled = n.enabled;
+  draft.notify_times = [...n.notify_times];
+  draft.notify_overdue = n.notify_overdue;
+  draft.notify_soon = n.notify_soon;
   unsavedChanges.value = false;
 }
 
 function addTime() {
-  const d = getDraft();
-  d.notify_times.push("12:00");
+  draft.notify_times.push("12:00");
   unsavedChanges.value = true;
 }
 
 function removeTime(idx) {
-  const d = getDraft();
-  if (d.notify_times.length > 1) {
-    d.notify_times.splice(idx, 1);
+  if (draft.notify_times.length > 1) {
+    draft.notify_times.splice(idx, 1);
     unsavedChanges.value = true;
   }
 }
 
-function discardChanges() {
-  draft.value = null;
+async function saveChanges() {
+  saving.value = true;
   unsavedChanges.value = false;
-}
-
-async function save() {
-  const d = getDraft();
-  await s.updateSettings({ notifications: d });
-  draft.value = null;
-  unsavedChanges.value = false;
+  try {
+    await s.updateSettings({ notifications: cloneDraft() });
+    s.clearError();
+  } catch (err) {
+    s.clearError();
+    const msg = err?.response?.data?.detail || err?.message || "Speichern fehlgeschlagen";
+    // Set store error so UI can display it (e.g. via SettingsToast)
+    s.error = msg;
+    // Revert draft so user sees current saved state
+    const n = s.notifications;
+    draft.enabled = n.enabled;
+    draft.notify_times = [...n.notify_times];
+    draft.notify_overdue = n.notify_overdue;
+    draft.notify_soon = n.notify_soon;
+    unsavedChanges.value = true;
+    console.error("[NotificationSettings] save failed:", err);
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 
@@ -274,6 +294,14 @@ async function save() {
   display: flex;
   align-items: center;
   gap: var(--md-sys-spacing-xs);
+}
+
+.time-input {
+  padding: 4px 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: var(--md-sys-typescale-body-medium);
 }
 
 .time-remove-btn {

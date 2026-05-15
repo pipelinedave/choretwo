@@ -28,7 +28,10 @@
           <input
             type="checkbox"
             :checked="aiDraft.learning_enabled"
-            @change="toggleLearning"
+            @change="
+              aiDraft.learning_enabled = !aiDraft.learning_enabled;
+              markAiChanged();
+            "
           />
           <span class="toggle-slider"></span>
         </label>
@@ -57,9 +60,9 @@
           <button
             class="btn btn-filled btn-sm"
             @click="saveAi"
-            :disabled="s.loading"
+            :disabled="savingAi"
           >
-            <span v-if="s.loading" class="spinner"></span>
+            <span v-if="savingAi" class="spinner"></span>
             Save
           </button>
         </div>
@@ -79,7 +82,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted, watch, computed } from "vue";
+import { reactive, ref, onMounted } from "vue";
 import { useSettingsStore } from "@/stores/settings";
 import NotificationSettings from "@/components/settings/NotificationSettings.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
@@ -88,6 +91,7 @@ import SettingsToast from "@/components/settings/SettingsToast.vue";
 
 const s = useSettingsStore();
 const unsavedAi = ref(false);
+const savingAi = ref(false);
 const toast = reactive({
   visible: false,
   message: "",
@@ -95,11 +99,9 @@ const toast = reactive({
   icon: "",
 });
 
-const aiDraft = computed({
-  get: () => ({
-    learning_enabled: s.ai.learning_enabled,
-    suggestion_types: [...s.ai.suggestion_types],
-  }),
+const aiDraft = reactive({
+  learning_enabled: true,
+  suggestion_types: ["recurrence", "timing", "assignment"],
 });
 
 const suggestionOptions = [
@@ -112,20 +114,15 @@ onMounted(async () => {
   try {
     await s.fetchSettings();
     s.applyTheme();
+    // Initialize AI draft from store after fetch
+    aiDraft.learning_enabled = s.ai.learning_enabled;
+    aiDraft.suggestion_types = [...s.ai.suggestion_types];
     showToast("success", "Settings loaded", "check-circle");
   } catch (err) {
     console.error("Failed to load settings:", err);
     showToast("error", "Failed to load settings");
   }
 });
-
-watch(
-  () => ({ ...s.ai }),
-  () => {
-    unsavedAi.value = false;
-  },
-  { deep: true },
-);
 
 function showToast(type, message, icon = "") {
   toast.visible = true;
@@ -138,22 +135,43 @@ function dismissToast() {
   toast.visible = false;
 }
 
-function toggleLearning() {
+function markAiChanged() {
   unsavedAi.value = true;
 }
 
-function toggleSuggestionType() {
+function toggleSuggestionType(value) {
+  const idx = aiDraft.suggestion_types.indexOf(value);
+  if (idx >= 0) {
+    aiDraft.suggestion_types.splice(idx, 1);
+  } else {
+    aiDraft.suggestion_types.push(value);
+  }
   unsavedAi.value = true;
 }
 
 function discardAi() {
+  aiDraft.learning_enabled = s.ai.learning_enabled;
+  aiDraft.suggestion_types = [...s.ai.suggestion_types];
   unsavedAi.value = false;
 }
 
 async function saveAi() {
-  await s.updateSettings({ ai: { ...aiDraft.value } });
+  savingAi.value = true;
   unsavedAi.value = false;
-  showToast("success", "AI settings saved", "check-circle");
+  try {
+    await s.updateSettings({ ai: { ...aiDraft } });
+    showToast("success", "AI settings saved", "check-circle");
+    s.clearError();
+  } catch (err) {
+    s.clearError();
+    const msg = err?.response?.data?.detail || err?.message || "AI settings konnten nicht gespeichert werden";
+    s.error = msg;
+    showToast("error", "Speichern fehlgeschlagen: " + msg);
+    unsavedAi.value = true;
+    console.error("[SettingsView] saveAi failed:", err);
+  } finally {
+    savingAi.value = false;
+  }
 }
 </script>
 

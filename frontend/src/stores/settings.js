@@ -1,22 +1,12 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { choreApi, logApi } from "@/api";
+import { settingsApi, logApi, choreApi } from "@/api";
 
-function getDefaultTheme() {
+function loadThemeFromStorage() {
   if (typeof window !== "undefined") {
-    const saved = localStorage.getItem("settings-theme");
-    if (saved && ["light", "dark", "system"].includes(saved)) {
-      return saved;
-    }
-    // Fallback to prefers-color-scheme
-    if (
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-    ) {
-      return "dark";
-    }
+    return localStorage.getItem("settings-theme");
   }
-  return "system";
+  return null;
 }
 
 export const useSettingsStore = defineStore("settings", () => {
@@ -31,7 +21,7 @@ export const useSettingsStore = defineStore("settings", () => {
     suggestion_types: ["recurrence", "timing", "assignment"],
   });
   const appearance = ref({
-    theme: getDefaultTheme(),
+    theme: loadThemeFromStorage() || "system",
   });
 
   const loading = ref(false);
@@ -43,7 +33,7 @@ export const useSettingsStore = defineStore("settings", () => {
     error.value = null;
 
     try {
-      const response = await choreApi.get("/settings");
+      const response = await settingsApi.get("/settings");
       const data = response.data;
 
       notifications.value = {
@@ -60,8 +50,10 @@ export const useSettingsStore = defineStore("settings", () => {
           "assignment",
         ],
       };
+      // Preserve localStorage theme over backend value
+      const storedTheme = loadThemeFromStorage();
       appearance.value = {
-        theme: data.appearance?.theme ?? "system",
+        theme: storedTheme || (data.appearance?.theme ?? "system"),
       };
     } catch (err) {
       error.value = err.message || "Failed to fetch settings";
@@ -100,7 +92,7 @@ export const useSettingsStore = defineStore("settings", () => {
         };
       }
 
-      await choreApi.put("/settings", payload);
+      await settingsApi.put("/settings", payload);
 
       // Update local state
       if (updates.notifications)
@@ -108,8 +100,8 @@ export const useSettingsStore = defineStore("settings", () => {
       if (updates.ai) ai.value = { ...updates.ai };
       if (updates.appearance) appearance.value = { ...updates.appearance };
 
-      // Persist theme
-      if (updates.appearance) {
+      // Persist theme to localStorage
+      if (updates.appearance?.theme) {
         localStorage.setItem("settings-theme", updates.appearance.theme);
       }
 
@@ -158,7 +150,7 @@ export const useSettingsStore = defineStore("settings", () => {
     try {
       const [chores, logsRaw] = await Promise.all([
         choreApi.get("/"),
-        logApi.get("/?limit=1000"),
+        logApi.get("/?limit=200"),
       ]);
 
       const data = {
@@ -219,7 +211,8 @@ export const useSettingsStore = defineStore("settings", () => {
       learning_enabled: true,
       suggestion_types: ["recurrence", "timing", "assignment"],
     };
-    appearance.value = { theme: getDefaultTheme() };
+    const storedTheme = loadThemeFromStorage();
+    appearance.value = { theme: storedTheme || "system" };
   }
 
   return {

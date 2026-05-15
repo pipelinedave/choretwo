@@ -38,6 +38,13 @@ export const aiApi = axios.create({
   },
 });
 
+export const settingsApi = axios.create({
+  baseURL: `${API_BASE}/api`,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
 // JWT Token Interceptor
 const attachToken = (config) => {
   const token = localStorage.getItem("token");
@@ -48,7 +55,7 @@ const attachToken = (config) => {
 };
 
 // Request interceptor for all APIs
-const apis = [authApi, choreApi, logApi, notifyApi, aiApi];
+const apis = [authApi, choreApi, logApi, notifyApi, aiApi, settingsApi];
 
 apis.forEach((api) => {
   api.interceptors.request.use(attachToken, (error) => {
