@@ -1,5 +1,28 @@
 # choretwo - Agent Instructions
 
+## Choretwo Agent System
+
+Dieses Projekt verwendet **spezialisierte Subagents** für jede Domain. Der Primary Model delegiert automatisch basierend auf Keywords.
+
+### Routing-Tabelle
+
+| TASK KEYWORDS | → DELEGATE TO |
+|---------------|---------------|
+| Vue, component, Pinia, Vite, PWA, Playwright, ChoreCard, FilterPills, swipe, Material Design, store, view | **choretwo-frontend** |
+| Go, Gin, Dex, OIDC, JWT, session, auth middleware, token, User model, login, callback | **choretwo-auth** |
+| chore, log, ai-copilot, FastAPI, recurrence, undo, NLP, intent, Pydantic, SQLAlchemy | **choretwo-backend** |
+| notification, Celery, push, Gotify, scheduler, preferences | **choretwo-notification** |
+| test, pytest, Vitest, Playwright, coverage, TDD, unit test, mock fixture | **choretwo-test-manager** |
+| Docker, Kubernetes, Flux, CI/CD, Helm, ingress, cert-manager, deploy, staging, production | **k8s-expert** |
+| unclear scope, cross-service, API integration, full-stack both directions | **choretwo-dev-lead** |
+
+### Spezialisten-Regeln
+
+- **IMMER spezialisierte Agenten verwenden** — NEVER `general` wenn ein Spezialist passt
+- Cross-cutting Tasks → `choretwo-dev-lead` (Supervisor, koordiniert mehrere Agents)
+- Infrastruktur/Deployment → `k8s-expert`
+- Spezialisten haben strikte File-Scopes (sogar `.opencode/agents/*.md`)
+
 ## Current Status
 
 ✅ **All services running successfully** (as of latest session)
