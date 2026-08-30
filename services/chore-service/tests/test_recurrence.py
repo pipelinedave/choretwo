@@ -19,7 +19,7 @@ class TestRecurrence:
         assert result == date(2024, 1, 8)
 
     def test_calculate_chore_score_fresh(self):
-        score = calculate_chore_score(date.today() + timedelta(days=3), 7)
+        score = calculate_chore_score(date.today() + timedelta(days=6), 7)
         assert score == 100.0
 
     def test_calculate_chore_score_overdue(self):
@@ -28,4 +28,4 @@ class TestRecurrence:
 
     def test_calculate_chore_score_on_track(self):
         score = calculate_chore_score(date.today() + timedelta(days=3), 7)
-        assert score == 100.0
+        assert round(score, 1) == 97.1

@@ -40,17 +40,13 @@ async def test_undo_marked_done_resets_all_fields(mock_db):
     """
     from app.services.undo_service import undo_action
     
-    # Trigger the undo
-    result = await undo_action(1, "test@example.com", mock_db)
-    
-    # Verify the result structure
-    assert result["undone_action_type"] == "marked_done"
-    assert result["message"] == "Action marked_done undone successfully"
-    
-    # Now check what HTTP calls were made
-    # We need to inspect the httpx calls
-    print("\n=== HTTP CALLS MADE ===")
-    # Note: In real test we'd mock httpx.AsyncClient and inspect calls
+    with patch("app.services.undo_service.create_log"), patch("app.services.undo_service.httpx.AsyncClient"):
+        # Trigger the undo
+        result = await undo_action(1, "test@example.com", mock_db)
+        
+        # Verify the result structure
+        assert result["undone_action_type"] == "marked_done"
+        assert result["message"] == "Action marked_done undone successfully"
 
 
 @pytest.mark.asyncio 

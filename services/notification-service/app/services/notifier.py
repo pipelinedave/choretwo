@@ -2,8 +2,8 @@ import httpx
 import os
 import logging
 
-GOTIFY_URL = os.getenv("GATWAY_URL", "https://gotify.stillon.top")
-GOTIFY_TOKEN = os.getenv("GATWAY_TOKEN", "")
+GOTIFY_URL = os.getenv("GOTIFY_URL", os.getenv("GATWAY_URL", "https://gotify.stillon.top"))
+GOTIFY_TOKEN = os.getenv("GOTIFY_TOKEN", os.getenv("GATWAY_TOKEN", ""))
 
 logger = logging.getLogger(__name__)
 

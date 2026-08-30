@@ -1,90 +1,92 @@
 <template>
-  <div class="add-chore-form-overlay" @click="handleBackdropClick">
-    <div class="add-chore-form card" @click.stop>
-      <div class="form-header">
-        <h2>{{ editingChore ? "Edit Chore" : "Add Chore" }}</h2>
-        <button @click="handleClose" class="btn-icon">
-          <span class="mdi mdi-close"></span>
-        </button>
+  <div class="modal-overlay" role="dialog" aria-modal="true" :aria-label="editing ? 'Edit Chore' : 'Add New Chore'" @click.self="onCancel">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>{{ editing ? 'Edit Chore' : 'Add New Chore' }}</h2>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="form-content">
-        <div class="form-group">
-          <label for="name" class="form-label">Chore Name</label>
-          <input
-            id="name"
-            v-model="formData.name"
-            type="text"
-            class="input"
-            placeholder="e.g., Wash dishes"
-            required
-          />
-        </div>
+      <div class="modal-body">
+        <form @submit.prevent="onSubmit" id="add-chore-form">
+          <div class="form-group">
+            <label for="chore-name">Name</label>
+            <input
+              id="chore-name"
+              v-model="formData.name"
+              type="text"
+              placeholder="e.g., Wash dishes"
+              required
+              autofocus
+            />
+          </div>
 
-        <div class="form-group">
-          <label for="interval" class="form-label">Repeat every</label>
-          <input
-            id="interval"
-            v-model.number="formData.interval"
-            type="number"
-            class="input"
-            min="1"
-            step="1"
-            placeholder="7"
-          />
-          <span class="form-hint">(e.g., 1 for daily, 7 for weekly)</span>
-        </div>
+          <div class="form-group">
+            <label for="chore-interval">Repeat every (days)</label>
+            <input
+              id="chore-interval"
+              v-model.number="formData.interval"
+              type="number"
+              min="1"
+              step="1"
+              required
+              placeholder="7"
+            />
+          </div>
 
-        <div class="form-group">
-          <label for="dueDate" class="form-label">Due Date (optional)</label>
-          <input
-            id="dueDate"
-            v-model="formData.dueDate"
-            type="date"
-            class="input"
-          />
-        </div>
+          <div class="form-group">
+            <label for="chore-due-date">Due Date</label>
+            <input
+              id="chore-due-date"
+              v-model="formData.dueDate"
+              type="date"
+              required
+            />
+          </div>
 
-        <div class="form-group">
-          <label for="priority" class="form-label">Priority</label>
-          <select v-model="formData.priority" class="input">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
+          <div class="form-group custom-checkbox-wrapper">
+            <input
+              type="checkbox"
+              id="chore-private"
+              v-model="formData.isPrivate"
+            />
+            <label for="chore-private">
+              <span class="checkbox-text">🔒 Private (only visible to me)</span>
+            </label>
+          </div>
+        </form>
+      </div>
 
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input v-model="formData.private" type="checkbox" />
-            <span class="checkbox-custom"></span>
-            <span class="form-label">Private (only you can see)</span>
-          </label>
-        </div>
-
-        <div class="form-actions">
-          <button
-            v-if="editingChore"
-            type="button"
-            @click="handleArchive"
-            class="btn btn-text btn-danger"
-          >
-            Archive
-          </button>
-          <button type="button" @click="handleClose" class="btn btn-text">
-            Cancel
-          </button>
-          <button type="submit" class="btn btn-filled">
-            {{ editingChore ? "Save Changes" : "Add Chore" }}
-          </button>
-        </div>
-      </form>
+      <div class="modal-footer">
+        <button
+          v-if="editing"
+          type="button"
+          class="btn btn-warning archive-btn"
+          @click="onArchive"
+        >
+          <span class="mdi mdi-archive"></span> Archive
+        </button>
+        <button
+          type="button"
+          class="btn btn-tonal cancel-btn"
+          @click="onCancel"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="add-chore-form"
+          class="btn btn-primary submit-btn"
+        >
+          <span class="mdi" :class="editing ? 'mdi-content-save' : 'mdi-plus'"></span>
+          {{ editing ? 'Save Changes' : 'Add Chore' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
+import { useAuthStore } from "@/stores/auth";
 
 const props = defineProps({
   chore: {
@@ -93,156 +95,195 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["submit", "close"]);
+const emit = defineEmits(["submit", "addChore", "close", "cancel", "archive"]);
+const authStore = useAuthStore();
+
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split("T")[0];
+};
 
 const formData = ref({
   name: "",
-  interval: 0,
-  dueDate: "",
-  priority: "medium",
-  private: false,
+  interval: 7,
+  dueDate: getTodayDate(),
+  isPrivate: false,
 });
 
-const editingChore = ref(false);
+const editing = computed(() => !!props.chore);
 
 watch(
   () => props.chore,
   (newChore) => {
     if (newChore) {
-      editingChore.value = true;
+      const rawDue = newChore.dueDate || newChore.due_date;
+      const dueStr = rawDue
+        ? (typeof rawDue === "string" ? rawDue.split("T")[0] : new Date(rawDue).toISOString().split("T")[0])
+        : getTodayDate();
+
       formData.value = {
         name: newChore.name || "",
-        interval: newChore.interval || 0,
-        dueDate: newChore.dueDate || "",
-        priority: newChore.priority || "medium",
-        private: newChore.private || false,
+        interval: newChore.interval || newChore.interval_days || 7,
+        dueDate: dueStr,
+        isPrivate: !!(newChore.isPrivate ?? newChore.is_private),
       };
     } else {
-      editingChore.value = false;
-      resetForm();
+      formData.value = {
+        name: "",
+        interval: 7,
+        dueDate: getTodayDate(),
+        isPrivate: false,
+      };
     }
   },
-  { immediate: true },
+  { immediate: true }
 );
 
-function resetForm() {
-  formData.value = {
-    name: "",
-    interval: 0,
-    dueDate: "",
-    priority: "medium",
-    private: false,
+function onSubmit() {
+  const result = {
+    ...props.chore,
+    name: formData.value.name,
+    interval_days: formData.value.interval,
+    interval: formData.value.interval,
+    due_date: formData.value.dueDate,
+    dueDate: formData.value.dueDate,
+    is_private: formData.value.isPrivate,
+    isPrivate: formData.value.isPrivate,
+    private: formData.value.isPrivate,
+    owner_email: formData.value.isPrivate
+      ? props.chore?.owner_email || authStore.user?.email || null
+      : null,
   };
-}
 
-function handleClose() {
-  resetForm();
+  emit("submit", result);
+  emit("addChore", result);
   emit("close");
 }
 
-function handleSubmit() {
-  emit("submit", {
-    ...formData.value,
-    id: props.chore?.id,
-  });
-  resetForm();
+function onCancel() {
+  emit("cancel");
+  emit("close");
 }
 
-function handleBackdropClick() {
-  handleClose();
+function onArchive() {
+  if (props.chore?.id) {
+    emit("archive", props.chore.id);
+  }
+  emit("close");
 }
 </script>
 
 <style scoped>
-.add-chore-form-overlay {
+.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(31, 45, 44, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--md-sys-spacing-md);
-  z-index: var(--md-sys-zindex-modal);
+  padding: 1rem;
 }
 
-.add-chore-form {
+.modal-content {
+  background: var(--color-background);
+  background-image:
+    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
+    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+  color: var(--color-text);
+  border-radius: var(--radius-lg);
   width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
-  background-color: var(--md-sys-color-surface);
-  border-radius: var(--md-sys-radius-extra-large);
-}
-
-.form-header {
+  max-width: 480px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--md-sys-spacing-lg);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  flex-direction: column;
+  overflow: hidden;
+  animation: popIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.form-header h2 {
-  font-size: var(--md-sys-typescale-headline-small);
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface);
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.form-content {
-  padding: var(--md-sys-spacing-lg);
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-surface-lighter);
+}
+
+.modal-header h2 {
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.modal-body {
+  padding: 1.5rem;
 }
 
 .form-group {
-  margin-bottom: var(--md-sys-spacing-lg);
-}
-
-.form-label {
-  display: block;
-  font-size: var(--md-sys-typescale-label-medium);
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface);
-  margin-bottom: var(--md-sys-spacing-sm);
-}
-
-.form-checkbox {
+  margin-bottom: 1.15rem;
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.form-group input[type="text"],
+.form-group input[type="date"],
+.form-group input[type="number"] {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-surface-lighter);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.custom-checkbox-wrapper {
+  flex-direction: row;
   align-items: center;
-  gap: var(--md-sys-spacing-sm);
+  gap: 8px;
+  margin-top: 0.5rem;
   cursor: pointer;
 }
 
-.checkbox-custom {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--md-sys-color-outline);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background-color var(--md-sys-transition-fast),
-    border-color var(--md-sys-transition-fast);
+.checkbox-text {
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
-input[type="checkbox"]:checked + .checkbox-custom {
-  background-color: var(--md-sys-color-primary);
-  border-color: var(--md-sys-color-primary);
-}
-
-input[type="checkbox"]:checked + .checkbox-custom::after {
-  content: "✓";
-  color: white;
-  font-size: 14px;
-}
-
-.form-actions {
+.modal-footer {
+  padding: 1rem 1.5rem;
   display: flex;
   justify-content: flex-end;
-  gap: var(--md-sys-spacing-sm);
-  padding-top: var(--md-sys-spacing-lg);
-  border-top: 1px solid var(--md-sys-color-outline-variant);
+  gap: 10px;
+  border-top: 1px solid var(--color-surface-lighter);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 576px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+  }
+  .modal-footer button {
+    width: 100%;
+  }
 }
 </style>

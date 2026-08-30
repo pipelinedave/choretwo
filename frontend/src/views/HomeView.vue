@@ -1,310 +1,204 @@
 <template>
   <div class="home-view">
+    <!-- Top Header -->
+    <AppHeader
+      title="CHORETWO"
+      :showAiBar="showAiBar"
+      @toggleAddChore="showAddModal = true"
+      @toggleAiBar="showAiBar = !showAiBar"
+      @openArchive="showArchiveModal = true"
+      @openNotifications="showNotificationsModal = true"
+      @openImportExport="showImportExportModal = true"
+      @openSettings="showSettingsModal = true"
+      @openAbout="showAboutModal = true"
+    />
+
+    <!-- AI Copilot Quick Action Bar -->
+    <transition name="fade">
+      <CopilotBar v-if="showAiBar" />
+    </transition>
+
     <!-- Welcome section -->
     <div class="welcome-section">
-      <h1>
-        Welcome back, {{ authStore.user?.email?.split("@")[0] || "User" }}!
-      </h1>
-      <p>Here's what's happening with your chores today.</p>
+      <p class="welcome-text">Welcome back, {{ authStore.user?.email?.split("@")[0] || "User" }}!</p>
     </div>
 
-    <!-- Performance bar -->
-    <PerformanceBar :score="choreStore.householdHealth" label="Health" />
+    <!-- Performance Bar (Household Health 0-100) -->
+    <PerformanceBar :score="choreStore.householdHealth" />
 
-    <!-- Stats cards -->
-    <div class="stats-grid">
-      <div class="stat-card card" @click="navigateTo('/chores?filter=overdue')">
-        <div class="stat-icon overdue">
-          <span class="mdi mdi-alert-circle"></span>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ choreStore.stats.overdue }}</span>
-          <span class="stat-label">Overdue</span>
-        </div>
-      </div>
+    <!-- Filter Pills Bar -->
+    <FilterPills
+      v-model:filter="choreStore.filter"
+      :counts="choreStore.bucketCounts"
+      :stats="choreStore.stats"
+      @clearFilter="choreStore.setFilter('all')"
+    />
 
-      <div
-        class="stat-card card"
-        @click="navigateTo('/chores?filter=due-soon')"
-      >
-        <div class="stat-icon due-soon">
-          <span class="mdi mdi-clock-outline"></span>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ choreStore.stats.dueSoon }}</span>
-          <span class="stat-label">Due Soon</span>
-        </div>
-      </div>
+    <!-- Loading Indicator -->
+    <LoadingSpinner v-if="choreStore.loading && choreStore.chores.length === 0" />
 
-      <div
-        class="stat-card card"
-        @click="navigateTo('/chores?filter=completed')"
-      >
-        <div class="stat-icon completed">
-          <span class="mdi mdi-check-circle"></span>
-        </div>
-        <div class="stat-content">
-          <span class="stat-value">{{ choreStore.stats.completed }}</span>
-          <span class="stat-label">Completed</span>
-        </div>
-      </div>
-    </div>
+    <!-- Empty State -->
+    <EmptyState
+      v-else-if="filteredChores.length === 0"
+      :message="emptyMessage"
+      :show-add-button="true"
+      @add="showAddModal = true"
+    />
 
-    <!-- Quick actions -->
-    <div class="quick-actions">
-      <button @click="showAddForm = true" class="btn btn-filled">
-        <span class="mdi mdi-plus" style="margin-right: 8px"></span>
-        Add Chore
-      </button>
-      <button @click="showLogs = true" class="btn btn-tonal">
-        <span class="mdi mdi-history" style="margin-right: 8px"></span>
-        View Logs
-      </button>
-    </div>
-
-    <!-- Today's chores preview -->
-    <div class="chores-preview">
-      <div class="section-header">
-        <h2>Today's Chores</h2>
-        <router-link to="/chores" class="view-all">View all</router-link>
-      </div>
-
-      <LoadingSpinner v-if="choreStore.loading" />
-
-      <EmptyState
-        v-else-if="filteredChores.length === 0"
-        message="No chores for today. Enjoy your free time!"
-        show-add-button
-        @add="showAddForm = true"
+    <!-- Urgency-Sorted Chore List -->
+    <div v-else class="chores-list" role="list">
+      <ChoreCard
+        v-for="chore in filteredChores"
+        :key="chore.id"
+        :chore="chore"
+        @toggle="handleToggle"
+        @markAsDone="handleToggle"
+        @updateChore="handleUpdateChore"
+        @archive="handleArchiveChore"
+        @archiveChore="handleArchiveChore"
       />
-
-      <div v-else class="chore-list-preview">
-        <ChoreCard
-          v-for="chore in filteredChores.slice(0, 5)"
-          :key="chore.id"
-          :chore="chore"
-          @toggle="handleToggle"
-          @edit="handleEdit"
-          @archive="handleArchive"
-        />
-      </div>
     </div>
 
-    <!-- Add chore form modal -->
+    <!-- Bottom Activity Log Drawer / Overlay -->
+    <LogOverlay />
+
+    <!-- Modals -->
     <AddChoreForm
-      v-if="showAddForm"
+      v-if="showAddModal"
+      @addChore="handleAddChore"
       @submit="handleAddChore"
-      @close="showAddForm = false"
+      @close="showAddModal = false"
     />
 
-    <!-- Edit chore form modal -->
-    <AddChoreForm
-      v-if="showEditForm && editingChore"
-      :chore="editingChore"
-      @submit="handleUpdateChore"
-      @close="showEditForm = false"
+    <ArchivedChoresModal
+      v-if="showArchiveModal"
+      @close="showArchiveModal = false"
     />
 
-    <!-- Log overlay -->
-    <LogOverlay :is-open="showLogs" @close="showLogs = false" />
+    <NotificationSettingsModal
+      v-if="showNotificationsModal"
+      @close="showNotificationsModal = false"
+    />
 
-    <!-- Undo banner -->
-    <UndoBanner />
+    <ImportExportModal
+      v-if="showImportExportModal"
+      @close="showImportExportModal = false"
+    />
+
+    <SettingsModal
+      v-if="showSettingsModal"
+      @close="showSettingsModal = false"
+    />
+
+    <AboutModal
+      v-if="showAboutModal"
+      @close="showAboutModal = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
 import { useChoreStore } from "@/stores/chore";
 import { useLogStore } from "@/stores/log";
-import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
-import EmptyState from "@/components/chores/EmptyState.vue";
-import ChoreCard from "@/components/chores/ChoreCard.vue";
-import AddChoreForm from "@/components/chores/AddChoreForm.vue";
-// FilterPills - used via ChoreCard previews
-import PerformanceBar from "@/components/layout/PerformanceBar.vue";
-import LogOverlay from "@/components/logs/LogOverlay.vue";
-import UndoBanner from "@/components/logs/UndoBanner.vue";
+import { useAuthStore } from "@/stores/auth";
 
-const router = useRouter();
-const authStore = useAuthStore();
+import AppHeader from "@/components/layout/AppHeader.vue";
+import PerformanceBar from "@/components/layout/PerformanceBar.vue";
+import FilterPills from "@/components/chores/FilterPills.vue";
+import ChoreCard from "@/components/chores/ChoreCard.vue";
+import EmptyState from "@/components/chores/EmptyState.vue";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
+import LogOverlay from "@/components/logs/LogOverlay.vue";
+import CopilotBar from "@/components/ai/CopilotBar.vue";
+
+import AddChoreForm from "@/components/chores/AddChoreForm.vue";
+import ArchivedChoresModal from "@/components/modals/ArchivedChoresModal.vue";
+import NotificationSettingsModal from "@/components/modals/NotificationSettingsModal.vue";
+import ImportExportModal from "@/components/modals/ImportExportModal.vue";
+import SettingsModal from "@/components/modals/SettingsModal.vue";
+import AboutModal from "@/components/modals/AboutModal.vue";
+
 const choreStore = useChoreStore();
 const logStore = useLogStore();
+const authStore = useAuthStore();
 
-const showAddForm = ref(false);
-const showEditForm = ref(false);
-const showLogs = ref(false);
-const editingChore = ref(null);
+const showAddModal = ref(false);
+const showAiBar = ref(false);
+const showArchiveModal = ref(false);
+const showNotificationsModal = ref(false);
+const showImportExportModal = ref(false);
+const showSettingsModal = ref(false);
+const showAboutModal = ref(false);
 
 const filteredChores = computed(() => {
   return choreStore.filteredChores;
 });
 
-onMounted(async () => {
-  await choreStore.fetchChores();
-  await logStore.fetchLogs(20);
+const emptyMessage = computed(() => {
+  const f = choreStore.filter;
+  if (f === "overdue") return "No overdue chores! Excellent work!";
+  if (f === "today") return "No chores due today! Enjoy your day!";
+  if (f === "tomorrow") return "No chores due tomorrow.";
+  if (f === "thisWeek") return "No chores due this week.";
+  if (f === "upcoming") return "No upcoming chores.";
+  return "No chores yet. Click + to add your first chore!";
 });
 
-function navigateTo(path) {
-  router.push(path);
-}
+onMounted(async () => {
+  await choreStore.fetchChores();
+  await logStore.fetchLogs();
+});
 
 async function handleToggle(choreId) {
-  const chore = choreStore.chores.find((c) => c.id === choreId);
-  if (chore && !chore.done) {
-    try {
-      await choreStore.markDone(choreId, authStore.user.email);
-    } catch (err) {
-      console.error("Failed to mark chore as done:", err);
-    }
-  }
-}
-
-function handleEdit(choreId) {
-  editingChore.value = choreStore.chores.find((c) => c.id === choreId);
-  showEditForm.value = true;
-}
-
-async function handleArchive(choreId) {
   try {
-    await choreStore.archiveChore(choreId);
+    await choreStore.markDone(choreId, authStore.user?.email);
+    await logStore.fetchLogs();
   } catch (err) {
-    console.error("Failed to archive chore:", err);
+    console.error("Failed to mark chore done:", err);
   }
 }
 
-async function handleAddChore(formData) {
+async function handleAddChore(choreData) {
   try {
-    await choreStore.addChore(formData);
-    showAddForm.value = false;
+    await choreStore.addChore(choreData);
+    await logStore.fetchLogs();
   } catch (err) {
     console.error("Failed to add chore:", err);
   }
 }
 
-async function handleUpdateChore(formData) {
+async function handleUpdateChore(choreData) {
   try {
-    await choreStore.updateChore(formData.id, formData);
-    showEditForm.value = false;
-    editingChore.value = null;
+    await choreStore.updateChore(choreData.id, choreData);
+    await logStore.fetchLogs();
   } catch (err) {
     console.error("Failed to update chore:", err);
+  }
+}
+
+async function handleArchiveChore(choreId) {
+  try {
+    await choreStore.archiveChore(choreId);
+    await logStore.fetchLogs();
+  } catch (err) {
+    console.error("Failed to archive chore:", err);
   }
 }
 </script>
 
 <style scoped>
 .home-view {
-  max-width: 800px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
+  padding-bottom: 90px;
 }
 
-.welcome-section {
-  margin-bottom: var(--md-sys-spacing-lg);
-}
-
-.welcome-section h1 {
-  font-size: var(--md-sys-typescale-headline-large);
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface);
-  margin-bottom: var(--md-sys-spacing-sm);
-}
-
-.welcome-section p {
-  font-size: var(--md-sys-typescale-body-large);
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--md-sys-spacing-md);
-  margin-bottom: var(--md-sys-spacing-lg);
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: var(--md-sys-spacing-md);
-  cursor: pointer;
-  transition: transform var(--md-sys-transition-fast);
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-}
-
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--md-sys-radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-}
-
-.stat-icon.overdue {
-  background-color: var(--md-sys-color-overdue);
-}
-
-.stat-icon.due-soon {
-  background-color: var(--md-sys-color-due-soon);
-}
-
-.stat-icon.completed {
-  background-color: var(--md-sys-color-completed);
-}
-
-.stat-content {
+.chores-list {
   display: flex;
   flex-direction: column;
-}
-
-.stat-value {
-  font-size: var(--md-sys-typescale-display-small);
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface);
-}
-
-.stat-label {
-  font-size: var(--md-sys-typescale-body-small);
-  color: var(--md-sys-color-on-surface-variant);
-}
-
-.quick-actions {
-  display: flex;
-  gap: var(--md-sys-spacing-md);
-  margin-bottom: var(--md-sys-spacing-lg);
-}
-
-.chores-preview {
-  margin-top: var(--md-sys-spacing-lg);
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--md-sys-spacing-md);
-}
-
-.section-header h2 {
-  font-size: var(--md-sys-typescale-headline-small);
-  font-weight: 500;
-}
-
-.view-all {
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
-  font-size: var(--md-sys-typescale-body-medium);
-}
-
-.chore-list-preview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--md-sys-spacing-sm);
+  gap: 8px;
+  margin-top: 4px;
 }
 </style>

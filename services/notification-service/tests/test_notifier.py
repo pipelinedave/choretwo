@@ -6,7 +6,7 @@ from app.services.notifier import send_gotify_notification, send_test_notificati
 class TestNotifier:
     @pytest.mark.asyncio
     async def test_send_gotify_notification_success(self):
-        with patch("httpx.AsyncClient") as mock_client:
+        with patch("app.services.notifier.GOTIFY_TOKEN", "test_token"), patch("httpx.AsyncClient") as mock_client:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_client.return_value.__aenter__.return_value.post.return_value = (

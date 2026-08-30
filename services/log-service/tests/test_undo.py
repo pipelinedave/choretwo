@@ -4,14 +4,16 @@ from app.services.undo_service import undo_action
 
 
 class TestUndoService:
-    def test_undo_not_found(self):
+    @pytest.mark.asyncio
+    async def test_undo_not_found(self):
         mock_db = Mock()
         mock_db.execute.return_value.fetchone.return_value = None
 
         with pytest.raises(ValueError, match="Log entry not found"):
-            undo_action(999, "test@example.com", mock_db)
+            await undo_action(999, "test@example.com", mock_db)
 
-    def test_undo_created_action(self):
+    @pytest.mark.asyncio
+    async def test_undo_created_action(self):
         mock_db = Mock()
         mock_db.execute.return_value.fetchone.return_value = (
             "created",
@@ -20,12 +22,13 @@ class TestUndoService:
         )
 
         with patch("app.services.undo_service.httpx.AsyncClient"):
-            result = undo_action(1, "test@example.com", mock_db)
+            result = await undo_action(1, "test@example.com", mock_db)
 
             assert result["undone_action_type"] == "created"
             assert result["log_id"] == 1
 
-    def test_undo_updated_action(self):
+    @pytest.mark.asyncio
+    async def test_undo_updated_action(self):
         mock_db = Mock()
         mock_db.execute.return_value.fetchone.return_value = (
             "updated",
@@ -41,11 +44,12 @@ class TestUndoService:
         )
 
         with patch("app.services.undo_service.httpx.AsyncClient"):
-            result = undo_action(2, "test@example.com", mock_db)
+            result = await undo_action(2, "test@example.com", mock_db)
 
             assert result["undone_action_type"] == "updated"
 
-    def test_undo_marked_done_action(self):
+    @pytest.mark.asyncio
+    async def test_undo_marked_done_action(self):
         mock_db = Mock()
         mock_db.execute.return_value.fetchone.return_value = (
             "marked_done",
@@ -54,6 +58,6 @@ class TestUndoService:
         )
 
         with patch("app.services.undo_service.httpx.AsyncClient"):
-            result = undo_action(3, "test@example.com", mock_db)
+            result = await undo_action(3, "test@example.com", mock_db)
 
             assert result["undone_action_type"] == "marked_done"

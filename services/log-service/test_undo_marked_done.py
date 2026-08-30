@@ -23,19 +23,18 @@ async def test_undo_marked_done():
     # Import
     from app.services.undo_service import undo_action
     
-    try:
+    with patch("app.services.undo_service.create_log"), patch("app.services.undo_service.httpx.AsyncClient"):
         result = await undo_action(1, "test@example.com", mock_db)
         print(f"✅ Undo result: {result.get('message')}")
-    except SyntaxError as e:
-        print(f"❌ SYNTAX ERROR in undo_service.py!")
-        print(f"   {e}")
-        return
+        assert result["undone_action_type"] == "marked_done"
 
 @pytest.mark.asyncio
 async def test_undo_service_syntax():
     """Test that undo_service.py has valid syntax"""
     import ast
-    with open("/home/dhallmann/projects/choretwo/services/log-service/app/services/undo_service.py") as f:
+    import os
+    path = os.path.join(os.path.dirname(__file__), "app/services/undo_service.py")
+    with open(path) as f:
         source = f.read()
     try:
         ast.parse(source)

@@ -221,15 +221,3 @@ async def delete_single_chore(
         raise HTTPException(status_code=404, detail="Chore not found")
 
     return {"message": f"Chore {chore_id} deleted successfully"}
-
-
-@router.get("/household-health")
-async def get_household_health_score(request: Request, db: Session = Depends(get_db)):
-    user_email = request.state.user_email
-    return get_household_health(db, user_email)
-
-
-@router.get("/count")
-async def get_chore_counts(request: Request, db: Session = Depends(get_db)):
-    user_email = request.state.user_email
-    return get_chore_bucket_counts(db, user_email)

@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -26,7 +27,7 @@ async def undo_action(log_id: int, user_email: str, db: Session) -> dict:
     if isinstance(action_details, str):
         action_details = json.loads(action_details)
 
-    chore_service_url = "http://chore-service:8000/api"
+    chore_service_url = os.getenv("CHORE_SERVICE_URL", "http://chore-service:8000/api")
 
     if action_type == "created":
         chore_id = action_details.get("id")

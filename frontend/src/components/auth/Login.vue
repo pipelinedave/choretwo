@@ -2,12 +2,9 @@
   <div class="login-container">
     <div class="login-card card">
       <div class="login-header">
-        <span
-          class="mdi mdi-checkbox-marked-circle"
-          style="font-size: 64px; color: var(--md-sys-color-primary)"
-        ></span>
-        <h1 class="login-title">Choretwo</h1>
-        <p class="login-subtitle">Manage your chores with ease</p>
+        <span class="mdi mdi-checkbox-marked-circle brand-icon"></span>
+        <h1 class="login-title">CHORETWO</h1>
+        <p class="login-subtitle">Tactile Microservice Household Task Tracker</p>
       </div>
 
       <div class="login-content">
@@ -18,13 +15,13 @@
             {{ authStore.error }}
           </p>
 
-          <button @click="handleLogin" class="btn btn-filled btn-login">
-            <span class="mdi mdi-google" style="margin-right: 8px"></span>
-            Sign in with Google
+          <button @click="handleLogin" class="btn btn-primary btn-login">
+            <span class="mdi mdi-google"></span>
+            Sign in with Dex / OAuth
           </button>
 
           <p class="login-note">
-            By signing in, you agree to our Terms of Service
+            Secure multi-user authentication powered by Dex OIDC
           </p>
         </div>
       </div>
@@ -35,6 +32,7 @@
 <script setup>
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 
 const route = useRoute();
 const authStore = useAuthStore();
@@ -47,61 +45,73 @@ function handleLogin() {
 
 <style scoped>
 .login-container {
-  min-height: 100vh;
+  min-height: 80vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--md-sys-spacing-lg);
-  background-color: var(--md-sys-color-background);
+  padding: var(--space-lg);
 }
 
 .login-card {
   width: 100%;
-  max-width: 400px;
-  padding: var(--md-sys-spacing-2xl);
+  max-width: 420px;
+  padding: var(--space-xl);
   text-align: center;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
 }
 
 .login-header {
-  margin-bottom: var(--md-sys-spacing-2xl);
+  margin-bottom: var(--space-xl);
+}
+
+.brand-icon {
+  font-size: 56px;
+  color: var(--color-primary);
 }
 
 .login-title {
-  font-size: var(--md-sys-typescale-headline-large);
-  font-weight: 500;
-  color: var(--md-sys-color-on-surface);
-  margin-top: var(--md-sys-spacing-md);
-  margin-bottom: var(--md-sys-spacing-sm);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: -0.5px;
+  margin-top: var(--space-xs);
+  margin-bottom: var(--space-xxs);
 }
 
 .login-subtitle {
-  font-size: var(--md-sys-typescale-body-large);
-  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
 }
 
 .login-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--md-sys-spacing-md);
+  gap: var(--space-md);
 }
 
 .btn-login {
   width: 100%;
-  padding: var(--md-sys-spacing-md);
-  font-size: var(--md-sys-typescale-body-large);
+  padding: 0.85rem var(--space-md);
+  font-size: 1rem;
+  border-radius: var(--radius-md);
 }
 
 .login-message {
-  padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md);
-  background-color: var(--md-sys-color-error-container);
-  color: var(--md-sys-color-on-error-container);
-  border-radius: var(--md-sys-radius-medium);
-  font-size: var(--md-sys-typescale-body-medium);
+  padding: 0.5rem 1rem;
+  background-color: rgba(231, 99, 99, 0.15);
+  color: var(--color-danger);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
 }
 
 .login-note {
-  font-size: var(--md-sys-typescale-body-small);
-  color: var(--md-sys-color-on-surface-variant);
-  margin-top: var(--md-sys-spacing-lg);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-md);
 }
 </style>
