@@ -33,7 +33,8 @@ jobs:
       - name: 📥 Clone k3s-config Repo
         if: steps.check_token.outputs.has_token == 'true'
         run: |
-          git clone "https://x-access-token:${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" k3s-config
+          git clone "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" k3s-config || \
+          git clone "https://github.com/${K3S_REPO}.git" k3s-config
           cd k3s-config
           git config user.name "GitHub Actions [bot]"
           git config user.email "actions@github.com"
@@ -75,10 +76,13 @@ jobs:
             echo "No changes to commit (manifests already match tag ${VERSION_TAG})."
           else
             git commit -m "chore(${OVERLAY}): update choretwo images to ${VERSION_TAG:0:7}"
-            git push origin HEAD:main
-            echo "Successfully updated and pushed image tags to k3s-config repository"
+            if git push "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" HEAD:main; then
+              echo "Successfully updated and pushed image tags to k3s-config repository"
+            else
+              echo "::warning::Failed to push GitOps update to k3s-config. Please verify K3S_CONFIG_TOKEN secret has write permissions for ${K3S_REPO}."
+            fi
           fi
 
           TAG_NAME="choretwo/${OVERLAY}/${{ env.VERSION_TAG }}"
           git tag -f "${TAG_NAME}"
-          git push origin -f "${TAG_NAME}" || echo "Tag push completed or skipped"
+          git push -f "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" "${TAG_NAME}" || echo "Tag push completed or skipped"
