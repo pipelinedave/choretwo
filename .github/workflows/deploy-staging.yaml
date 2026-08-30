@@ -11,9 +11,8 @@ on:
 jobs:
   deploy:
     name: Trigger Staging Deployment
-    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    uses: ./.github/workflows/update-kubernetes-deployment.yaml
     with:
       overlay: staging
       version_tag: ${{ inputs.version_tag || 'latest' }}
-    secrets:
-      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+    secrets: inherit

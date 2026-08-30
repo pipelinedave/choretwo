@@ -82,20 +82,18 @@ jobs:
     name: Deploy to Staging (GitOps Flux)
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    uses: ./.github/workflows/update-kubernetes-deployment.yaml
     with:
       overlay: staging
       version_tag: ${{ github.sha }}
-    secrets:
-      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+    secrets: inherit
 
   deploy-production:
     name: Deploy to Production (GitOps Flux)
     needs: build-and-push
     if: startsWith(github.ref, 'refs/tags/v')
-    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    uses: ./.github/workflows/update-kubernetes-deployment.yaml
     with:
       overlay: production
       version_tag: ${{ github.ref_name }}
-    secrets:
-      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+    secrets: inherit

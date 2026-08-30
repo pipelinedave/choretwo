@@ -11,10 +11,8 @@ on:
 jobs:
   deploy:
     name: Trigger Production Deployment
-    environment: production
-    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    uses: ./.github/workflows/update-kubernetes-deployment.yaml
     with:
       overlay: production
       version_tag: ${{ inputs.version_tag }}
-    secrets:
-      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+    secrets: inherit
