@@ -4,17 +4,22 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Custom tag for images (default: git sha)'
+        required: false
+        default: ''
 
 env:
   DOCKER_REGISTRY: pipelinedave
 
 jobs:
   build-and-push:
-    name: Build and Push ${{ matrix.service.name }}
+    name: Build & Push ${{ matrix.service.name }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         service:
           - name: auth-service
@@ -34,9 +39,10 @@ jobs:
             dockerfile: ./services/ai-copilot-service/Dockerfile
           - name: frontend
             context: ./frontend
-            dockerfile: ./frontend/Dockerfile.prod
+            dockerfile: ./frontend/Dockerfile
+
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -45,35 +51,51 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME || secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+      - name: Compute Image Tags
+        id: meta
+        run: |
+          TAGS="${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:${{ github.sha }}"
+          TAGS="${TAGS},${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:latest"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            REF_TAG="${GITHUB_REF#refs/tags/}"
+            TAGS="${TAGS},${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:${REF_TAG}"
+          fi
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAGS="${TAGS},${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:${{ github.event.inputs.tag }}"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & Push Image
+        uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile }}
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:${{ github.sha }}
-            ${{ env.DOCKER_REGISTRY }}/${{ matrix.service.name }}:latest
-          build-args: |
-            BUILD_DATE=${{ github.run_id }}
-          no-cache: true
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  notify-build-complete:
-    name: Notify Build Complete
-    runs-on: ubuntu-latest
+  deploy-staging:
+    name: Deploy to Staging (GitOps Flux)
     needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Send notification (placeholder)
-        run: |
-          echo "All services built and pushed successfully"
-          echo "Images available at:"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/auth-service:${{ github.sha }}"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/chore-service:${{ github.sha }}"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/log-service:${{ github.sha }}"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/notification-service:${{ github.sha }}"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/ai-copilot-service:${{ github.sha }}"
-          echo "  - ${{ env.DOCKER_REGISTRY }}/frontend:${{ github.sha }}"
+    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    with:
+      overlay: staging
+      version_tag: ${{ github.sha }}
+    secrets:
+      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
+
+  deploy-production:
+    name: Deploy to Production (GitOps Flux)
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    with:
+      overlay: production
+      version_tag: ${{ github.ref_name }}
+    secrets:
+      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}

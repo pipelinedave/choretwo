@@ -1,143 +1,20 @@
-name: Deploy to Production
+name: Deploy to Production (Manual)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
-
-env:
-  PRODUCTION_DOMAIN: choretwo.stillon.top
+    inputs:
+      version_tag:
+        description: 'Version tag or image tag to deploy'
+        required: true
+        default: 'latest'
 
 jobs:
-  approve-production:
-    name: Manual Approval for Production
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
-    outputs:
-      approved: ${{ steps.approval.outputs.approved }}
-    steps:
-      - name: Wait for manual approval
-        id: approval
-        run: |
-          echo "Production deployment requires manual approval"
-          echo "Check the Actions tab to approve or reject"
-          echo "approved=true" >> $GITHUB_OUTPUT
-
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: approve-production
-    if: ${{ (needs.approve-production.outputs.approved == 'true' && github.event_name == 'push') || github.event_name == 'workflow_dispatch' }}
+  deploy:
+    name: Trigger Production Deployment
     environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Flux CLI
-        uses: fluxcd/flux2/action@main
-        with:
-          version: latest
-
-      - name: Checkout k3s-config repo
-        uses: actions/checkout@v4
-        with:
-          repository: pipelinedave/k3s-config
-          token: ${{ secrets.K3S_CONFIG_TOKEN }}
-          path: k3s-config
-
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update image tags
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          echo "Updating production images to version: $VERSION"
-          
-          find k3s-config/kustomize/choretwo/overlays/production/ -name "deployment.yaml" -type f | while read file; do
-            if grep -q "image: pipelinedave/" "$file"; then
-              SERVICE_DIR=$(dirname "$file" | xargs basename)
-              if [ "$SERVICE_DIR" != "overlays" ] && [ "$SERVICE_DIR" != "production" ]; then
-                sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${VERSION}|g" "$file"
-                echo "Updated $file"
-              fi
-            fi
-          done
-
-      - name: Commit and push
-        run: |
-          cd k3s-config
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add kustomize/choretwo/base/
-          
-          if ! git diff --staged --quiet; then
-            git commit -m "release: update choretwo images to ${{ steps.version.outputs.version }}"
-            git push https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git main
-            echo "Image tags updated and pushed"
-          else
-            echo "No changes to commit"
-          fi
-
-  smoke-tests-production:
-    name: Production Smoke Tests
-    runs-on: ubuntu-latest
-    needs: deploy-production
-    environment: production
-    if: always() && github.event_name != 'workflow_dispatch'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Wait for deployment
-        run: |
-          echo "Waiting 5 minutes for Flux to deploy..."
-          sleep 300
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: 'npm'
-
-      - name: Install Playwright
-        run: |
-          cd frontend
-          npm ci
-          npx playwright install --with-deps
-
-      - name: Run smoke tests against production
-        run: |
-          cd frontend
-          BASE_URL=https://${{ env.PRODUCTION_DOMAIN }} npm run test:e2e -- --grep "smoke"
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-production-report
-          path: frontend/playwright-report/
-
-  notify-production-deploy:
-    name: Notify Production Deployment
-    runs-on: ubuntu-latest
-    needs: [deploy-production, smoke-tests-production]
-    if: always()
-    steps:
-      - name: Deployment status
-        run: |
-          if [ "${{ needs.deploy-production.result }}" == "success" ]; then
-            echo "✅ Production deployment successful!"
-            echo "Version: ${{ steps.version.outputs.version || github.ref_name }}"
-            echo "URL: https://${{ env.PRODUCTION_DOMAIN }}"
-          else
-            echo "❌ Production deployment failed"
-            echo "Deploy result: ${{ needs.deploy-production.result }}"
-            echo "Smoke test result: ${{ needs.smoke-tests-production.result }}"
-          fi
+    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    with:
+      overlay: production
+      version_tag: ${{ inputs.version_tag }}
+    secrets:
+      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}

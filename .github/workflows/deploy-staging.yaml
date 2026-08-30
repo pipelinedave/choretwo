@@ -1,128 +1,19 @@
-name: Deploy to Staging
+name: Deploy to Staging (Manual)
 
 on:
-  workflow_run:
-    workflows: ["Build and Push Docker Images"]
-    types:
-      - completed
-    branches: [main]
   workflow_dispatch:
-
-env:
-  STAGING_DOMAIN: choretwo-staging.stillon.top
+    inputs:
+      version_tag:
+        description: 'Image tag to deploy (default: latest)'
+        required: false
+        default: 'latest'
 
 jobs:
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-    environment: staging
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Get commit SHA
-        id: get-sha
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install Flux CLI
-        uses: fluxcd/flux2/action@main
-        with:
-          version: latest
-
-      - name: Checkout k3s-config repo
-        uses: actions/checkout@v4
-        with:
-          repository: pipelinedave/k3s-config
-          token: ${{ secrets.K3S_CONFIG_TOKEN }}
-          path: k3s-config
-
-      - name: Update image tags
-        run: |
-          SHA=${{ steps.get-sha.outputs.sha }}
-          echo "Updating staging images to sha: $SHA"
-          
-          # Update base deployments (referenced by overlays)
-          find k3s-config/kustomize/choretwo/base/ -name "deployment.yaml" -type f | while read file; do
-            if grep -q "image: pipelinedave/" "$file"; then
-              SERVICE_DIR=$(dirname "$file" | xargs basename)
-              sed -i "s|image: pipelinedave/.*:.*|image: pipelinedave/${SERVICE_DIR}:${SHA}|g" "$file"
-              echo "Updated $file"
-            fi
-          done
-
-      - name: Commit and push
-        run: |
-          cd k3s-config
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add kustomize/choretwo/base/
-          
-          if ! git diff --staged --quiet; then
-            git commit -m "chore(staging): update choretwo images to ${{ steps.get-sha.outputs.sha }}"
-            git push https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/pipelinedave/k3s-config.git main
-            echo "Image tags updated and pushed"
-          else
-            echo "No changes to commit"
-          fi
-
-  e2e-staging:
-    name: E2E Tests on Staging
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    environment: staging
-    if: github.event_name != 'workflow_dispatch'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Wait for deployment
-        run: |
-          echo "Waiting 5 minutes for Flux to deploy..."
-          sleep 300
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: 'npm'
-
-      - name: Install Playwright
-        run: |
-          cd frontend
-          npm ci
-          npx playwright install --with-deps
-
-      - name: Run E2E tests against staging
-        run: |
-          cd frontend
-          BASE_URL=https://${{ env.STAGING_DOMAIN }} npm run test:e2e
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-staging-report
-          path: frontend/playwright-report/
-
-  notify-staging-deploy:
-    name: Notify Staging Deployment
-    runs-on: ubuntu-latest
-    needs: [deploy-staging, e2e-staging]
-    if: always()
-    steps:
-      - name: Deployment status
-        run: |
-          if [ "${{ needs.deploy-staging.result }}" == "success" ]; then
-            echo "✅ Staging deployment successful!"
-            echo "URL: https://${{ env.STAGING_DOMAIN }}"
-          else
-            echo "❌ Staging deployment failed"
-            echo "Deploy result: ${{ needs.deploy-staging.result }}"
-            echo "E2E result: ${{ needs.e2e-staging.result }}"
-          fi
+  deploy:
+    name: Trigger Staging Deployment
+    uses: ./.github/workflows/update-kubernetes-deployment.yml
+    with:
+      overlay: staging
+      version_tag: ${{ inputs.version_tag || 'latest' }}
+    secrets:
+      K3S_CONFIG_TOKEN: ${{ secrets.K3S_CONFIG_TOKEN }}
