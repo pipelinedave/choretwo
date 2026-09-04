@@ -1,0 +1,43 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from chore.app.database import init_db, run_migrations
+from chore.app.routes.chores import router as chores_router
+from chore.app.routes.export import router as export_router
+from chore.app.routes.settings import router as settings_router
+from chore.app.middleware.auth import AuthMiddleware
+
+app = FastAPI(
+    title="Chore Service",
+    description="Microservice for chore management",
+    version="1.0.0",
+)
+
+app.add_middleware(AuthMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+async def startup_event():
+    run_migrations()
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "chore-service"}
+
+
+@app.get("/")
+async def root():
+    return {"message": "Chore Service", "version": "1.0.0"}
+
+
+app.include_router(chores_router)
+app.include_router(export_router)
+app.include_router(settings_router)
