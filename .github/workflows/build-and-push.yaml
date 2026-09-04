@@ -25,18 +25,9 @@ jobs:
           - name: auth-service
             context: ./services/auth-service
             dockerfile: ./services/auth-service/Dockerfile
-          - name: chore-service
-            context: ./services/chore-service
-            dockerfile: ./services/chore-service/Dockerfile
-          - name: log-service
-            context: ./services/log-service
-            dockerfile: ./services/log-service/Dockerfile
-          - name: notification-service
-            context: ./services/notification-service
-            dockerfile: ./services/notification-service/Dockerfile
-          - name: ai-copilot-service
-            context: ./services/ai-copilot-service
-            dockerfile: ./services/ai-copilot-service/Dockerfile
+          - name: monolith
+            context: .
+            dockerfile: ./monolith/Dockerfile
           - name: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile

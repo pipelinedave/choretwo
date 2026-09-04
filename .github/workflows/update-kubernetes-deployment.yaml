@@ -53,6 +53,7 @@ jobs:
           if [ -d "$OVERLAY_DIR" ]; then
             cd "$OVERLAY_DIR"
             kustomize edit set image pipelinedave/auth-service=pipelinedave/auth-service:${VERSION_TAG} || true
+            kustomize edit set image pipelinedave/monolith=pipelinedave/monolith:${VERSION_TAG} || true
             kustomize edit set image pipelinedave/chore-service=pipelinedave/chore-service:${VERSION_TAG} || true
             kustomize edit set image pipelinedave/log-service=pipelinedave/log-service:${VERSION_TAG} || true
             kustomize edit set image pipelinedave/notification-service=pipelinedave/notification-service:${VERSION_TAG} || true
