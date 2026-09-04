@@ -1,10 +1,11 @@
 import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
+const AUTH_BASE = import.meta.env.VITE_AUTH_BASE || "";
 
 // Create axios instances for each service
 export const authApi = axios.create({
-  baseURL: `${API_BASE}/api/auth`,
+  baseURL: `${AUTH_BASE}/api/auth`,
   headers: {
     "Content-Type": "application/json",
   },

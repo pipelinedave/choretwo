@@ -143,11 +143,8 @@ services:
     ports:
       - "3000:80"
     environment:
-      VITE_AUTH_SERVICE_URL: ${VITE_AUTH_SERVICE_URL:-http://localhost:8001}
-      VITE_CHORE_SERVICE_URL: ${VITE_CHORE_SERVICE_URL:-http://localhost:8002}
-      VITE_LOG_SERVICE_URL: ${VITE_LOG_SERVICE_URL:-http://localhost:8003}
-      VITE_NOTIFICATION_SERVICE_URL: ${VITE_NOTIFICATION_SERVICE_URL:-http://localhost:8004}
-      VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8005}
+      VITE_API_BASE: ${VITE_API_BASE:-http://localhost:3000}
+      VITE_AUTH_BASE: ${VITE_AUTH_BASE:-http://localhost:8001}
     depends_on:
       - auth-service
       - chore-service

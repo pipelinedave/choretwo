@@ -88,6 +88,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
+      // Auth service (Go, standalone) — proxy to auth-service:8001
       "/api/auth": {
         target: "http://localhost:8001",
         changeOrigin: true,
@@ -101,8 +102,9 @@ export default defineConfig({
           });
         },
       },
+      // Modular monolith APIs — proxy to monolith:8000
       "/api/chores": {
-        target: "http://localhost:8002",
+        target: "http://localhost:8000",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq, req) => {
@@ -115,7 +117,7 @@ export default defineConfig({
         },
       },
       "/api/logs": {
-        target: "http://localhost:8003",
+        target: "http://localhost:8000",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq, req) => {
@@ -128,7 +130,7 @@ export default defineConfig({
         },
       },
       "/api/notify": {
-        target: "http://localhost:8004",
+        target: "http://localhost:8000",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq, req) => {
@@ -141,7 +143,7 @@ export default defineConfig({
         },
       },
       "/api/ai": {
-        target: "http://localhost:8005",
+        target: "http://localhost:8000",
         changeOrigin: true,
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq, req) => {
@@ -153,8 +155,9 @@ export default defineConfig({
           });
         },
       },
+      // Settings — proxy to monolith:8000
       "/api/settings": {
-        target: "http://localhost:8002",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
     },
