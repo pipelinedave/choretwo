@@ -39,6 +39,10 @@ if (process.env.NODE_ENV === "production") {
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        navigateFallback: "/index.html",
+        // Never treat /api/* navigations as SPA fallback — let the browser hit
+        // the real backend (auth mock-login-page / callback) instead of Vue.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.(?:png|jpg|jpeg|svg|gif|webp)/,
