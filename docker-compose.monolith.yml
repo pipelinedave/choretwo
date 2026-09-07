@@ -1,31 +1,56 @@
-# docker-compose.monolith.yml — Override zu docker-compose.yml
-# Ersetzt die vier Python-Einzelservices (chore, log, notify, ai)
-# durch EINEN Monolith-Container auf Port 8000.
+# docker-compose.monolith.yml
+# Override file for running Choretwo in monolith mode.
 #
-# Aktivierung:
+# Usage:
 #   docker compose -f docker-compose.yml -f docker-compose.monolith.yml up
 #
-# Go-auth-service, Postgres und Redis bleiben unverstaendet.
+# This replaces the 4 Python services with a single 'monolith' container.
+# The Go auth-service remains standalone (handles OAuth/Dex flow).
+# The ai-copilot-service is excluded by default (optional, resource-heavy).
+
+version: '3.8'
 
 services:
-  # -----------------------------------------------------------
-  # Monolith — kombiniert chore-service, log-service,
-  # notification-service und ai-copilot-service in einem Prozess.
-  # -----------------------------------------------------------
+  # Disable individual Python microservices in monolith mode
+  chore-service:
+    deploy:
+      replicas: 0
+    profiles:
+      - microservices
+
+  log-service:
+    deploy:
+      replicas: 0
+    profiles:
+      - microservices
+
+  notification-service:
+    deploy:
+      replicas: 0
+    profiles:
+      - microservices
+
+  ai-copilot-service:
+    deploy:
+      replicas: 0
+    profiles:
+      - microservices
+
+  # Single monolith container replacing all 4 Python services
   monolith:
     build:
       context: .
       dockerfile: monolith/Dockerfile
-    container_name: choretwo-monolith
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
       REDIS_URL: "redis://redis:6379"
+      AUTH_SERVICE_URL: "http://auth-service:8000"
       JWT_SECRET: ${JWT_SECRET:-choretwo-dev-jwt-secret-change-in-production}
+      USE_MOCK_AUTH: ${USE_MOCK_AUTH:-false}
+      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173"
       GATWAY_URL: ${GATWAY_URL:-http://gotify.stillon.top}
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      OPENWEBUI_URL: ${OPENWEBUI_URL:-http://open-webui:8080}
     depends_on:
       postgres:
         condition: service_healthy
@@ -35,15 +60,13 @@ services:
       - choretwo-network
     restart: unless-stopped
 
-  # -----------------------------------------------------------
-  # Frontend — zeigt jetzt auf den Monolith (VITE_API_BASE).
-  # depends_on: auth-service (Go) bleibt — Monolith verlaesst
-  # sich auf JWTs vom auth-service, nicht auf HTTP-Calls.
-  # -----------------------------------------------------------
+  # Frontend now points to single monolith
   frontend:
     environment:
-      VITE_API_BASE: "http://localhost:8000"
-      VITE_AUTH_BASE: "http://localhost:8001"
-    depends_on:
-      - auth-service
-      - monolith
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      # Legacy vars for backward compat during transition:
+      VITE_AUTH_SERVICE_URL: ${VITE_AUTH_SERVICE_URL:-http://localhost:8001}
+      VITE_CHORE_SERVICE_URL: ${VITE_CHORE_SERVICE_URL:-http://localhost:8000}
+      VITE_LOG_SERVICE_URL: ${VITE_LOG_SERVICE_URL:-http://localhost:8000}
+      VITE_NOTIFICATION_SERVICE_URL: ${VITE_NOTIFICATION_SERVICE_URL:-http://localhost:8000}
+      VITE_AI_SERVICE_URL: ${VITE_AI_SERVICE_URL:-http://localhost:8005}
