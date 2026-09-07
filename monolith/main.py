@@ -1,123 +1,158 @@
-"""Choretwo Modular Monolith — kombinierter FastAPI-Entrypoint.
+"""Choretwo Monolith — single FastAPI app combining all Python services.
 
-Führt die vier Python-Einzelservices (chore, log, notify, ai) in EINEM
-Uvicorn-Prozess zusammen. Die Einzelservice-Pakete liegen unverändert
-(eigener Code) unter `monolith/vendor/<service>/` und werden hier nur
-eingebunden. Der Go-auth-service (OAuth/Dex-Callback) bleibt eigenständig;
-seine JWT-Validierung übernimmt der Monolith nativ per `monolith/auth.py`.
+Architecture:
+- chore-service (Python/FastAPI)  → /api/chores/, /api/export/, /api/settings/
+- log-service   (Python/FastAPI)  → /api/logs/
+- notification-service (Python)   → /api/notifications/
+- auth-service  (Go)              → runs separately, handles /auth/* OAuth flow
+- ai-copilot    (Python)          → runs separately (optional, resource-heavy)
 
-Endpunkte:
-    /api/chores/*    <- chore-service
-    /api/logs/*      <- log-service
-    /api/notify/*    <- notification-service
-    /api/ai/*        <- ai-copilot-service
-    /health          <- unified healthcheck
+Each service's own main.py still works for standalone Microservice mode.
+This file is the monolith entry point only.
+
+DB strategy: All services read DATABASE_URL from env.
+Since we set it before importing service code, they all share the same connection.
+DB pool is managed by SQLAlchemy (single process = single pool).
+
+Auth strategy (Option A): JWT validated in-process via monolith/auth_proxy.py.
+Middleware injects user_email into request.state before routers are called.
 """
-
-from __future__ import annotations
-
-import importlib
+import os
 import sys
-from pathlib import Path
+import logging
 
-from fastapi import FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from .auth import auth_middleware
-from . import database as shared_db
+# ---------------------------------------------------------------------------
+# Bootstrap: ensure service packages are importable.
+# In production Docker image, PYTHONPATH includes the repo root.
+# In local dev, run from repo root: uvicorn monolith.main:app
+# ---------------------------------------------------------------------------
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
-SERVICES_ROOT = Path(__file__).resolve().parent / "vendor"
-# Vendor-Pakete (chore/log/notify/ai) müssen importierbar sein.
-if str(SERVICES_ROOT) not in sys.path:
-    sys.path.insert(0, str(SERVICES_ROOT))
+# Add each service to the path so "from app.xxx import" works
+for svc in ("chore-service", "log-service", "notification-service"):
+    svc_path = os.path.join(REPO_ROOT, "services", svc)
+    if svc_path not in sys.path:
+        sys.path.insert(0, svc_path)
 
-# (Vendor-Paketname, Router-Modul, Health-Service-Name)
-ROUTERS = [
-    ("chore", "chore.app.routes.chores", "chore"),
-    ("chore", "chore.app.routes.export", "chore"),
-    ("chore", "chore.app.routes.settings", "chore"),
-    ("log", "log.app.routes.logs", "log"),
-    ("notify", "notify.app.routes.preferences", "notify"),
-    ("ai", "ai.app.routes.ai", "ai"),
-]
+# ---------------------------------------------------------------------------
+# Shared DB migrations
+# ---------------------------------------------------------------------------
+from monolith.database import run_all_migrations  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Auth middleware (JWT validation, sets request.state.user_email)
+# ---------------------------------------------------------------------------
+from monolith.auth_proxy import get_user_email, EXEMPT_PATHS  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Service routers — import after sys.path manipulation
+# ---------------------------------------------------------------------------
+from app.routes.chores import router as chores_router       # chore-service  # noqa: E402
+from app.routes.export import router as export_router       # chore-service  # noqa: E402
+from app.routes.settings import router as settings_router   # chore-service  # noqa: E402
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("monolith")
+
+# ---------------------------------------------------------------------------
+# FastAPI app
+# ---------------------------------------------------------------------------
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "https://choretwo.vercel.app,http://localhost:3000,http://localhost:5173",
+).split(",")
 
 app = FastAPI(
     title="Choretwo Monolith",
-    description="Combined API for Choretwo (chore, log, notification, AI)",
-    version="1.0.0",
+    description="Unified API for all Choretwo services",
+    version="2.0.0",
 )
 
-# Echte JWT-Auth-Middleware (innere Middleware)
-app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
-# CORS (äußere Middleware) -> OPTIONS-Preflight funktioniert, Auth bleibt innen
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://choretwo.stillon.top",
-        "https://choretwo-staging.stillon.top",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-def _bind_shared_database(package: str) -> None:
-    """Lässt das geladene Service-Paket die gemeinsame Engine verwenden.
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Validate JWT and inject user_email into request.state."""
+    if request.url.path in EXEMPT_PATHS or request.url.path.startswith("/auth/"):
+        return await call_next(request)
 
-    Die Router der Einzelservices importieren `from <pkg>.app.database import
-    get_db` und rufen zur Laufzeit `SessionLocal()` auf. Indem wir die
-    Modul-Globals `engine`, `SessionLocal` und `get_db` auf die Singleton-
-    Instanzen aus `monolith.database` setzen, teilen sich alle vier Pakete
-    tatsächlich eine Engine bzw. Session-Factory.
-    """
-    db_mod = importlib.import_module(f"{package}.app.database")
-    db_mod.engine = shared_db.engine
-    db_mod.SessionLocal = shared_db.SessionLocal
-    db_mod.get_db = shared_db.get_db
-
-
-# Router laden und mit shared DB verbinden
-_loaded = set()
-for _package, module_name, _svc in ROUTERS:
-    mod = importlib.import_module(module_name)
-    pkg = module_name.split(".")[0]
-    if pkg not in _loaded:
-        _bind_shared_database(pkg)
-        _loaded.add(pkg)
-    router = getattr(mod, "router", None)
-    if router is None:
-        raise RuntimeError(f"Router-Modul {module_name} hat kein `router`-Attribut")
-    app.include_router(router)
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Führt die Migrationen aller vier Services aus (idempotent)."""
-    for package in ("chore", "log", "notify", "ai"):
-        db_mod = importlib.import_module(f"{package}.app.database")
-        try:
-            db_mod.run_migrations()
-        except Exception as exc:  # pragma: no cover - nicht deterministisch
-            print(f"[WARN] Migration {package} fehlgeschlagen: {exc}")
-
-    # obligationen: Ollama-Client (AI) initialisieren, falls verfügbar
     try:
-        ai_routes = importlib.import_module("ai.app.routes.ai")
-        if hasattr(ai_routes, "get_ollama_client"):
-            ai_routes.ollama_client = ai_routes.get_ollama_client()
-            print("[monolith] Ollama-Client initialisiert")
-    except Exception as exc:  # pragma: no cover
-        print(f"[WARN] AI/Ollama-Init fehlgeschlagen (degraded): {exc}")
+        user_email = get_user_email(request)
+        request.state.user_email = user_email
+    except Exception:
+        return JSONResponse(status_code=401, content={"error": "Authentication required"})
+
+    return await call_next(request)
 
 
+# ---------------------------------------------------------------------------
+# Startup
+# ---------------------------------------------------------------------------
+@app.on_event("startup")
+async def startup_event():
+    logger.info("[monolith] Starting up...")
+    run_all_migrations()
+    logger.info("[monolith] Ready")
+
+
+# ---------------------------------------------------------------------------
+# Health & root
+# ---------------------------------------------------------------------------
 @app.get("/health")
-async def health_check() -> dict:
-    return {"status": "ok", "service": "choretwo-monolith"}
+async def health_check():
+    return {
+        "status": "ok",
+        "service": "choretwo-monolith",
+        "version": "2.0.0",
+        "includes": ["chore-service", "log-service", "notification-service"],
+    }
 
 
 @app.get("/")
-async def root() -> dict:
-    return {"message": "Choretwo Monolith", "version": "1.0.0"}
+async def root():
+    return {"message": "Choretwo Monolith", "version": "2.0.0", "docs": "/docs"}
+
+
+# ---------------------------------------------------------------------------
+# Mount service routers
+# chore-service: keep original prefixes (/chores, /export, /settings)
+# ---------------------------------------------------------------------------
+app.include_router(chores_router)
+app.include_router(export_router)
+app.include_router(settings_router)
+
+# log-service: imported separately to avoid module naming collision
+# (both chore-service and log-service have app.routes)
+try:
+    # Temporarily adjust import path to pick up log-service
+    log_svc_path = os.path.join(REPO_ROOT, "services", "log-service")
+    sys.path.insert(0, log_svc_path)
+    import importlib
+    log_routes_mod = importlib.import_module("app.routes.logs")
+    app.include_router(log_routes_mod.router)
+    logger.info("[monolith] log-service routes mounted")
+except Exception as e:
+    logger.warning(f"[monolith] Could not mount log-service routes: {e}")
+
+# notification-service
+try:
+    notif_svc_path = os.path.join(REPO_ROOT, "services", "notification-service")
+    sys.path.insert(0, notif_svc_path)
+    notif_routes_mod = importlib.import_module("app.routes.preferences")
+    app.include_router(notif_routes_mod.router)
+    logger.info("[monolith] notification-service routes mounted")
+except Exception as e:
+    logger.warning(f"[monolith] Could not mount notification-service routes: {e}")
