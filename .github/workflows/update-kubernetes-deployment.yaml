@@ -20,70 +20,70 @@ jobs:
       VERSION_TAG: ${{ inputs.version_tag }}
       OVERLAY: ${{ inputs.overlay }}
     steps:
-      - name: 🔍 Check K3S_CONFIG_TOKEN Availability
+      - name: Check K3S_CONFIG_TOKEN Availability
         id: check_token
         run: |
           if [ -z "${{ secrets.K3S_CONFIG_TOKEN }}" ]; then
             echo "has_token=false" >> $GITHUB_OUTPUT
-            echo "::warning::K3S_CONFIG_TOKEN secret is not configured in this repository. Skipping automatic GitOps update of k3s-config."
+            echo "::warning::K3S_CONFIG_TOKEN not set. Skipping GitOps update."
           else
             echo "has_token=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: 📥 Clone k3s-config Repo
+      - name: Clone k3s-config Repo
         if: steps.check_token.outputs.has_token == 'true'
         run: |
-          git clone "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" k3s-config || \
-          git clone "https://github.com/${K3S_REPO}.git" k3s-config
+          git clone "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" k3s-config
           cd k3s-config
           git config user.name "GitHub Actions [bot]"
           git config user.email "actions@github.com"
 
-      - name: 📦 Set up Kustomize
+      - name: Set up Kustomize
         if: steps.check_token.outputs.has_token == 'true'
         uses: imranismail/setup-kustomize@v2
 
-      - name: 🚀 Update Image Tags in Overlay
+      - name: Update Image Tags in Overlay
         if: steps.check_token.outputs.has_token == 'true'
         run: |
-          echo "Updating all choretwo service images in overlay ${OVERLAY} to tag: ${VERSION_TAG}"
+          echo "Updating choretwo images in overlay ${OVERLAY} to tag: ${VERSION_TAG}"
           cd k3s-config
           OVERLAY_DIR="kustomize/choretwo/overlays/${OVERLAY}"
-          
+
           if [ -d "$OVERLAY_DIR" ]; then
             cd "$OVERLAY_DIR"
-            kustomize edit set image pipelinedave/auth-service=pipelinedave/auth-service:${VERSION_TAG} || true
+            # Monolith replaces the Python microservices
             kustomize edit set image pipelinedave/monolith=pipelinedave/monolith:${VERSION_TAG} || true
-            kustomize edit set image pipelinedave/chore-service=pipelinedave/chore-service:${VERSION_TAG} || true
-            kustomize edit set image pipelinedave/log-service=pipelinedave/log-service:${VERSION_TAG} || true
-            kustomize edit set image pipelinedave/notification-service=pipelinedave/notification-service:${VERSION_TAG} || true
-            kustomize edit set image pipelinedave/ai-copilot-service=pipelinedave/ai-copilot-service:${VERSION_TAG} || true
+            # Auth-service (Go) still gets its own image
+            kustomize edit set image pipelinedave/auth-service=pipelinedave/auth-service:${VERSION_TAG} || true
+            # Frontend
             kustomize edit set image pipelinedave/frontend=pipelinedave/frontend:${VERSION_TAG} || true
+            # AI copilot (optional, separate)
+            kustomize edit set image pipelinedave/ai-copilot-service=pipelinedave/ai-copilot-service:${VERSION_TAG} || true
             cd -
           fi
-          
-          # Also update any explicit image lines in deployment manifests if present
-          find "kustomize/choretwo/overlays/${OVERLAY}/" -name "*.yaml" -type f | while read file; do
-            sed -i "s|image: pipelinedave/\([^:]*\):.*|image: pipelinedave/\1:${VERSION_TAG}|g" "$file"
+
+          # Also update direct image references in base manifests
+          find "kustomize/choretwo/base/monolith/" -name "*.yaml" -type f | while read file; do
+            sed -i "s|image: pipelinedave/monolith:.*|image: pipelinedave/monolith:${VERSION_TAG}|g" "$file"
           done
 
-      - name: 💾 Commit & Push to k3s-config
+      - name: Commit & Push to k3s-config
         if: steps.check_token.outputs.has_token == 'true'
         run: |
           cd k3s-config
           git add kustomize/choretwo/
-          
+
           if git diff --cached --quiet; then
-            echo "No changes to commit (manifests already match tag ${VERSION_TAG})."
+            echo "No changes to commit (images already at ${VERSION_TAG})."
           else
-            git commit -m "chore(${OVERLAY}): update choretwo images to ${VERSION_TAG:0:7}"
+            git commit -m "choretwo(${OVERLAY}): update monolith image to ${VERSION_TAG:0:7}"
             if git push "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" HEAD:main; then
-              echo "Successfully updated and pushed image tags to k3s-config repository"
+              echo "Successfully pushed GitOps update to k3s-config"
             else
-              echo "::warning::Failed to push GitOps update to k3s-config. Please verify K3S_CONFIG_TOKEN secret has write permissions for ${K3S_REPO}."
+              echo "::warning::Failed to push. Check K3S_CONFIG_TOKEN permissions."
             fi
           fi
 
           TAG_NAME="choretwo/${OVERLAY}/${{ env.VERSION_TAG }}"
           git tag -f "${TAG_NAME}"
-          git push -f "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" "${TAG_NAME}" || echo "Tag push completed or skipped"
+          git push -f "https://${{ secrets.K3S_CONFIG_TOKEN }}@github.com/${K3S_REPO}.git" "${TAG_NAME}" || echo "Tag push done"

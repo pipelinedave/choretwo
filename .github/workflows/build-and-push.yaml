@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/monolith]
     tags: ['v*']
   workflow_dispatch:
     inputs:
@@ -22,15 +22,22 @@ jobs:
       fail-fast: false
       matrix:
         service:
+          # Go auth-service (remains standalone)
           - name: auth-service
             context: ./services/auth-service
             dockerfile: ./services/auth-service/Dockerfile
+          # Monolith: replaces chore-service, log-service, notification-service
           - name: monolith
             context: .
             dockerfile: ./monolith/Dockerfile
+          # Frontend
           - name: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile
+          # ai-copilot-service stays separate (resource-heavy)
+          - name: ai-copilot-service
+            context: ./services/ai-copilot-service
+            dockerfile: ./services/ai-copilot-service/Dockerfile
 
     steps:
       - name: Checkout Code
@@ -69,22 +76,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-staging:
-    name: Deploy to Staging (GitOps Flux)
-    needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/update-kubernetes-deployment.yaml
-    with:
-      overlay: staging
-      version_tag: ${{ github.sha }}
-    secrets: inherit
-
   deploy-production:
     name: Deploy to Production (GitOps Flux)
     needs: build-and-push
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     uses: ./.github/workflows/update-kubernetes-deployment.yaml
     with:
       overlay: production
-      version_tag: ${{ github.ref_name }}
+      version_tag: ${{ github.sha }}
     secrets: inherit
