@@ -1,54 +1,37 @@
-# Choretwo Monolith — Single-Image für nucy (k3s)
-# Führt chore-, log-, notification- und ai-copilot-logik in einem Prozess.
+# syntax=docker/dockerfile:1
+# Choretwo monolith image — all 3 Python services in one process
+# Reduces idle RAM from ~300 MB (3 containers) to ~90 MB (1 container)
 
 FROM python:3.11-slim AS base
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
 WORKDIR /app
 
-# System-Voraussetzungen für psycopg2-binary & Co.
+# Install system deps for psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
+    libpq-dev \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python deps
 COPY monolith/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Paketstruktur: monolith/ + vendor/ (vendor nicht im Image, sondern beim Build aus services/ generiert)
-COPY monolith/ /app/monolith/
-COPY services/chore-service/app /svc-src/chore
-COPY services/log-service/app /svc-src/log
-COPY services/notification-service/app /svc-src/notify
-COPY services/ai-copilot-service/app /svc-src/ai
+# Copy service source code (keep original package structure intact)
+COPY services/chore-service /app/services/chore-service
+COPY services/log-service /app/services/log-service
+COPY services/notification-service /app/services/notification-service
 
-# Vendor-Sync im Build (Import-Prefix-Rewrite) per Sync-Skript
-RUN python3 - <<'PY'
-import re, shutil
-from pathlib import Path
+# Copy monolith glue code
+COPY monolith /app/monolith
 
-IMPORT_RE = re.compile(r"(?P<prefix>\b(from|import)\s+)app(?P<suffix>\.[\w.]+|\s)")
-MAP = {"chore": "chore", "log": "log", "notify": "notify", "ai": "ai"}
-
-def rewrite(content, pkg):
-    return IMPORT_RE.sub(lambda m: f"{m.group('prefix')}{pkg}.app{m.group('suffix')}", content)
-
-vendor = Path("/app/monolith/vendor")
-for svc, pkg in MAP.items():
-    src = Path("/svc-src") / svc
-    dst = vendor / pkg / "app"
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__"))
-    (vendor / pkg / "__init__.py").write_text("", encoding="utf-8")
-    (dst / "__init__.py").write_text("", encoding="utf-8") if not (dst / "__init__.py").exists() else None
-    for py in dst.rglob("*.py"):
-        c = py.read_text(encoding="utf-8")
-        nc = rewrite(c, pkg)
-        if nc != c:
-            py.write_text(nc, encoding="utf-8")
-PY
+# PYTHONPATH: repo root so "from monolith.xxx" and "from app.xxx" both resolve
+# The main.py adds service paths dynamically at runtime
+ENV PYTHONPATH=/app
 
 EXPOSE 8000
 
-CMD ["python", "-m", "uvicorn", "monolith.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Health check: poll /health every 30s
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+CMD ["uvicorn", "monolith.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--log-level", "info"]

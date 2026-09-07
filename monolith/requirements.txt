@@ -1,3 +1,5 @@
+# Monolith requirements — consolidated from chore-service, log-service, notification-service
+# ai-copilot-service is excluded (runs as separate container)
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 sqlalchemy==2.0.25
@@ -5,8 +7,14 @@ asyncpg==0.29.0
 psycopg2-binary==2.9.9
 python-dotenv==1.0.0
 pydantic==2.5.3
+alembic==1.13.1
 redis==5.0.1
 httpx==0.26.0
 PyJWT==2.8.0
 python-multipart==0.0.9
+# notification-service uses celery for background tasks (optional in monolith)
 celery==5.3.4
+# test deps
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
