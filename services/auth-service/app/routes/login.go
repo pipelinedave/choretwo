@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"auth-service/app/dex"
+	"auth-service/app/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -17,8 +18,7 @@ func Login(c *gin.Context) {
 	}
 
 	state := uuid.New().String()
-	session := c.GetStringMap("session")
-	session["oauth_state"] = state
+	middleware.SetSessionValue(c, "oauth_state", state)
 
 	authURL := dex.GetAuthURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
@@ -47,8 +47,7 @@ func OAuthCallback(c *gin.Context) {
 		return
 	}
 
-	session := c.GetStringMap("session")
-	expectedState, ok := session["oauth_state"].(string)
+	expectedState, ok := middleware.GetSessionValue(c, "oauth_state").(string)
 	if !ok || expectedState != state {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "Invalid state parameter",
@@ -89,10 +88,10 @@ func OAuthCallback(c *gin.Context) {
 		name = email
 	}
 
-	session["user_email"] = email
-	session["user_name"] = name
-	session["access_token"] = token.AccessToken
-	session["refresh_token"] = token.RefreshToken
+	middleware.SetSessionValue(c, "user_email", email)
+	middleware.SetSessionValue(c, "user_name", name)
+	middleware.SetSessionValue(c, "access_token", token.AccessToken)
+	middleware.SetSessionValue(c, "refresh_token", token.RefreshToken)
 
 	c.Redirect(http.StatusTemporaryRedirect, "/auth-callback?success=true")
 }
