@@ -39,6 +39,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/catchup",
+    name: "CatchUp",
+    component: () => import("@/views/CatchUpView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/auth-callback",
     name: "AuthCallback",
     component: () => import("@/views/CallbackView.vue"),

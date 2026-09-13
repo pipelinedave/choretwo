@@ -20,6 +20,7 @@ const route = useRoute();
 
 const navItems = [
   { path: "/", label: "Home", icon: "mdi-home" },
+  { path: "/catchup", label: "Aufholen", icon: "mdi-bullseye-arrow" },
   { path: "/chores", label: "Chores", icon: "mdi-checkbox-marked-circle" },
   { path: "/logs", label: "Logs", icon: "mdi-history" },
   { path: "/settings", label: "Settings", icon: "mdi-cog" },
