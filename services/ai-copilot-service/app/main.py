@@ -4,8 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.database import run_migrations
-from app.routes.ai import router as ai_router, ollama_client, get_ollama_client
-from app.ollama_client import OllamaClient
+from app.routes.ai import router as ai_router, get_aihub_client
 
 app = FastAPI(
     title="AI Copilot Service",
@@ -57,11 +56,11 @@ async def auth_middleware(request: Request, call_next):
 async def startup_event():
     run_migrations()
     try:
-        global ollama_client
-        ollama_client = get_ollama_client()
+        global aihub_client
+        aihub_client = get_aihub_client()
     except Exception as e:
-        print(f"[WARN] Ollama client init failed: {e} (AI features degraded)")
-        ollama_client = None
+        print(f"[WARN] AI-Hub client init failed: {e} (AI features degraded)")
+        aihub_client = None
 
 
 @app.get("/health")

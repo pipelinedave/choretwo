@@ -51,8 +51,20 @@
               :class="msg.role === 'user' ? 'mdi-account' : 'mdi-robot-happy'"
             ></span>
           </div>
-          <div class="message-content">
-            {{ msg.content }}
+          <div class="message-body">
+            <div class="message-content">
+              {{ msg.content }}
+            </div>
+            <button
+              v-if="msg.role === 'assistant' && msg.canConfirm && !msg.confirmed"
+              @click="confirmAction(msg)"
+              class="confirm-btn"
+              :disabled="msg.confirming"
+            >
+              <span v-if="msg.confirming" class="dot"></span>
+              <span v-else class="mdi mdi-check"></span>
+              {{ msg.confirmLabel }}
+            </button>
           </div>
         </div>
 
@@ -93,6 +105,12 @@
 import { ref, nextTick, onMounted } from "vue";
 import { aiApi } from "@/api";
 import { useAuthStore } from "@/stores/auth";
+import {
+  assistantText,
+  sendToCopilot,
+  executeProposal,
+  isActionIntent,
+} from "@/composables/useCopilot";
 
 const authStore = useAuthStore();
 const messages = ref([]);
@@ -138,6 +156,40 @@ onMounted(async () => {
   await fetchSuggestions();
 });
 
+function confirmLabelFor(intent) {
+  switch (intent) {
+    case "mark_done":
+      return "Erledigt";
+    case "create_chore":
+      return "Anlegen";
+    case "update_chore":
+      return "Aktualisieren";
+    case "archive":
+      return "Archivieren";
+    default:
+      return "Bestätigen";
+  }
+}
+
+async function confirmAction(msg) {
+  if (msg.confirming || msg.confirmed) return;
+  msg.confirming = true;
+  try {
+    const data = await executeProposal(msg.proposalId);
+    msg.content = data?.message || "Ausgeführt.";
+    msg.confirmed = true;
+    msg.canConfirm = false;
+  } catch (err) {
+    console.error("Execute error:", err);
+    msg.content =
+      "Ausführung fehlgeschlagen: " +
+      (err?.response?.data?.detail || err.message || "Unbekannter Fehler");
+  } finally {
+    msg.confirming = false;
+    await scrollToBottom();
+  }
+}
+
 async function sendMessage() {
   if (!inputMessage.value.trim() || loading.value) return;
 
@@ -154,18 +206,17 @@ async function sendMessage() {
   loading.value = true;
 
   try {
-    const response = await aiApi.post("/chat", {
-      message: userMessage.content,
-      user_id: authStore.user?.id,
-    });
+    const data = await sendToCopilot(userMessage.content, authStore.user?.id);
 
     const assistantMessage = {
       id: Date.now() + 1,
       role: "assistant",
-      content:
-        response.data.response ||
-        response.data.message ||
-        "I'm not sure how to help with that.",
+      content: assistantText(data),
+      canConfirm: !!(data.requires_confirmation && data.proposal_id && isActionIntent(data.intent)),
+      confirmed: false,
+      confirming: false,
+      proposalId: data.proposal_id,
+      confirmLabel: confirmLabelFor(data.intent),
     };
 
     messages.value.push(assistantMessage);
@@ -190,11 +241,35 @@ async function sendQuickCommand(command) {
 async function fetchSuggestions() {
   try {
     const response = await aiApi.get("/suggestions");
-    if (response.data.suggestions && response.data.suggestions.length > 0) {
+    const data = response.data;
+    // Neues Backend liefert direkt eine Liste von Objekten
+    // {chore_name, reason, priority}; defensiv auch String-Listen oder
+    // { suggestions: [...] } abfangen.
+    let list = [];
+    if (Array.isArray(data)) {
+      list = data;
+    } else if (data?.suggestions && Array.isArray(data.suggestions)) {
+      list = data.suggestions;
+    }
+
+    if (list.length > 0) {
+      const formatSuggestion = (s) =>
+        typeof s === "string"
+          ? s
+          : `• ${s.chore_name || "Chore"} (${s.reason || "fällig"})`;
+      const text =
+        "Hier sind ein paar Vorschläge:\n" +
+        list.slice(0, 3).map(formatSuggestion).join("\n");
       messages.value.push({
         id: Date.now(),
         role: "assistant",
-        content: `Here are some suggestions: ${response.data.suggestions.slice(0, 3).join(", ")}`,
+        content: text,
+      });
+    } else {
+      messages.value.push({
+        id: Date.now(),
+        role: "assistant",
+        content: "Momentan gibt es keine offenen Aufgaben.",
       });
     }
   } catch (err) {
@@ -350,6 +425,42 @@ async function scrollToBottom() {
 .chat-message.user .message-content {
   background-color: var(--md-sys-color-primary);
   color: var(--md-sys-color-on-primary);
+}
+
+.message-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--md-sys-spacing-xs);
+  max-width: 100%;
+}
+
+.chat-message.user .message-body {
+  align-items: flex-end;
+}
+
+.confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--md-sys-spacing-xs) var(--md-sys-spacing-md);
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border: none;
+  border-radius: var(--md-sys-radius-full);
+  font-size: var(--md-sys-typescale-body-small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--md-sys-transition-fast);
+}
+
+.confirm-btn:hover {
+  opacity: 0.9;
+}
+
+.confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .message-content.loading {

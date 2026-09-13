@@ -27,7 +27,16 @@
         :class="{ error: isError }"
       >
         <span class="feedback-text">{{ responseMessage }}</span>
-        <button class="feedback-close" @click="responseMessage = ''">✕</button>
+        <button
+          v-if="pendingProposal && !isError"
+          class="confirm-btn"
+          @click="confirmAction"
+          :disabled="confirming"
+        >
+          <span v-if="confirming" class="spinner-sm"></span>
+          <span v-else>{{ pendingProposal.label }}</span>
+        </button>
+        <button class="feedback-close" @click="dismissFeedback">✕</button>
       </div>
     </transition>
   </div>
@@ -35,17 +44,61 @@
 
 <script setup>
 import { ref } from "vue";
-import { aiApi } from "@/api";
-import { useChoreStore } from "@/stores/chore";
-import { useLogStore } from "@/stores/log";
+import { useAuthStore } from "@/stores/auth";
+import {
+  assistantText,
+  sendToCopilot,
+  executeProposal,
+  isActionIntent,
+} from "@/composables/useCopilot";
 
-const choreStore = useChoreStore();
-const logStore = useLogStore();
+const authStore = useAuthStore();
 
 const query = ref("");
 const loading = ref(false);
 const responseMessage = ref("");
 const isError = ref(false);
+const confirming = ref(false);
+const pendingProposal = ref(null);
+
+function confirmLabelFor(intent) {
+  switch (intent) {
+    case "mark_done":
+      return "Erledigt";
+    case "create_chore":
+      return "Anlegen";
+    case "update_chore":
+      return "Aktualisieren";
+    case "archive":
+      return "Archivieren";
+    default:
+      return "Bestätigen";
+  }
+}
+
+function dismissFeedback() {
+  responseMessage.value = "";
+  pendingProposal.value = null;
+  isError.value = false;
+}
+
+async function confirmAction() {
+  if (confirming.value || !pendingProposal.value) return;
+  confirming.value = true;
+  try {
+    const data = await executeProposal(pendingProposal.value.proposalId);
+    responseMessage.value = data?.message || "Ausgeführt.";
+    pendingProposal.value = null;
+    isError.value = false;
+  } catch (err) {
+    isError.value = true;
+    responseMessage.value =
+      "Ausführung fehlgeschlagen: " +
+      (err?.response?.data?.detail || err.message || "Unbekannter Fehler");
+  } finally {
+    confirming.value = false;
+  }
+}
 
 async function handleSubmit() {
   const text = query.value.trim();
@@ -53,39 +106,21 @@ async function handleSubmit() {
 
   loading.value = true;
   responseMessage.value = "";
+  pendingProposal.value = null;
   isError.value = false;
 
   try {
-    const res = await aiApi.post("/intent", { text });
-    const data = res.data;
+    const data = await sendToCopilot(text, authStore.user?.id);
 
-    if (data.intent === "create_chore" && data.entities?.name) {
-      await choreStore.addChore({
-        name: data.entities.name,
-        interval: data.entities.interval_days || 7,
-        dueDate:
-          data.entities.due_date || new Date().toISOString().split("T")[0],
-        private: false,
-      });
-      responseMessage.value = `✨ Created chore "${data.entities.name}"!`;
-    } else if (data.intent === "complete_chore" && data.entities?.name) {
-      const match = choreStore.chores.find((c) =>
-        c.name.toLowerCase().includes(data.entities.name.toLowerCase()),
-      );
-      if (match) {
-        await choreStore.markDone(match.id);
-        responseMessage.value = `✓ Marked "${match.name}" as done!`;
-      } else {
-        responseMessage.value = `Could not find a matching chore for "${data.entities.name}".`;
-      }
-    } else {
-      responseMessage.value =
-        data.message || `Processed intent: ${data.intent || "understood"}`;
+    if (data.requires_confirmation && data.proposal_id && isActionIntent(data.intent)) {
+      pendingProposal.value = {
+        proposalId: data.proposal_id,
+        label: confirmLabelFor(data.intent),
+        intent: data.intent,
+      };
     }
-
+    responseMessage.value = assistantText(data);
     query.value = "";
-    await choreStore.fetchChores();
-    await logStore.fetchLogs();
   } catch (err) {
     isError.value = true;
     responseMessage.value =
@@ -162,6 +197,7 @@ async function handleSubmit() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--color-text);
@@ -170,6 +206,31 @@ async function handleSubmit() {
 .ai-feedback.error {
   background: rgba(231, 99, 99, 0.15);
   color: var(--color-danger);
+}
+
+.feedback-text {
+  flex: 1;
+}
+
+.confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .feedback-close {

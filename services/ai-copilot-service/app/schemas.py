@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     message: str
+    user_id: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -13,6 +14,21 @@ class ChatResponse(BaseModel):
     confidence: float
     requires_confirmation: bool = True
     suggested_action: Optional[str] = None
+    # Direkt anzeigbarer, menschenlesbarer Text für das Frontend
+    message: Optional[str] = None
+    # ID des gespeicherten Vorschlags (ai.command_history) für den
+    # /execute-Endpoint — nur gesetzt, wenn requires_confirmation.
+    proposal_id: Optional[int] = None
+
+
+class ExecuteRequest(BaseModel):
+    proposal_id: int = Field(..., description="ID des bestätigten Vorschlags")
+
+
+class ExecuteResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
 
 
 class Suggestion(BaseModel):
@@ -39,6 +55,6 @@ class AnalysisResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     status: str
-    ollama_connected: bool
+    aihub_connected: bool
     available_models: List[str]
     current_model: str

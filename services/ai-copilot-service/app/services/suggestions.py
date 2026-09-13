@@ -1,47 +1,77 @@
 import logging
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, date
 
 logger = logging.getLogger(__name__)
 
 
-async def generate_suggestions(user_email: str, chores: List[dict]) -> List[dict]:
-    """Generate chore suggestions based on patterns"""
+def _to_date(value) -> Optional[date]:
+    """Konvertiert date/datetime/ISO-String in ein date-Objekt."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+async def generate_suggestions(user_email: str, chores: List) -> List[dict]:
+    """Erzeugt echte, deterministische Vorschläge aus den geladenen Chores.
+
+    Priorisiert überfällige > heute fällige > bald fällige (7 Tage) Chores.
+    `chores` sind chore-service-ORM-Objekte (Attribute .name/.due_date/.done).
+    """
     suggestions = []
 
     if not chores:
         return suggestions
 
-    # Simple pattern-based suggestions
+    today = date.today()
     for chore in chores:
-        if chore.get("done"):
+        if getattr(chore, "done", False) or getattr(chore, "archived", False):
             continue
 
-        due_date = chore.get("due_date")
-        if due_date:
-            try:
-                due = (
-                    datetime.fromisoformat(due_date)
-                    if isinstance(due_date, str)
-                    else due_date
-                )
-                days_until_due = (due - datetime.now()).days
+        due = _to_date(getattr(chore, "due_date", None))
+        name = getattr(chore, "name", "Chore")
+        if due is None:
+            continue
 
-                if days_until_due <= 1:
-                    suggestions.append(
-                        {
-                            "chore_name": chore.get("name"),
-                            "reason": "Due soon" if days_until_due == 1 else "Overdue",
-                            "priority": 0.9 if days_until_due <= 0 else 0.7,
-                        }
-                    )
-            except Exception as e:
-                logger.error(f"Error processing chore due date: {e}")
+        days_until_due = (due - today).days
 
-    # Sort by priority
+        if days_until_due < 0:
+            suggestions.append(
+                {
+                    "chore_name": name,
+                    "reason": "Overdue",
+                    "priority": 1.0,
+                }
+            )
+        elif days_until_due == 0:
+            suggestions.append(
+                {
+                    "chore_name": name,
+                    "reason": "Due today",
+                    "priority": 0.9,
+                }
+            )
+        elif days_until_due <= 7:
+            suggestions.append(
+                {
+                    "chore_name": name,
+                    "reason": "Due within a week",
+                    "priority": 0.7,
+                }
+            )
+
+    # Nach Priorität sortieren
     suggestions.sort(key=lambda x: x["priority"], reverse=True)
-
-    return suggestions[:5]  # Return top 5 suggestions
+    return suggestions[:5]  # Top 5
 
 
 async def analyze_patterns(user_email: str, period: str = "30d") -> dict:
@@ -73,20 +103,20 @@ async def analyze_patterns(user_email: str, period: str = "30d") -> dict:
     }
 
 
-def calculate_health_score(chores: List[dict]) -> int:
+def calculate_health_score(chores: List) -> int:
     """Calculate overall health score from chores"""
     if not chores:
         return 100
 
     total = len(chores)
-    done = sum(1 for c in chores if c.get("done"))
-    overdue = sum(
-        1
-        for c in chores
-        if c.get("due_date")
-        and c.get("due_date") < datetime.now().isoformat()
-        and not c.get("done")
-    )
+    done = sum(1 for c in chores if getattr(c, "done", False))
+
+    today = date.today()
+    overdue = 0
+    for c in chores:
+        due = _to_date(getattr(c, "due_date", None))
+        if due and due < today and not getattr(c, "done", False):
+            overdue += 1
 
     completion_rate = done / total if total > 0 else 1.0
     overdue_penalty = min(overdue * 5, 30)  # Max 30 point penalty
