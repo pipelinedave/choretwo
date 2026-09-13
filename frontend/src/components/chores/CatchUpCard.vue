@@ -47,11 +47,28 @@
           <span
             v-if="chore.interval || chore.interval_days"
             class="chore-interval"
+            :title="intervalHint"
           >
             {{ chore.interval || chore.interval_days }}
           </span>
         </div>
       </div>
+
+      <p v-if="chore.interval || chore.interval_days" class="recurrence-hint">
+        <span class="mdi mdi-repeat"></span>
+        {{ intervalHint }}
+      </p>
+
+      <!-- Snooze Button (Aktive Card unten) -->
+      <button
+        v-if="isActive"
+        class="snooze-btn"
+        @click.stop.prevent="emit('snooze', chore)"
+        aria-label="Chore aufschieben"
+      >
+        <span class="mdi mdi-sleep"></span>
+        <span>Später</span>
+      </button>
 
       <!-- Card Position Indicator -->
       <div class="card-position">
@@ -72,7 +89,7 @@ const props = defineProps({
   isActive: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(["toggle", "edit"]);
+const emit = defineEmits(["toggle", "edit", "snooze"]);
 
 // Swipe Configuration
 const SWIPE_THRESHOLD = 80;
@@ -82,6 +99,14 @@ const RETURN_ANIMATION_MS = 480;
 const isSwiping = ref(false);
 const isReturning = ref(false);
 const swipeOffset = ref(0);
+
+const intervalHint = computed(() => {
+  const days = props.chore.interval || props.chore.interval_days;
+  if (!days) return "";
+  return days === 1
+    ? "wiederkehrend jeden Tag"
+    : `wiederkehrend alle ${days} Tage`;
+});
 
 const swipeThresholdPct = computed(() =>
   Math.min(1, Math.abs(swipeOffset.value) / SWIPE_THRESHOLD),
@@ -179,12 +204,16 @@ let startY = 0;
 let isGestureActive = false;
 let isScrollLocked = false;
 let isSwipeLocked = false;
+let isUpSwipeLocked = false;
 let gestureSource = "";
+
+const UP_SWIPE_THRESHOLD = 70;
 
 function startGesture(clientX, clientY, source) {
   isGestureActive = true;
   isScrollLocked = false;
   isSwipeLocked = false;
+  isUpSwipeLocked = false;
   gestureSource = source;
   startX = clientX;
   startY = clientY;
@@ -197,15 +226,21 @@ function moveGesture(clientX, clientY) {
   const dx = clientX - startX;
   const dy = clientY - startY;
 
-  if (!isSwipeLocked) {
+  if (!isSwipeLocked && !isUpSwipeLocked) {
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
 
     if (absDx < 6 && absDy < 6) return;
 
     if (absDy > absDx) {
-      isScrollLocked = true;
-      isGestureActive = false;
+      // Vertikale Geste: nach oben (dy < 0) → Snooze, sonst Scroll
+      if (dy < 0 && absDy > UP_SWIPE_THRESHOLD) {
+        isUpSwipeLocked = true;
+        isSwiping.value = true;
+      } else {
+        isScrollLocked = true;
+        isGestureActive = false;
+      }
       return;
     } else {
       isSwipeLocked = true;
@@ -305,7 +340,9 @@ function endGesture() {
   isGestureActive = false;
   isSwiping.value = false;
 
-  if (isSwipeLocked && Math.abs(swipeOffset.value) > SWIPE_THRESHOLD) {
+  if (isUpSwipeLocked) {
+    triggerSnooze();
+  } else if (isSwipeLocked && Math.abs(swipeOffset.value) > SWIPE_THRESHOLD) {
     if (swipeOffset.value < 0) {
       triggerEdit();
     } else {
@@ -317,7 +354,13 @@ function endGesture() {
 
   isScrollLocked = false;
   isSwipeLocked = false;
+  isUpSwipeLocked = false;
   gestureSource = "";
+}
+
+function triggerSnooze() {
+  swipeOffset.value = 0;
+  emit("snooze", props.chore);
 }
 
 function triggerEdit() {
@@ -508,6 +551,48 @@ function handleGlobalClick() {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--color-text);
+}
+
+/* Recurrence hint text */
+.recurrence-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.recurrence-hint .mdi {
+  font-size: 0.9rem;
+}
+
+/* Snooze button (bottom, active card only) */
+.snooze-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 10px auto 0;
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(31, 45, 44, 0.1);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color var(--transition-fast);
+}
+
+.snooze-btn:hover {
+  background: rgba(31, 45, 44, 0.18);
+}
+
+.snooze-btn .mdi {
+  font-size: 1rem;
 }
 
 /* Bottom Position Indicator */

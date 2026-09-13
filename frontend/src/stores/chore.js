@@ -85,7 +85,9 @@ export const useChoreStore = defineStore("chores", () => {
     error.value = null;
 
     try {
-      const response = await choreApi.get("/");
+      const response = await choreApi.get("/", {
+        params: { limit: 100 },
+      });
       chores.value = (response.data || []).map(normalizeChore);
       await fetchChoreCounts();
       return chores.value;
@@ -164,6 +166,12 @@ export const useChoreStore = defineStore("chores", () => {
       }
       const dueDate = updates.dueDate || updates.due_date;
       if (dueDate) payload.due_date = dueDate;
+      if (Object.prototype.hasOwnProperty.call(updates, "done")) {
+        payload.done = !!updates.done;
+      }
+      if (Object.prototype.hasOwnProperty.call(updates, "done_by")) {
+        payload.done_by = updates.done_by;
+      }
       if (
         Object.prototype.hasOwnProperty.call(updates, "private") ||
         Object.prototype.hasOwnProperty.call(updates, "is_private")
@@ -212,6 +220,32 @@ export const useChoreStore = defineStore("chores", () => {
       error.value = err.message || "Failed to mark chore as done";
       throw err;
     }
+  }
+
+  async function undoDone(id) {
+    // Backend resets done/done_by when done_by == "undo" (recurrence state
+    // und die bisherige due_date bleiben erhalten → Chore kommt zurück in den Stack).
+    try {
+      const response = await choreApi.put(`/${id}/done`, { done_by: "undo" });
+      const index = chores.value.findIndex((c) => c.id === id);
+      if (index !== -1) {
+        chores.value[index] = {
+          ...chores.value[index],
+          done: false,
+          doneBy: null,
+          done_by: null,
+        };
+      }
+      await fetchChoreCounts();
+      return response.data;
+    } catch (err) {
+      error.value = err.message || "Failed to undo chore";
+      throw err;
+    }
+  }
+
+  async function snoozeChore(id, dueDate) {
+    return updateChore(id, { due_date: dueDate, dueDate });
   }
 
   async function archiveChore(id) {
@@ -289,6 +323,8 @@ export const useChoreStore = defineStore("chores", () => {
     updateChore,
     markDone,
     markChoreDone: markDone,
+    undoDone,
+    snoozeChore,
     archiveChore,
     unarchiveChore,
     deleteChore,
