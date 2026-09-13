@@ -13,7 +13,10 @@
     <!-- Sliding Surface Card -->
     <div
       class="chore-card"
-      :style="{ transform: isSwiping || isReturning ? `translateX(${swipeOffset}px)` : '' }"
+      :style="{
+        transform:
+          isSwiping || isReturning ? `translateX(${swipeOffset}px)` : '',
+      }"
       :class="[
         choreClass,
         {
@@ -21,9 +24,9 @@
           'done-today': isDoneToday,
           'private-chore': isPrivate,
           'archived-view': isArchivedView,
-          'swiping': isSwiping,
-          'returning': isReturning
-        }
+          swiping: isSwiping,
+          returning: isReturning,
+        },
       ]"
       :id="`chore-card-${chore.id}`"
       ref="cardRef"
@@ -34,7 +37,9 @@
       @pointercancel="handlePointerCancel"
       role="listitem"
       tabindex="0"
-      :aria-label="isPrivate ? `Private chore: ${chore.name}` : `Chore: ${chore.name}`"
+      :aria-label="
+        isPrivate ? `Private chore: ${chore.name}` : `Chore: ${chore.name}`
+      "
     >
       <transition name="fade">
         <!-- Inline Edit Mode -->
@@ -47,37 +52,75 @@
             <div class="form-body">
               <div class="form-group">
                 <label for="chore-name">Name</label>
-                <input id="chore-name" v-model="editableChore.name" type="text" placeholder="Chore Name" required />
+                <input
+                  id="chore-name"
+                  v-model="editableChore.name"
+                  type="text"
+                  placeholder="Chore Name"
+                  required
+                />
               </div>
 
               <div class="form-group">
                 <label for="chore-due-date">Due Date</label>
-                <input id="chore-due-date" v-model="editableChore.dueDate" type="date" required />
+                <input
+                  id="chore-due-date"
+                  v-model="editableChore.dueDate"
+                  type="date"
+                  required
+                />
               </div>
 
               <div class="form-group">
                 <label for="chore-interval">Interval (days)</label>
-                <input id="chore-interval" v-model.number="editableChore.interval" type="number" min="1" required />
+                <input
+                  id="chore-interval"
+                  v-model.number="editableChore.interval"
+                  type="number"
+                  min="1"
+                  required
+                />
               </div>
 
               <div class="form-group custom-checkbox-wrapper">
-                <input type="checkbox" id="chore-private" v-model="editableChore.isPrivate" />
+                <input
+                  type="checkbox"
+                  id="chore-private"
+                  v-model="editableChore.isPrivate"
+                />
                 <label for="chore-private">
-                  <span class="checkbox-text">🔒 Private (only visible to me)</span>
+                  <span class="checkbox-text"
+                    >🔒 Private (only visible to me)</span
+                  >
                 </label>
               </div>
             </div>
 
             <div class="form-footer">
-              <button v-if="!isArchivedView" type="button" class="btn btn-warning btn-sm archive-button" @click="handleArchive">
-                <span class="mdi" :class="chore.archived ? 'mdi-undo' : 'mdi-archive'"></span>
-                {{ chore.archived ? 'Unarchive' : 'Archive' }}
+              <button
+                v-if="!isArchivedView"
+                type="button"
+                class="btn btn-warning btn-sm archive-button"
+                @click="handleArchive"
+              >
+                <span
+                  class="mdi"
+                  :class="chore.archived ? 'mdi-undo' : 'mdi-archive'"
+                ></span>
+                {{ chore.archived ? "Unarchive" : "Archive" }}
               </button>
               <div class="action-buttons">
-                <button type="button" class="btn btn-tonal btn-sm cancel-button" @click="cancelEditMode">
+                <button
+                  type="button"
+                  class="btn btn-tonal btn-sm cancel-button"
+                  @click="cancelEditMode"
+                >
                   Cancel
                 </button>
-                <button type="submit" class="btn btn-primary btn-sm save-button">
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-sm save-button"
+                >
                   Save
                 </button>
               </div>
@@ -88,7 +131,13 @@
         <!-- Normal Display Mode -->
         <div v-else class="chore-content" @click="handleClick">
           <div class="chore-left">
-            <span v-if="isPrivate" class="lock-icon" title="Private chore" aria-label="Private chore">🔒</span>
+            <span
+              v-if="isPrivate"
+              class="lock-icon"
+              title="Private chore"
+              aria-label="Private chore"
+              >🔒</span
+            >
             <span class="chore-title" :class="{ 'line-through': isDoneToday }">
               {{ chore.name }}
             </span>
@@ -98,7 +147,10 @@
             <span class="chore-due" :class="{ 'chore-overdue': isOverdueDate }">
               {{ friendlyDueDate }}
             </span>
-            <span v-if="chore.interval || chore.interval_days" class="chore-interval">
+            <span
+              v-if="chore.interval || chore.interval_days"
+              class="chore-interval"
+            >
               {{ chore.interval || chore.interval_days }}
             </span>
           </div>
@@ -117,7 +169,14 @@ const props = defineProps({
   isArchivedView: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(["toggle", "markAsDone", "edit", "updateChore", "archive", "archiveChore"]);
+const emit = defineEmits([
+  "toggle",
+  "markAsDone",
+  "edit",
+  "updateChore",
+  "archive",
+  "archiveChore",
+]);
 
 const authStore = useAuthStore();
 const cardRef = ref(null);
@@ -154,7 +213,7 @@ watch(
       };
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Swipe Configuration
@@ -167,7 +226,7 @@ const isReturning = ref(false);
 const swipeOffset = ref(0);
 
 const swipeThresholdPct = computed(() =>
-  Math.min(1, Math.abs(swipeOffset.value) / SWIPE_THRESHOLD)
+  Math.min(1, Math.abs(swipeOffset.value) / SWIPE_THRESHOLD),
 );
 
 const leftIconStyle = computed(() => {
@@ -209,7 +268,9 @@ const isDoneToday = computed(() => {
   const todayStr = new Date().toISOString().split("T")[0];
   return (
     props.chore.done &&
-    (typeof lastDoneStr === "string" ? lastDoneStr.split("T")[0] === todayStr : false)
+    (typeof lastDoneStr === "string"
+      ? lastDoneStr.split("T")[0] === todayStr
+      : false)
   );
 });
 
@@ -312,7 +373,7 @@ function handlePointerMove(e) {
     const rawOffset = dx;
     swipeOffset.value = Math.max(
       -MAX_RETURN_DISTANCE * 1.3,
-      Math.min(MAX_RETURN_DISTANCE * 1.3, rawOffset)
+      Math.min(MAX_RETURN_DISTANCE * 1.3, rawOffset),
     );
   }
 }
@@ -463,7 +524,9 @@ function handleArchive() {
   height: 38px;
   color: #ffffff;
   font-size: 1.5rem;
-  transition: transform var(--transition-fast), opacity var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 /* Sliding Chore Card Surface */

@@ -204,7 +204,8 @@ async function saveChanges() {
     s.clearError();
   } catch (err) {
     s.clearError();
-    const msg = err?.response?.data?.detail || err?.message || "Speichern fehlgeschlagen";
+    const msg =
+      err?.response?.data?.detail || err?.message || "Speichern fehlgeschlagen";
     // Set store error so UI can display it (e.g. via SettingsToast)
     s.error = msg;
     // Revert draft so user sees current saved state

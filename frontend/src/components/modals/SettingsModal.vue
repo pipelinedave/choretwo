@@ -1,5 +1,11 @@
 <template>
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Settings" @click.self="$emit('close')">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Settings"
+    @click.self="$emit('close')"
+  >
     <div class="modal-content">
       <div class="modal-header">
         <h2>App Settings</h2>
@@ -36,18 +42,23 @@
         <div class="settings-section">
           <label class="section-title">AI Copilot</label>
           <div class="custom-checkbox-wrapper">
-            <input type="checkbox" id="ai-enabled" v-model="aiEnabled" @change="savePreferences" />
+            <input
+              type="checkbox"
+              id="ai-enabled"
+              v-model="aiEnabled"
+              @change="savePreferences"
+            />
             <label for="ai-enabled">
-              <span class="checkbox-text">Enable Natural Language Copilot Bar</span>
+              <span class="checkbox-text"
+                >Enable Natural Language Copilot Bar</span
+              >
             </label>
           </div>
         </div>
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-primary" @click="$emit('close')">
-          Done
-        </button>
+        <button class="btn btn-primary" @click="$emit('close')">Done</button>
       </div>
     </div>
   </div>
@@ -77,7 +88,11 @@ function setTheme(val) {
 }
 
 function applyTheme(val) {
-  if (val === "dark" || (val === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+  if (
+    val === "dark" ||
+    (val === "auto" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  ) {
     document.documentElement.setAttribute("data-theme", "dark");
   } else {
     document.documentElement.removeAttribute("data-theme");
@@ -108,8 +123,16 @@ function savePreferences() {
 .modal-content {
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.6) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.6) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   color: var(--color-text);
   border-radius: var(--radius-lg);
   width: 100%;

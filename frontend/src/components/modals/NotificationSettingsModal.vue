@@ -1,5 +1,11 @@
 <template>
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Notification Settings" @click.self="$emit('close')">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Notification Settings"
+    @click.self="$emit('close')"
+  >
     <div class="modal-content">
       <div class="modal-header">
         <h2>Notification Settings</h2>
@@ -7,7 +13,12 @@
 
       <div class="modal-body">
         <div class="custom-checkbox-wrapper">
-          <input type="checkbox" id="enable-notif" v-model="enabled" @change="onToggleNotifications" />
+          <input
+            type="checkbox"
+            id="enable-notif"
+            v-model="enabled"
+            @change="onToggleNotifications"
+          />
           <label for="enable-notif">
             <span class="checkbox-text">Enable Push Notifications</span>
           </label>
@@ -28,14 +39,23 @@
             </button>
           </div>
 
-          <button type="button" class="btn btn-sm btn-tonal add-time-btn" @click="addTime">
+          <button
+            type="button"
+            class="btn btn-sm btn-tonal add-time-btn"
+            @click="addTime"
+          >
             <span class="mdi mdi-plus"></span> Add Time
           </button>
 
           <div class="test-notif-section">
-            <button type="button" class="btn btn-sm btn-tonal" @click="sendTestNotification" :disabled="testing">
+            <button
+              type="button"
+              class="btn btn-sm btn-tonal"
+              @click="sendTestNotification"
+              :disabled="testing"
+            >
               <span class="mdi mdi-bell-ring-outline"></span>
-              {{ testing ? 'Sending...' : 'Send Test Notification' }}
+              {{ testing ? "Sending..." : "Send Test Notification" }}
             </button>
             <span v-if="testResult" class="test-result">{{ testResult }}</span>
           </div>
@@ -43,9 +63,7 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-tonal" @click="cancelChanges">
-          Cancel
-        </button>
+        <button class="btn btn-tonal" @click="cancelChanges">Cancel</button>
         <button class="btn btn-primary" @click="saveChanges">
           <span class="mdi mdi-content-save"></span> Save
         </button>
@@ -77,8 +95,14 @@ function loadSettings() {
     try {
       const parsed = JSON.parse(saved);
       enabled.value = !!parsed.enabled;
-      times.value = Array.isArray(parsed.times) && parsed.times.length > 0 ? parsed.times : ["09:00"];
-      initialSettings.value = { enabled: enabled.value, times: [...times.value] };
+      times.value =
+        Array.isArray(parsed.times) && parsed.times.length > 0
+          ? parsed.times
+          : ["09:00"];
+      initialSettings.value = {
+        enabled: enabled.value,
+        times: [...times.value],
+      };
     } catch (e) {
       resetToDefaults();
     }
@@ -97,7 +121,7 @@ function saveChanges() {
   try {
     localStorage.setItem(
       NOTIF_KEY,
-      JSON.stringify({ enabled: enabled.value, times: times.value })
+      JSON.stringify({ enabled: enabled.value, times: times.value }),
     );
     emit("close");
   } catch (e) {
@@ -135,7 +159,9 @@ async function sendTestNotification() {
   testing.value = true;
   testResult.value = "";
   try {
-    await notifyApi.post("/test", { message: "Choretwo test notification! Everything is working." });
+    await notifyApi.post("/test", {
+      message: "Choretwo test notification! Everything is working.",
+    });
     testResult.value = "Notification sent!";
   } catch (err) {
     testResult.value = "Failed to send: " + (err.message || "Network error");
@@ -164,8 +190,16 @@ async function sendTestNotification() {
 .modal-content {
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.6) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.6) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   color: var(--color-text);
   border-radius: var(--radius-lg);
   width: 100%;

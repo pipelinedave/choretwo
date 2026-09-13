@@ -77,7 +77,11 @@ test.describe("Settings — Notification Draft & Save", () => {
         "Content-Type": "application/json",
       },
       data: {
-        notifications: { enabled: true, notify_overdue: false, notify_soon: true },
+        notifications: {
+          enabled: true,
+          notify_overdue: false,
+          notify_soon: true,
+        },
       },
     });
 

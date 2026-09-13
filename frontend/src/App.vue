@@ -15,7 +15,11 @@ import { onMounted } from "vue";
 
 onMounted(() => {
   const savedTheme = localStorage.getItem("choretwo_theme") || "light";
-  if (savedTheme === "dark" || (savedTheme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+  if (
+    savedTheme === "dark" ||
+    (savedTheme === "auto" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
+  ) {
     document.documentElement.setAttribute("data-theme", "dark");
   }
 });

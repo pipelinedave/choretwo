@@ -1,12 +1,33 @@
 import { test, expect } from "@playwright/test";
 
-function prepareSettings({ context, page, theme, enableNotifications, 
-  notifyOverdue, notifySoon, aiLearning, suggestionTypes }) {
+function prepareSettings({
+  context,
+  page,
+  theme,
+  enableNotifications,
+  notifyOverdue,
+  notifySoon,
+  aiLearning,
+  suggestionTypes,
+}) {
   if (theme) localStorage.setItem("settings-theme", theme);
-  if (enableNotifications !== undefined) localStorage.setItem("settings-notifications-enabled", JSON.stringify(enableNotifications));
-  if (notifyOverdue !== undefined) localStorage.setItem("settings-notifications-overdue", JSON.stringify(notifyOverdue));
-  if (notifySoon !== undefined) localStorage.setItem("settings-notifications-soon", JSON.stringify(notifySoon));
-  if (aiLearning !== undefined) localStorage.setItem("settings-ai-learning", JSON.stringify(aiLearning));
+  if (enableNotifications !== undefined)
+    localStorage.setItem(
+      "settings-notifications-enabled",
+      JSON.stringify(enableNotifications),
+    );
+  if (notifyOverdue !== undefined)
+    localStorage.setItem(
+      "settings-notifications-overdue",
+      JSON.stringify(notifyOverdue),
+    );
+  if (notifySoon !== undefined)
+    localStorage.setItem(
+      "settings-notifications-soon",
+      JSON.stringify(notifySoon),
+    );
+  if (aiLearning !== undefined)
+    localStorage.setItem("settings-ai-learning", JSON.stringify(aiLearning));
 }
 
 test.describe("Settings — Appearance Theme", () => {
@@ -25,7 +46,9 @@ test.describe("Settings — Appearance Theme", () => {
 
     // Wait for page to fully render
     await expect(page.locator("text=Appearance")).toBeVisible();
-    await expect(page.locator(".theme-option:has-text('Light')")).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.locator(".theme-option:has-text('Light')"),
+    ).toHaveAttribute("aria-pressed", "true");
 
     // Click "Dark" theme
     const darkBtn = page.locator(".theme-option:has-text('Dark')");
@@ -37,14 +60,20 @@ test.describe("Settings — Appearance Theme", () => {
     );
 
     // "Dark" button should now be active
-    await expect(page.locator(".theme-option:has-text('Dark')")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator(".theme-option:has-text('Light')")).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.locator(".theme-option:has-text('Dark')"),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.locator(".theme-option:has-text('Light')"),
+    ).toHaveAttribute("aria-pressed", "false");
 
     // Preview should change
     await expect(page.locator("text=Dark theme preview text")).toBeVisible();
   });
 
-  test("discarding theme change should revert to saved value", async ({ page }) => {
+  test("discarding theme change should revert to saved value", async ({
+    page,
+  }) => {
     await page.evaluate(() => localStorage.setItem("settings-theme", "dark"));
     await page.click('a[href="/settings"]');
     await page.waitForURL("/settings");

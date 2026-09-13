@@ -164,7 +164,10 @@ export const useChoreStore = defineStore("chores", () => {
       }
       const dueDate = updates.dueDate || updates.due_date;
       if (dueDate) payload.due_date = dueDate;
-      if (Object.prototype.hasOwnProperty.call(updates, "private") || Object.prototype.hasOwnProperty.call(updates, "is_private")) {
+      if (
+        Object.prototype.hasOwnProperty.call(updates, "private") ||
+        Object.prototype.hasOwnProperty.call(updates, "is_private")
+      ) {
         payload.is_private = !!(updates.private ?? updates.is_private);
       }
 

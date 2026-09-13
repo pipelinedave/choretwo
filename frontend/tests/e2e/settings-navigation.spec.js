@@ -16,16 +16,10 @@ test.describe("Settings Page Navigation & Rendering", () => {
     await page.waitForURL("/settings");
     await expect(page).toHaveURL("/settings");
 
-    await expect(
-      page.locator("h2:has-text('Notifications')"),
-    ).toBeVisible();
-    await expect(
-      page.locator("h2:has-text('Appearance')"),
-    ).toBeVisible();
+    await expect(page.locator("h2:has-text('Notifications')")).toBeVisible();
+    await expect(page.locator("h2:has-text('Appearance')")).toBeVisible();
     await expect(page.locator("h2:has-text('Data')")).toBeVisible();
-    await expect(
-      page.locator("h2:has-text('AI Copilot')"),
-    ).toBeVisible();
+    await expect(page.locator("h2:has-text('AI Copilot')")).toBeVisible();
   });
 
   test("should have notification toggles rendered correctly", async ({

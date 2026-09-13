@@ -1,14 +1,24 @@
 <template>
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Import/Export Data" @click.self="$emit('close')">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Import/Export Data"
+    @click.self="$emit('close')"
+  >
     <div class="modal-content">
       <div class="modal-header">
         <h2>Import / Export Chores & Logs</h2>
       </div>
 
       <div class="modal-body">
-        <button class="btn btn-primary export-btn" @click="exportData" :disabled="exporting">
+        <button
+          class="btn btn-primary export-btn"
+          @click="exportData"
+          :disabled="exporting"
+        >
           <span class="mdi mdi-download"></span>
-          {{ exporting ? 'Exporting...' : 'Export Backup (JSON)' }}
+          {{ exporting ? "Exporting..." : "Export Backup (JSON)" }}
         </button>
 
         <input
@@ -19,20 +29,26 @@
           accept="application/json"
         />
 
-        <button class="btn btn-warning import-btn" @click="triggerImport" :disabled="importing">
+        <button
+          class="btn btn-warning import-btn"
+          @click="triggerImport"
+          :disabled="importing"
+        >
           <span class="mdi mdi-upload"></span>
-          {{ importing ? 'Importing...' : 'Import Backup (JSON)' }}
+          {{ importing ? "Importing..." : "Import Backup (JSON)" }}
         </button>
 
-        <div v-if="statusMessage" class="status-msg" :class="{ error: isError, success: !isError }">
+        <div
+          v-if="statusMessage"
+          class="status-msg"
+          :class="{ error: isError, success: !isError }"
+        >
           {{ statusMessage }}
         </div>
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-tonal" @click="$emit('close')">
-          Done
-        </button>
+        <button class="btn btn-tonal" @click="$emit('close')">Done</button>
       </div>
     </div>
   </div>
@@ -66,7 +82,9 @@ async function exportData() {
       logs: logStore.logs,
     };
 
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -100,7 +118,11 @@ async function handleFileSelected(event) {
   reader.onload = async (e) => {
     try {
       const data = JSON.parse(e.target.result);
-      const choresList = Array.isArray(data.chores) ? data.chores : Array.isArray(data) ? data : null;
+      const choresList = Array.isArray(data.chores)
+        ? data.chores
+        : Array.isArray(data)
+          ? data
+          : null;
 
       if (!choresList) {
         throw new Error("Invalid backup file structure: expected chores array");
@@ -112,7 +134,10 @@ async function handleFileSelected(event) {
           await choreStore.addChore({
             name: item.name || item.title,
             interval: item.interval || item.interval_days || 7,
-            dueDate: item.dueDate || item.due_date || new Date().toISOString().split("T")[0],
+            dueDate:
+              item.dueDate ||
+              item.due_date ||
+              new Date().toISOString().split("T")[0],
             private: !!(item.private || item.is_private),
           });
           importedCount++;
@@ -158,8 +183,16 @@ async function handleFileSelected(event) {
 .modal-content {
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.6) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.6) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   color: var(--color-text);
   border-radius: var(--radius-lg);
   width: 100%;
@@ -188,7 +221,8 @@ async function handleFileSelected(event) {
   gap: 1rem;
 }
 
-.export-btn, .import-btn {
+.export-btn,
+.import-btn {
   padding: 0.85rem 1.25rem;
   font-size: 1rem;
   border-radius: var(--radius-md);

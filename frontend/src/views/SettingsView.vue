@@ -164,7 +164,10 @@ async function saveAi() {
     s.clearError();
   } catch (err) {
     s.clearError();
-    const msg = err?.response?.data?.detail || err?.message || "AI settings konnten nicht gespeichert werden";
+    const msg =
+      err?.response?.data?.detail ||
+      err?.message ||
+      "AI settings konnten nicht gespeichert werden";
     s.error = msg;
     showToast("error", "Speichern fehlgeschlagen: " + msg);
     unsavedAi.value = true;

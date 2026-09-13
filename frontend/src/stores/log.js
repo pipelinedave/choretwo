@@ -72,8 +72,10 @@ const formatTimeAgo = (timestamp) => {
 
 const normalizeEntry = (entry) => {
   const details = normalizeDetails(entry?.action_details || entry?.details);
-  const action = entry?.action_type || details?.action_type || entry?.action || null;
-  const timestamp = entry?.done_at || entry?.timestamp || new Date().toISOString();
+  const action =
+    entry?.action_type || details?.action_type || entry?.action || null;
+  const timestamp =
+    entry?.done_at || entry?.timestamp || new Date().toISOString();
   const choreName = getChoreLabel(details, entry);
   const actionDescription = getActionDescription(action, details);
   const user = entry?.done_by || entry?.user_email || null;
@@ -89,7 +91,9 @@ const normalizeEntry = (entry) => {
     timeAgo: formatTimeAgo(timestamp),
     raw: entry,
     isLocal: String(entry?.id).startsWith("local-"),
-    isHidden: action === "undo" || (!choreName && action !== "import" && action !== "export"),
+    isHidden:
+      action === "undo" ||
+      (!choreName && action !== "import" && action !== "export"),
   };
 };
 

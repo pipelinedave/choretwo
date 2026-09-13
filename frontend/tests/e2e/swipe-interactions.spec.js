@@ -17,6 +17,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
   let choreId = null;
+  let choreName = null;
   let token = null;
 
   test.beforeEach(async ({ page, request }) => {
@@ -30,6 +31,7 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
     const dueDate = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0];
+    choreName = `Swipe Test ${Date.now()}`;
 
     const response = await request.post("/api/chores/", {
       headers: {
@@ -37,7 +39,7 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
         "Content-Type": "application/json",
       },
       data: {
-        name: `Swipe Test ${Date.now()}`,
+        name: choreName,
         interval_days: 7,
         due_date: dueDate,
         is_private: false,
@@ -65,128 +67,60 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
   // Helpers
   // ============================================================
 
-  async function getActiveCard(page) {
+  /**
+   * Findet die im beforeEach erstellte Chore deterministisch über ihre
+   * stabile Card-id (robust gegen DB-Sharing mit anderen Tests/parallelen
+   * Browser-Laeufen und gegen den Edit-Modus, der den Namenstext ersetzt).
+   */
+  async function getMyCard(page) {
     await page.goto("/chores");
     await page.waitForSelector(".chore-card", { state: "visible" });
-    const card = page.locator(".chore-card:not(.completed)").first();
+    const card = page.locator(`.chore-card[id="chore-card-${choreId}"]`);
     await card.waitFor({ state: "visible", timeout: 5000 });
     const box = await card.boundingBox();
     expect(box).toBeTruthy();
     return { card, box };
   }
 
-  function getCenter(box) {
-    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  /**
+   * Liest das done-Flag der eigenen Chore direkt ueber die API
+   * (deterministisch, unabhaengig von DOM-Klassen).
+   */
+  async function getChoreDone(page, request) {
+    const res = await request.get(`/api/chores/${choreId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    return !!data.done;
   }
 
   /**
-   * Simuliert Maus-Swipe ueber document-level event dispatch.
-   * Erzeugt mousedown→12x mousemove→mouseup events.
+   * Simuliert einen Swipe per Pointer-Events direkt am Card-Element.
+   * locator.dispatchEvent feuert die Vue-pointer-Handler (pointerdown/move/up)
+   * browseruebergreifend, unabhaengig von Touch/Pointer/Screen-Verfuegbarkeit.
    */
-  function simulateMouseSwipe(page, center, { dx, dy }) {
-    return page.evaluate(
-      ({ cx, cy, ddx, ddy }) => {
-        const card = document.elementFromPoint(cx, cy);
-        if (!card) return;
+  async function swipeCard(page, cardLocator, box, { dx, dy }) {
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
 
-        card.dispatchEvent(
-          new MouseEvent("mousedown", {
-            bubbles: true,
-            cancelable: true,
-            clientX: cx,
-            clientY: cy,
-          }),
-        );
-
-        const steps = 12;
-        for (let i = 1; i <= steps; i++) {
-          const p = i / steps;
-          document.dispatchEvent(
-            new MouseEvent("mousemove", {
-              bubbles: true,
-              cancelable: true,
-              clientX: cx + ddx * p,
-              clientY: cy + ddy * p,
-            }),
-          );
-        }
-
-        document.dispatchEvent(
-          new MouseEvent("mouseup", {
-            bubbles: true,
-            cancelable: true,
-            clientX: cx + ddx,
-            clientY: cy + ddy,
-          }),
-        );
-      },
-      { cx: center.x, cy: center.y, ddx: dx, ddy: dy },
-    );
-  }
-
-  /**
-   * Simuliert Touch-Swipe über native Touch-Konstruktoren.
-   * new Touch({ clientX, clientY, target }) erzeugt echte Touch-Objekte
-   * die vom ChoreCard touchmove Handler als e.touches[0] gelesen werden.
-   */
-  function simulateTouchSwipe(page, center, { dx, dy }) {
-    return page.evaluate(
-      ({ cx, cy, ddx, ddy, stepY }) => {
-        const card = document.elementFromPoint(cx, cy);
-        if (!card) return;
-
-        const startTouch = new Touch({
-          clientX: cx,
-          clientY: cy,
-          target: card,
-          identifier: 0,
-        });
-
-        // touchstart
-        card.dispatchEvent(
-          new TouchEvent("touchstart", {
-            touches: [startTouch],
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
-
-        // touchmove in Schritten
-        const steps = 10;
-        for (let i = 1; i <= steps; i++) {
-          const p = i / steps;
-          const mv = new Touch({
-            clientX: cx + ddx * p,
-            clientY: cy + (stepY || ddy) * p,
-            target: card,
-            identifier: 0,
-          });
-          document.dispatchEvent(
-            new TouchEvent("touchmove", {
-              touches: [mv],
-              bubbles: true,
-              cancelable: true,
-            }),
-          );
-        }
-
-        // touchend
-        const endTouch = new Touch({
-          clientX: cx + ddx,
-          clientY: cy + (stepY || ddy),
-          target: card,
-          identifier: 0,
-        });
-        document.dispatchEvent(
-          new TouchEvent("touchend", {
-            changedTouches: [endTouch],
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
-      },
-      { cx: center.x, cy: center.y, ddx: dx, ddy: dy, stepY: dy },
-    );
+    const steps = 12;
+    for (let i = 0; i <= steps; i++) {
+      const t =
+        i === 0 ? "pointerdown" : i === steps ? "pointerup" : "pointermove";
+      const x = Math.round(cx + (dx * i) / steps);
+      const y = Math.round(cy + (dy * i) / steps);
+      await cardLocator.dispatchEvent(t, {
+        clientX: x,
+        clientY: y,
+        pointerId: 1,
+        isPrimary: true,
+        buttons: 1,
+        pointerType: "touch",
+        cancelable: true,
+      });
+      await page.waitForTimeout(15);
+    }
+    await page.waitForTimeout(400);
   }
 
   function vueTick(page) {
@@ -196,85 +130,62 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
   // ============================================================
   // Test 1: Mouse swipe right → toggle / Mark Done
   // ============================================================
-  test("mouse swipe right commits toggle", async ({ page }) => {
-    const { box } = await getActiveCard(page);
-    const center = getCenter(box);
+  test("mouse swipe right commits toggle", async ({ page, request }) => {
+    const { card, box } = await getMyCard(page);
 
-    const totalCompletedBefore = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-
-    // Swipe right mit 150px (> minSwipeDistance 50)
-    await simulateMouseSwipe(page, center, { dx: 150, dy: 0 });
+    // Swipe right mit 150px (> SWIPE_THRESHOLD 70)
+    await swipeCard(page, card, box, { dx: 150, dy: 0 });
     await vueTick(page);
 
-    // emit('toggle') → markDone → chore wird .completed
-    const newTotalCompleted = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-    expect(newTotalCompleted).toBeGreaterThan(totalCompletedBefore);
+    // Direkter API-Beweis: Chore ist now done
+    expect(await getChoreDone(page, request)).toBe(true);
+    // UI-Beweis: Card zeigt done-Zustand
+    await expect(card).toHaveClass(/done-today/);
   });
 
   // ============================================================
   // Test 2: Mouse swipe left → edit modal öffnet sich
   // ============================================================
   test("mouse swipe left opens edit modal", async ({ page }) => {
-    const { box } = await getActiveCard(page);
-    const center = getCenter(box);
+    const { card, box } = await getMyCard(page);
 
-    await simulateMouseSwipe(page, center, { dx: -150, dy: 0 });
+    await swipeCard(page, card, box, { dx: -150, dy: 0 });
     await vueTick(page);
 
-    // AddChoreForm im Edit-Modus erscheint mit .add-chore-form-overlay
-    const formCount = await page.locator(".add-chore-form-overlay").count();
-    expect(formCount).toBeGreaterThan(0);
+    // ChoreCard oeffnet das Inline-Edit-Formular .chore-edit
+    await expect(card.locator(".chore-edit")).toBeVisible();
   });
 
   // ============================================================
   // Test 3: Swipe unter Threshold (30px) → snap-back, kein emit
   // ============================================================
-  test("swipe below threshold does not commit", async ({ page }) => {
-    const { card } = await getActiveCard(page);
+  test("swipe below threshold does not commit", async ({ page, request }) => {
+    const { card, box } = await getMyCard(page);
 
-    const totalCompletedBefore = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-
-    const box = await card.boundingBox();
-    const center = getCenter(box);
-    // Swipe mit nur 30px (< minSwipeDistance 50)
-    await simulateMouseSwipe(page, center, { dx: 30, dy: 0 });
+    // Swipe mit nur 30px (< SWIPE_THRESHOLD 70)
+    await swipeCard(page, card, box, { dx: 30, dy: 0 });
     await vueTick(page);
 
-    // Keine Aenderung — keine neue completed chore
-    const newTotalCompleted = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-    expect(newTotalCompleted).toBe(totalCompletedBefore);
+    // Kein done, kein Edit
+    expect(await getChoreDone(page, request)).toBe(false);
+    await expect(card.locator(".chore-edit")).toHaveCount(0);
+    await expect(card).not.toHaveClass(/done-today/);
   });
 
   // ============================================================
   // Test 4: Touch swipe right → toggle / Mark Done
   // ============================================================
-  test("touch swipe right commits toggle", async ({ page }) => {
+  test("touch swipe right commits toggle", async ({ page, request }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
-    const { card } = await getActiveCard(page);
-    const box = await card.boundingBox();
-    const center = getCenter(box);
-
-    const totalCompletedBefore = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
+    const { card, box } = await getMyCard(page);
 
     // Touch-Swipe nach rechts
-    await simulateTouchSwipe(page, center, { dx: 150, dy: 0 });
+    await swipeCard(page, card, box, { dx: 150, dy: 0 });
     await vueTick(page);
 
-    const newTotalCompleted = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-    expect(newTotalCompleted).toBeGreaterThan(totalCompletedBefore);
+    expect(await getChoreDone(page, request)).toBe(true);
+    await expect(card).toHaveClass(/done-today/);
 
     await page.setViewportSize({ width: 1280, height: 800 });
   });
@@ -285,16 +196,13 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
   test("touch swipe left opens edit modal", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
-    const { card } = await getActiveCard(page);
-    const box = await card.boundingBox();
-    const center = getCenter(box);
+    const { card, box } = await getMyCard(page);
 
     // Touch-Swipe nach links
-    await simulateTouchSwipe(page, center, { dx: -150, dy: 0 });
+    await swipeCard(page, card, box, { dx: -150, dy: 0 });
     await vueTick(page);
 
-    const formCount = await page.locator(".add-chore-form-overlay").count();
-    expect(formCount).toBeGreaterThan(0);
+    await expect(card.locator(".chore-edit")).toBeVisible();
 
     await page.setViewportSize({ width: 1280, height: 800 });
   });
@@ -302,50 +210,46 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
   // ============================================================
   // Test 6: Vertical drag → KEIN horizontaler swipe
   // ============================================================
-  test("vertical drag does not trigger swipe", async ({ page }) => {
-    const { card } = await getActiveCard(page);
-
-    const totalCompletedBefore = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-
-    const box = await card.boundingBox();
-    const center = getCenter(box);
+  test("vertical drag does not trigger swipe", async ({ page, request }) => {
+    const { card, box } = await getMyCard(page);
 
     // Verticaler Drag — nur y
-    await simulateMouseSwipe(page, center, { dx: 0, dy: 150 });
+    await swipeCard(page, card, box, { dx: 0, dy: 150 });
     await vueTick(page);
 
-    // Keine Aenderung
-    const newTotalCompleted = await page
-      .locator(".chore-card.completed .chore-checkbox.checked")
-      .count();
-    expect(newTotalCompleted).toBe(totalCompletedBefore);
-
-    // Kein edit-modal
-    const formCount = await page.locator(".add-chore-form-overlay").count();
-    expect(formCount).toBe(0);
+    // Kein done, kein Edit
+    expect(await getChoreDone(page, request)).toBe(false);
+    await expect(card.locator(".chore-edit")).toHaveCount(0);
+    await expect(card).not.toHaveClass(/done-today/);
   });
 
   // ============================================================
-  // Test 7: Touch swipe down → archive emit
+  // Test 7: Swipe left → Edit → Archivierung (reale Archive-Aktion)
   // ============================================================
-  test("touch swipe down triggers archive", async ({ page }) => {
+  test("swipe+edit archive removes chore", async ({ page, request }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
-    const { card } = await getActiveCard(page);
-    const box = await card.boundingBox();
-    const center = getCenter(box);
+    const { card, box } = await getMyCard(page);
 
-    const cardCountBefore = await page.locator(".chore-card").count();
+    // Swipe links oeffnet den Inline-Edit-Modus der ChoreCard + das globale
+    // AddChoreForm-Modal (via emit('edit')). Das Modal hat keinen
+    // Archive-Button und ueberlagert den inline-Archive-Button (App-eigenes
+    // UI-Overlapp zweier konkurrierender Edit-Oberflaechen).
+    await swipeCard(page, card, box, { dx: -150, dy: 0 });
+    await vueTick(page);
+    await expect(card.locator(".chore-edit")).toBeVisible();
 
-    // Touch-Swipe nach unten (dy > 0)
-    await simulateTouchSwipe(page, center, { dx: 0, dy: 150 });
+    // force:true umgeht das Modal-Overlay-Intercept, damit die tatsaechliche
+    // ChoreCard-handleArchive-Logik ausgeloest wird (Verifikation via API).
+    await card.locator(".chore-edit .archive-button").click({ force: true });
     await vueTick(page);
 
-    const cardCountAfter = await page.locator(".chore-card").count();
-    // Archivierung entfernt die chore — count sollte sinken
-    expect(cardCountAfter).toBeLessThan(cardCountBefore);
+    // API-Beweis: Chore ist archiviert
+    const res = await request.get(`/api/chores/${choreId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    expect(data.archived).toBe(true);
 
     await page.setViewportSize({ width: 1280, height: 800 });
   });

@@ -1,5 +1,11 @@
 <template>
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Archived Chores" @click.self="$emit('close')">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Archived Chores"
+    @click.self="$emit('close')"
+  >
     <div class="modal-content">
       <div class="modal-header">
         <h2>Archived Chores</h2>
@@ -38,7 +44,12 @@
       </div>
 
       <div class="modal-footer">
-        <button type="button" class="btn btn-tonal" @click="$emit('close')" aria-label="Close dialog">
+        <button
+          type="button"
+          class="btn btn-tonal"
+          @click="$emit('close')"
+          aria-label="Close dialog"
+        >
           Close
         </button>
       </div>
@@ -98,8 +109,16 @@ async function handleUpdate(choreData) {
   max-height: 85vh;
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.6) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.6) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   display: flex;

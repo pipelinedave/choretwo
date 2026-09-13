@@ -3,7 +3,7 @@
     <div class="header-content">
       <div class="brand">
         <router-link to="/" class="brand-link">
-          <span class="brand-title">{{ title || 'CHORETWO' }}</span>
+          <span class="brand-title">{{ title || "CHORETWO" }}</span>
         </router-link>
       </div>
 
@@ -16,6 +16,16 @@
           title="Add new chore"
         >
           <span class="mdi mdi-plus"></span>
+        </button>
+
+        <!-- CatchUp Button (Aufholen) -->
+        <button
+          class="btn-icon catchup-btn"
+          @click="$emit('openCatchUp')"
+          aria-label="CatchUp - chores aufholen"
+          title="Chores aufholen"
+        >
+          <span class="mdi mdi-bullseye-arrow"></span>
         </button>
 
         <!-- Install PWA Button -->
@@ -56,7 +66,9 @@
           <transition name="scale">
             <div v-if="showMenu" class="dropdown-menu user-menu">
               <div class="user-greeting" v-if="authStore.user?.email">
-                <span class="user-name user-email">{{ authStore.user.email }}</span>
+                <span class="user-name user-email">{{
+                  authStore.user.email
+                }}</span>
               </div>
 
               <div class="menu-divider" v-if="authStore.user?.email"></div>
@@ -66,12 +78,23 @@
                 <span>Archived Chores</span>
               </button>
 
-              <button class="menu-item" @click="handleMenuAction('notifications')">
+              <button
+                class="menu-item"
+                @click="handleMenuAction('notifications')"
+              >
                 <span class="mdi mdi-bell"></span>
                 <span>Notifications</span>
               </button>
 
-              <button class="menu-item" @click="handleMenuAction('import-export')">
+              <button class="menu-item" @click="handleMenuAction('catchup')">
+                <span class="mdi mdi-bullseye-arrow"></span>
+                <span>Aufholen</span>
+              </button>
+
+              <button
+                class="menu-item"
+                @click="handleMenuAction('import-export')"
+              >
                 <span class="mdi mdi-swap-horizontal"></span>
                 <span>Import / Export</span>
               </button>
@@ -88,7 +111,10 @@
 
               <div class="menu-divider"></div>
 
-              <button class="menu-item logout" @click="handleMenuAction('logout')">
+              <button
+                class="menu-item logout"
+                @click="handleMenuAction('logout')"
+              >
                 <span class="mdi mdi-logout"></span>
                 <span>Logout</span>
               </button>
@@ -117,6 +143,7 @@ const emit = defineEmits([
   "openImportExport",
   "openSettings",
   "openAbout",
+  "openCatchUp",
 ]);
 
 const authStore = useAuthStore();
@@ -153,6 +180,9 @@ function handleMenuAction(action) {
       break;
     case "notifications":
       emit("openNotifications");
+      break;
+    case "catchup":
+      emit("openCatchUp");
       break;
     case "import-export":
       emit("openImportExport");
@@ -202,7 +232,7 @@ async function installPwa() {
 }
 
 .brand-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -229,7 +259,10 @@ async function installPwa() {
   font-size: 1.25rem;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
   padding: 0;
 }
 
@@ -252,6 +285,15 @@ async function installPwa() {
   background: var(--color-primary-hover);
 }
 
+.catchup-btn {
+  background: var(--color-warning);
+  color: #3b2b1a;
+}
+
+.catchup-btn:hover {
+  background: var(--color-warning-hover);
+}
+
 .menu-wrapper {
   position: relative;
 }
@@ -263,8 +305,16 @@ async function installPwa() {
   width: 220px;
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.9) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.9) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.9) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.9) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -326,7 +376,9 @@ async function installPwa() {
 
 .scale-enter-active,
 .scale-leave-active {
-  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease;
 }
 
 .scale-enter-from,

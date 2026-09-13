@@ -1,8 +1,14 @@
 <template>
-  <div class="modal-overlay" role="dialog" aria-modal="true" :aria-label="editing ? 'Edit Chore' : 'Add New Chore'" @click.self="onCancel">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="editing ? 'Edit Chore' : 'Add New Chore'"
+    @click.self="onCancel"
+  >
     <div class="modal-content">
       <div class="modal-header">
-        <h2>{{ editing ? 'Edit Chore' : 'Add New Chore' }}</h2>
+        <h2>{{ editing ? "Edit Chore" : "Add New Chore" }}</h2>
       </div>
 
       <div class="modal-body">
@@ -76,8 +82,11 @@
           form="add-chore-form"
           class="btn btn-primary submit-btn"
         >
-          <span class="mdi" :class="editing ? 'mdi-content-save' : 'mdi-plus'"></span>
-          {{ editing ? 'Save Changes' : 'Add Chore' }}
+          <span
+            class="mdi"
+            :class="editing ? 'mdi-content-save' : 'mdi-plus'"
+          ></span>
+          {{ editing ? "Save Changes" : "Add Chore" }}
         </button>
       </div>
     </div>
@@ -118,7 +127,9 @@ watch(
     if (newChore) {
       const rawDue = newChore.dueDate || newChore.due_date;
       const dueStr = rawDue
-        ? (typeof rawDue === "string" ? rawDue.split("T")[0] : new Date(rawDue).toISOString().split("T")[0])
+        ? typeof rawDue === "string"
+          ? rawDue.split("T")[0]
+          : new Date(rawDue).toISOString().split("T")[0]
         : getTodayDate();
 
       formData.value = {
@@ -136,7 +147,7 @@ watch(
       };
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 function onSubmit() {
@@ -192,8 +203,16 @@ function onArchive() {
 .modal-content {
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.6) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.6) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   color: var(--color-text);
   border-radius: var(--radius-lg);
   width: 100%;

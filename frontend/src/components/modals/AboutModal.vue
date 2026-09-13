@@ -1,5 +1,11 @@
 <template>
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="About Choretwo" @click.self="$emit('close')">
+  <div
+    class="modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="About Choretwo"
+    @click.self="$emit('close')"
+  >
     <div class="modal-content">
       <div class="modal-header">
         <h2>About Choretwo</h2>
@@ -8,7 +14,9 @@
       <div class="modal-body">
         <div class="app-brand">
           <span class="brand-title">CHORETWO</span>
-          <span class="brand-subtitle">Tactile Microservice Household Task Tracker</span>
+          <span class="brand-subtitle"
+            >Tactile Microservice Household Task Tracker</span
+          >
         </div>
 
         <div class="info-list">
@@ -31,16 +39,19 @@
         </div>
 
         <div class="about-links">
-          <a href="https://github.com/pipelinedave/choretwo" target="_blank" rel="noopener" class="btn btn-tonal btn-sm">
+          <a
+            href="https://github.com/pipelinedave/choretwo"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-tonal btn-sm"
+          >
             <span class="mdi mdi-github"></span> GitHub Repo
           </a>
         </div>
       </div>
 
       <div class="modal-footer">
-        <button class="btn btn-primary" @click="$emit('close')">
-          Close
-        </button>
+        <button class="btn btn-primary" @click="$emit('close')">Close</button>
       </div>
     </div>
   </div>
@@ -69,8 +80,16 @@ defineEmits(["close"]);
 .modal-content {
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 10%, rgba(253, 232, 213, 0.6) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 20%, rgba(189, 233, 221, 0.6) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 10%,
+      rgba(253, 232, 213, 0.6) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 20%,
+      rgba(189, 233, 221, 0.6) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   color: var(--color-text);
   border-radius: var(--radius-lg);
   width: 100%;
@@ -105,7 +124,7 @@ defineEmits(["close"]);
 
 .brand-title {
   display: block;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   font-size: 1.6rem;
   font-weight: 800;
   letter-spacing: -0.5px;

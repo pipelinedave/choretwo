@@ -98,7 +98,10 @@ async function saveTheme() {
     s.clearError();
   } catch (err) {
     s.clearError();
-    const msg = err?.response?.data?.detail || err?.message || "Theme konnte nicht gespeichert werden";
+    const msg =
+      err?.response?.data?.detail ||
+      err?.message ||
+      "Theme konnte nicht gespeichert werden";
     s.error = msg;
     console.error("[AppearanceSettings] save failed:", err);
   } finally {

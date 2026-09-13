@@ -1,8 +1,15 @@
 <template>
-  <div class="performance-container" role="progressbar" :aria-valuenow="score" aria-valuemin="0" aria-valuemax="100" aria-label="Household Health Score">
+  <div
+    class="performance-container"
+    role="progressbar"
+    :aria-valuenow="score"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    aria-label="Household Health Score"
+  >
     <div class="bar-background">
-      <div 
-        class="bar-fill" 
+      <div
+        class="bar-fill"
         :style="{ width: `${score}%`, background: listColor }"
       ></div>
     </div>
@@ -63,13 +70,15 @@ const textColor = computed(() => {
 .bar-fill {
   height: 100%;
   border-radius: 6px;
-  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+  transition:
+    width 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.3s ease;
 }
 
 .score-value {
   font-weight: 700;
   font-size: 1.15rem;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   min-width: 2ch;
   text-align: right;
   flex-shrink: 0;

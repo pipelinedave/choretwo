@@ -4,7 +4,9 @@
       <div class="login-header">
         <span class="mdi mdi-checkbox-marked-circle brand-icon"></span>
         <h1 class="login-title">CHORETWO</h1>
-        <p class="login-subtitle">Tactile Microservice Household Task Tracker</p>
+        <p class="login-subtitle">
+          Tactile Microservice Household Task Tracker
+        </p>
       </div>
 
       <div class="login-content">
@@ -74,7 +76,7 @@ function handleLogin() {
 }
 
 .login-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   font-size: 2rem;
   font-weight: 800;
   color: var(--color-primary);

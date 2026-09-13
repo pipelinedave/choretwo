@@ -47,11 +47,31 @@ const activeFilter = computed(() => {
 });
 
 const pills = [
-  { label: "Overdue", value: "overdue", color: "var(--color-overdue, #f7b4ae)" },
-  { label: "Due Today", value: "today", color: "var(--color-due-today, #f6c7ae)" },
-  { label: "Due Tomorrow", value: "tomorrow", color: "var(--color-due-soon, #f2ddba)" },
-  { label: "Due This Week", value: "thisWeek", color: "var(--color-due-7-days, #d3ead8)" },
-  { label: "Later", value: "upcoming", color: "var(--color-due-far-future, #a4dcd3)" },
+  {
+    label: "Overdue",
+    value: "overdue",
+    color: "var(--color-overdue, #f7b4ae)",
+  },
+  {
+    label: "Due Today",
+    value: "today",
+    color: "var(--color-due-today, #f6c7ae)",
+  },
+  {
+    label: "Due Tomorrow",
+    value: "tomorrow",
+    color: "var(--color-due-soon, #f2ddba)",
+  },
+  {
+    label: "Due This Week",
+    value: "thisWeek",
+    color: "var(--color-due-7-days, #d3ead8)",
+  },
+  {
+    label: "Later",
+    value: "upcoming",
+    color: "var(--color-due-far-future, #a4dcd3)",
+  },
 ];
 
 const pillsWithCounts = computed(() => {
@@ -111,7 +131,9 @@ function clearFilters() {
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   padding: 0;
-  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    background-color var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -135,7 +157,8 @@ function clearFilters() {
   display: none;
 }
 
-.pill, .chip {
+.pill,
+.chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -148,23 +171,31 @@ function clearFilters() {
   white-space: nowrap;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    opacity var(--transition-fast);
   opacity: 0.82;
 }
 
-.pill:hover, .chip:hover {
+.pill:hover,
+.chip:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
   opacity: 1;
 }
 
-.pill.active, .chip.active {
+.pill.active,
+.chip.active {
   opacity: 1;
-  box-shadow: 0 0 0 2px var(--color-primary, #2f6f6f), var(--shadow-md);
+  box-shadow:
+    0 0 0 2px var(--color-primary, #2f6f6f),
+    var(--shadow-md);
   transform: translateY(-1px);
 }
 
-.pill-count, .chip-count {
+.pill-count,
+.chip-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -177,7 +208,8 @@ function clearFilters() {
   font-weight: 700;
 }
 
-.pill.active .pill-count, .chip.active .chip-count {
+.pill.active .pill-count,
+.chip.active .chip-count {
   background: rgba(31, 45, 44, 0.25);
 }
 </style>

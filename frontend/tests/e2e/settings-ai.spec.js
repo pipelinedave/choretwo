@@ -29,7 +29,9 @@ test.describe("Settings — AI Settings", () => {
     await expect(page.locator("text=Unsaved AI changes")).toBeVisible();
   });
 
-  test("toggling suggestion type chip should show save bar", async ({ page }) => {
+  test("toggling suggestion type chip should show save bar", async ({
+    page,
+  }) => {
     await page.evaluate(() => {
       localStorage.setItem("settings-ai-learning", JSON.stringify(true));
     });
@@ -47,10 +49,14 @@ test.describe("Settings — AI Settings", () => {
     await expect(page.locator("text=Unsaved AI changes")).toBeVisible();
 
     // Chip should no longer be active
-    await expect(page.locator(".chip:has-text('Recurrence')")).not.toHaveClass(/active/);
+    await expect(page.locator(".chip:has-text('Recurrence')")).not.toHaveClass(
+      /active/,
+    );
   });
 
-  test("discarding AI changes should revert to saved state", async ({ page }) => {
+  test("discarding AI changes should revert to saved state", async ({
+    page,
+  }) => {
     await page.evaluate(() => {
       localStorage.setItem("settings-ai-learning", JSON.stringify(true));
     });
@@ -94,10 +100,12 @@ test.describe("Settings — AI Settings", () => {
     await expect(page.locator("text=Unsaved AI changes")).toBeVisible();
 
     // Verify draft reflects the toggle (chip gets active when learning enabled)
-    await expect(page.locator(".chip:has-text('Recurrence')")).toHaveClass(/active/);
+    await expect(page.locator(".chip:has-text('Recurrence')")).toHaveClass(
+      /active/,
+    );
 
     // Save
-    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole("button", { name: "Save" }).click();
 
     // Save bar gone
     await expect(page.locator("text=Unsaved AI changes")).not.toBeVisible();

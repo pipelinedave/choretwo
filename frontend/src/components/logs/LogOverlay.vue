@@ -23,9 +23,11 @@
           <span class="chore-pill" v-if="logStore.latestEntry.choreName">
             {{ logStore.latestEntry.choreName }}
           </span>
-          <span class="action-text">{{ logStore.latestEntry.actionDescription }}</span>
+          <span class="action-text">{{
+            logStore.latestEntry.actionDescription
+          }}</span>
           <span class="user-text" v-if="logStore.latestEntry.user">
-            by {{ logStore.latestEntry.user.split('@')[0] }}
+            by {{ logStore.latestEntry.user.split("@")[0] }}
           </span>
         </div>
         <div class="handle-right">
@@ -37,13 +39,14 @@
             :aria-label="getRevertLabel(logStore.latestEntry)"
             :title="getRevertLabel(logStore.latestEntry)"
           >
-            <span class="mdi" :class="getRevertIcon(logStore.latestEntry)"></span>
+            <span
+              class="mdi"
+              :class="getRevertIcon(logStore.latestEntry)"
+            ></span>
           </button>
         </div>
       </div>
-      <div class="handle-content empty" v-else>
-        No recent activity
-      </div>
+      <div class="handle-content empty" v-else>No recent activity</div>
     </div>
 
     <!-- Expanded Header -->
@@ -51,7 +54,11 @@
       <div class="handle-bar"></div>
       <div class="header-title-row">
         <h3>Activity Log</h3>
-        <button class="close-btn" @click.stop="toggleExpand" aria-label="Collapse log">
+        <button
+          class="close-btn"
+          @click.stop="toggleExpand"
+          aria-label="Collapse log"
+        >
           <span class="mdi mdi-chevron-down"></span>
         </button>
       </div>
@@ -67,9 +74,13 @@
         >
           <div class="entry-info">
             <div class="entry-display">
-              <span class="chore-pill" v-if="entry.choreName">{{ entry.choreName }}</span>
+              <span class="chore-pill" v-if="entry.choreName">{{
+                entry.choreName
+              }}</span>
               <span class="action-text">{{ entry.actionDescription }}</span>
-              <span class="user-text" v-if="entry.user">by {{ entry.user.split('@')[0] }}</span>
+              <span class="user-text" v-if="entry.user"
+                >by {{ entry.user.split("@")[0] }}</span
+              >
             </div>
             <span class="entry-time">{{ entry.timeAgo }}</span>
           </div>
@@ -133,7 +144,7 @@ watch(
     if (newVal) {
       logStore.fetchLogs();
     }
-  }
+  },
 );
 
 onMounted(() => {
@@ -145,12 +156,14 @@ function toggleExpand() {
 }
 
 function getRevertLabel(entry) {
-  if (entry?.action === "created" || entry?.action_type === "created") return "Archive";
+  if (entry?.action === "created" || entry?.action_type === "created")
+    return "Archive";
   return "Undo";
 }
 
 function getRevertIcon(entry) {
-  if (entry?.action === "created" || entry?.action_type === "created") return "mdi-archive";
+  if (entry?.action === "created" || entry?.action_type === "created")
+    return "mdi-archive";
   return "mdi-undo";
 }
 
@@ -174,8 +187,16 @@ async function handleRevert(entry) {
   margin: 0 auto;
   background: var(--color-background);
   background-image:
-    radial-gradient(120% 160% at 10% 90%, rgba(253, 232, 213, 0.5) 0%, rgba(253, 232, 213, 0) 45%),
-    radial-gradient(90% 120% at 90% 80%, rgba(189, 233, 221, 0.5) 0%, rgba(189, 233, 221, 0) 52%);
+    radial-gradient(
+      120% 160% at 10% 90%,
+      rgba(253, 232, 213, 0.5) 0%,
+      rgba(253, 232, 213, 0) 45%
+    ),
+    radial-gradient(
+      90% 120% at 90% 80%,
+      rgba(189, 233, 221, 0.5) 0%,
+      rgba(189, 233, 221, 0) 52%
+    );
   color: var(--color-text);
   box-shadow: 0 -4px 24px rgba(31, 45, 44, 0.15);
   border-top-left-radius: var(--radius-lg);
@@ -318,7 +339,9 @@ async function handleRevert(entry) {
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    background-color var(--transition-fast);
   box-shadow: var(--shadow-sm);
 }
 

@@ -21,7 +21,11 @@
     </div>
 
     <transition name="fade">
-      <div v-if="responseMessage" class="ai-feedback" :class="{ error: isError }">
+      <div
+        v-if="responseMessage"
+        class="ai-feedback"
+        :class="{ error: isError }"
+      >
         <span class="feedback-text">{{ responseMessage }}</span>
         <button class="feedback-close" @click="responseMessage = ''">✕</button>
       </div>
@@ -59,13 +63,14 @@ async function handleSubmit() {
       await choreStore.addChore({
         name: data.entities.name,
         interval: data.entities.interval_days || 7,
-        dueDate: data.entities.due_date || new Date().toISOString().split("T")[0],
+        dueDate:
+          data.entities.due_date || new Date().toISOString().split("T")[0],
         private: false,
       });
       responseMessage.value = `✨ Created chore "${data.entities.name}"!`;
     } else if (data.intent === "complete_chore" && data.entities?.name) {
-      const match = choreStore.chores.find(
-        (c) => c.name.toLowerCase().includes(data.entities.name.toLowerCase())
+      const match = choreStore.chores.find((c) =>
+        c.name.toLowerCase().includes(data.entities.name.toLowerCase()),
       );
       if (match) {
         await choreStore.markDone(match.id);
@@ -74,7 +79,8 @@ async function handleSubmit() {
         responseMessage.value = `Could not find a matching chore for "${data.entities.name}".`;
       }
     } else {
-      responseMessage.value = data.message || `Processed intent: ${data.intent || 'understood'}`;
+      responseMessage.value =
+        data.message || `Processed intent: ${data.intent || "understood"}`;
     }
 
     query.value = "";
@@ -82,7 +88,8 @@ async function handleSubmit() {
     await logStore.fetchLogs();
   } catch (err) {
     isError.value = true;
-    responseMessage.value = "AI Assistant error: " + (err.message || "Failed to process");
+    responseMessage.value =
+      "AI Assistant error: " + (err.message || "Failed to process");
   } finally {
     loading.value = false;
   }

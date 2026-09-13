@@ -11,6 +11,7 @@
       @openImportExport="showImportExportModal = true"
       @openSettings="showSettingsModal = true"
       @openAbout="showAboutModal = true"
+      @openCatchUp="$router.push('/catchup')"
     />
 
     <!-- AI Copilot Quick Action Bar -->
@@ -20,7 +21,9 @@
 
     <!-- Welcome section -->
     <div class="welcome-section">
-      <p class="welcome-text">Welcome back, {{ authStore.user?.email?.split("@")[0] || "User" }}!</p>
+      <p class="welcome-text">
+        Welcome back, {{ authStore.user?.email?.split("@")[0] || "User" }}!
+      </p>
     </div>
 
     <!-- Performance Bar (Household Health 0-100) -->
@@ -35,7 +38,9 @@
     />
 
     <!-- Loading Indicator -->
-    <LoadingSpinner v-if="choreStore.loading && choreStore.chores.length === 0" />
+    <LoadingSpinner
+      v-if="choreStore.loading && choreStore.chores.length === 0"
+    />
 
     <!-- Empty State -->
     <EmptyState
@@ -90,10 +95,7 @@
       @close="showSettingsModal = false"
     />
 
-    <AboutModal
-      v-if="showAboutModal"
-      @close="showAboutModal = false"
-    />
+    <AboutModal v-if="showAboutModal" @close="showAboutModal = false" />
   </div>
 </template>
 

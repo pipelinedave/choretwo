@@ -82,20 +82,25 @@ describe("bucketChores", () => {
   });
 
   it("assigns each chore to exactly one time bucket", () => {
-    bucketChores([
-      makeChore({ dueDate: "2026-05-10" }),
-    ], baseDate).buckets.overdue.forEach((c) => expect(c).toBeTruthy());
-    bucketChores([
-      makeChore({ dueDate: "2026-05-15" }),
-    ], baseDate).buckets.today.forEach((c) => expect(c).toBeTruthy());
-    bucketChores([
-      makeChore({ dueDate: "2026-05-16" }),
-    ], baseDate).buckets.tomorrow.forEach((c) => expect(c).toBeTruthy());
-    bucketChores([
-      makeChore({ dueDate: "2026-05-18" }),
-    ], baseDate).buckets.thisWeek.forEach((c) => expect(c).toBeTruthy());
-    bucketChores([
-      makeChore({ dueDate: "2026-05-23" }),
-    ], baseDate).buckets.upcoming.forEach((c) => expect(c).toBeTruthy());
+    bucketChores(
+      [makeChore({ dueDate: "2026-05-10" })],
+      baseDate,
+    ).buckets.overdue.forEach((c) => expect(c).toBeTruthy());
+    bucketChores(
+      [makeChore({ dueDate: "2026-05-15" })],
+      baseDate,
+    ).buckets.today.forEach((c) => expect(c).toBeTruthy());
+    bucketChores(
+      [makeChore({ dueDate: "2026-05-16" })],
+      baseDate,
+    ).buckets.tomorrow.forEach((c) => expect(c).toBeTruthy());
+    bucketChores(
+      [makeChore({ dueDate: "2026-05-18" })],
+      baseDate,
+    ).buckets.thisWeek.forEach((c) => expect(c).toBeTruthy());
+    bucketChores(
+      [makeChore({ dueDate: "2026-05-23" })],
+      baseDate,
+    ).buckets.upcoming.forEach((c) => expect(c).toBeTruthy());
   });
 });
