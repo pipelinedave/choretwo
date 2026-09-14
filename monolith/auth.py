@@ -15,7 +15,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "choretwo-dev-jwt-secret-change-in-producti
 ISSUER = "choretwo-auth-service"
 AUDIENCE = "choretwo"
 
-# Pfade, die keine Authentifizierung erfordern.
+# Pfade, die keine Authentifizierung erfordern (egal ob GET/POST/...).
 EXEMPT_PATHS = {
     "/health",
     "/health/",
@@ -26,6 +26,24 @@ EXEMPT_PATHS = {
     "/redoc/",
     "/",
 }
+
+# Pfad-Präfixe, deren GET-Fehlen eines authentifizierten Users erlaubt ist.
+# Unauthentifizierte GETs liefern dann NUR öffentliche (Shared-)Chores; die
+# Service-Schicht filtert private Chores über `owner_email == user_email`,
+# sodass bei user_email=None niemals private Daten herausgegeben werden.
+# Schreiboperationen (POST/PUT/DELETE) auf dieselben Pfade bleiben auth-pflichtig.
+PUBLIC_READ_GET_PREFIXES = (
+    "/api/chores",
+    "/api/export",
+)
+
+
+def is_public_read_get(request) -> bool:
+    """True, wenn ein GET ohne Login auf einem öffentlich-lesbaren Pfad liegt."""
+    if request.method != "GET":
+        return False
+    path = request.url.path
+    return any(path == p or path.startswith(p + "/") for p in PUBLIC_READ_GET_PREFIXES)
 
 
 def validate_token(token: str) -> dict:
@@ -73,10 +91,15 @@ async def auth_middleware(request, call_next):
         user_email = request.headers.get("X-User-Email")
 
     if not user_email:
-        return JSONResponse(
-            status_code=401,
-            content={"error": "Authentication required"},
-        )
+        # Öffentlich lesbare GET-Endpunkte (Shared-Chores/Export) erlauben
+        # auch ohne Login — die Service-Schicht liefert dann nur Nicht-Private.
+        if is_public_read_get(request):
+            user_email = None
+        else:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Authentication required"},
+            )
 
     request.state.user_email = user_email
     request.state.user_name = user_name
