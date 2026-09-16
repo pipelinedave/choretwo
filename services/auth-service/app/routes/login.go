@@ -1,10 +1,14 @@
 package routes
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
+	"auth-service/app/database"
 	"auth-service/app/dex"
+	"auth-service/app/jwt"
 	"auth-service/app/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -93,5 +97,35 @@ func OAuthCallback(c *gin.Context) {
 	middleware.SetSessionValue(c, "access_token", token.AccessToken)
 	middleware.SetSessionValue(c, "refresh_token", token.RefreshToken)
 
-	c.Redirect(http.StatusTemporaryRedirect, "/auth-callback?success=true")
+	// Den Nutzer in der DB anlegen/laden (identisch zum Mock-Pfad), damit
+	// der OAuth-Login denselben konsistenten User-Stamm erzeugt.
+	user, err := database.GetOrCreateUser(email, name)
+	if err != nil {
+		log.Printf("Failed to get or create user: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to create user",
+		})
+		return
+	}
+
+	// Choretwo-JWT für den authentifizierten Nutzer erzeugen (analog MockCallback).
+	accessToken, refreshToken, err := jwt.GenerateToken(user.Email, user.Name)
+	if err != nil {
+		log.Printf("Failed to generate token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to generate token",
+		})
+		return
+	}
+
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
+	// Browser zum Frontend-Callback umleiten und das JWT als Query-Param mitgeben.
+	redirectURL := fmt.Sprintf("%s/auth-callback?token=%s&id_token=%s&refresh_token=%s&expires_in=86400",
+		frontendURL, accessToken, accessToken, refreshToken)
+
+	c.Redirect(http.StatusSeeOther, redirectURL)
 }
