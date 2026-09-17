@@ -10,6 +10,7 @@ import (
 	"auth-service/app/dex"
 	"auth-service/app/jwt"
 	"auth-service/app/middleware"
+	"auth-service/app/redis"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,6 +23,13 @@ func Login(c *gin.Context) {
 	}
 
 	state := uuid.New().String()
+
+	// oauth_state primär in Redis ablegen, damit er den Cross-Host-Dex-Roundtrip
+	// (choretwo.stillon.top -> dex.stillon.top -> callback) zuverlässig überlebt.
+	redis.SetOAuthState(c.Request.Context(), state)
+
+	// Cookie-Wert als Fallback setzen, falls Redis nicht verfügbar ist oder der
+	// State im Roundtrip doch im Session-Cookie mitkommt.
 	middleware.SetSessionValue(c, "oauth_state", state)
 
 	authURL := dex.GetAuthURL(state)
@@ -51,8 +59,20 @@ func OAuthCallback(c *gin.Context) {
 		return
 	}
 
-	expectedState, ok := middleware.GetSessionValue(c, "oauth_state").(string)
-	if !ok || expectedState != state {
+	// State-Validierung: Der oauth_state wird primär gegen Redis geprüft (one-time),
+	// weil das Cookie den Cross-Host-Dex-Roundtrip nicht zuverlässig überlebt.
+	// Liefert Redis einen Treffer, verbrauchen wir den State und löschen ihn.
+	stateValid := redis.GetOAuthState(c.Request.Context(), state)
+	if stateValid {
+		redis.DeleteOAuthState(c.Request.Context(), state)
+	} else {
+		// Fallback: Session-Cookie-Wert (z.B. wenn kein Redis konfiguriert ist).
+		expectedState, ok := middleware.GetSessionValue(c, "oauth_state").(string)
+		stateValid = ok && expectedState == state
+	}
+
+	if !stateValid {
+		log.Printf("OAuth callback: invalid state parameter (state=%q)", state)
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "Invalid state parameter",
 		})

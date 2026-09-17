@@ -8,6 +8,7 @@ import (
 	"auth-service/app/database"
 	"auth-service/app/dex"
 	"auth-service/app/jwt"
+	"auth-service/app/redis"
 )
 
 func main() {
@@ -21,6 +22,8 @@ func main() {
 			log.Println("Falling back to mock auth")
 		}
 	}
+
+	redis.Init()
 
 	database.InitDB()
 	defer database.CloseDB()

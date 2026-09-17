@@ -12,6 +12,16 @@ import (
 
 var DB *sql.DB
 
+// dbRetryAttempts und dbRetryDelay steuern den nicht-fatalen Startup-Retry.
+// Der auth-service darf bei transienten DNS-/DB-Problemen (beobachtet in Prod:
+// CoreDNS "connection refused", "no such host") nicht mehr hart per log.Fatalf
+// beenden (das verursachte den CrashLoop). Stattdessen retried er begrenzt und
+// läuft weiter; DB-Operationen zur Laufzeit scheitern dann isoliert.
+const (
+	dbRetryAttempts = 10
+	dbRetryDelay    = 3 * time.Second
+)
+
 func InitDB() {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -21,18 +31,26 @@ func InitDB() {
 	var err error
 	DB, err = sql.Open("postgres", dsn)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Printf("Failed to open database handle: %v (continuing with retry)", err)
 	}
 
 	DB.SetMaxOpenConns(25)
 	DB.SetMaxIdleConns(5)
 	DB.SetConnMaxLifetime(5 * time.Minute)
 
-	if err = DB.Ping(); err != nil {
-		log.Fatalf("Failed to ping database: %v", err)
+	for attempt := 1; attempt <= dbRetryAttempts; attempt++ {
+		if err = DB.Ping(); err == nil {
+			log.Println("Database connection established")
+			return
+		}
+		log.Printf("Failed to ping database (attempt %d/%d): %v", attempt, dbRetryAttempts, err)
+		time.Sleep(dbRetryDelay)
 	}
 
-	log.Println("Database connection established")
+	// Nach den Retries: nicht fatal, damit der Pod bei transiärem DNS-Ausfall am
+	// Leben bleibt (Liveness-Probe prüft nur /health). Fehlgeschlagene
+	// DB-Aufrufe zur Laufzeit scheitern dann isoliert.
+	log.Printf("Database unavailable after %d attempts — continuing without DB connection", dbRetryAttempts)
 }
 
 func CloseDB() {

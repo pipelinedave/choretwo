@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/gob"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -46,10 +47,13 @@ func SessionMiddleware() gin.HandlerFunc {
 		c.Set("session", sess)
 		c.Next()
 
+		// WICHTIG (Crash-Fix): Nach c.Next() ist der Response-Header in der Regel
+		// bereits geschrieben (Redirect beim Login/Callback). Ein hier ausgeführter
+		// c.JSON würde einen Gin-ErrUnsupportedWriteError/Panic auslösen und den
+		// Handler crashen lassen. Wir loggen Save-Fehler daher nur noch statt den
+		// Response nachträglich zu beschreiben.
 		if err := sess.Save(c.Request, c.Writer); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to save session",
-			})
+			log.Printf("Failed to save session: %v", err)
 		}
 	}
 }
