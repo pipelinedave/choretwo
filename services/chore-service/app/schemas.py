@@ -78,6 +78,10 @@ class ChoreResponse(BaseModel):
     owner_email: Optional[str]
     is_private: bool
     archived: bool
+    # Nur bei /done gesetzt: die durch die Recurrence vorgezogene nächste
+    # Fälligkeit (für den "Nächste Fälligkeit"-Toast im Frontend). Optional,
+    # damit bestehende Listen-/Read-Responses unverändert bleiben.
+    new_due_date: Optional[date] = None
 
     class Config:
         from_attributes = True

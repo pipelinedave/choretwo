@@ -171,6 +171,9 @@ const toastTimer = ref(null);
 
 // Success effect
 const showSuccess = ref(false);
+// Timer für das Erfolgs-Routing – wird beim UNDO abgebrochen, damit die View
+// nicht wegnavigiert, solange der User noch rückgängig machen kann.
+let successTimer = null;
 
 onMounted(async () => {
   try {
@@ -212,9 +215,24 @@ function localDateStr(d) {
   return `${y}-${m}-${day}`;
 }
 
+// Parst "YYYY-MM-DD" LOKAL (nicht als UTC), damit der angezeigte Wochentag/Tag
+// bei Offset-Zeitzonen nicht um einen Tag abweicht. Konsistent zu localDateStr()
+// und zu normalizeToLocalDate() (choreBuckets).
+function parseLocalDate(raw) {
+  if (raw instanceof Date) return raw;
+  const parts = String(raw).split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const [y, m, d] = parts;
+  return new Date(y, m - 1, d);
+}
+
 function formatNextDue(raw) {
   if (!raw) return "";
-  const d = new Date(raw);
+  const d = parseLocalDate(raw);
+  if (!d) return "";
   return d.toLocaleDateString("de-DE", {
     weekday: "short",
     day: "2-digit",
@@ -254,7 +272,7 @@ async function handleToggle(choreId) {
     rebuildStack();
 
     // Recurrence-Hinweis, falls vorhanden
-    const nextDue = response?.new_due_date;
+    const nextDue = response?.due_date ?? response?.new_due_date;
     const msg = nextDue
       ? `Erledigt ✓ Nächste Fälligkeit: ${formatNextDue(nextDue)}`
       : `Erledigt ✓`;
@@ -262,10 +280,12 @@ async function handleToggle(choreId) {
 
     if (stack.value.length === 0) {
       showSuccess.value = true;
-      setTimeout(() => {
+      if (successTimer) clearTimeout(successTimer);
+      successTimer = setTimeout(() => {
         showSuccess.value = false;
+        successTimer = null;
         setTimeout(() => router.push("/"), 500);
-      }, 900);
+      }, 1300);
     }
   } catch (err) {
     console.error("Failed to mark chore done in catchup:", err);
@@ -278,6 +298,14 @@ async function handleToggle(choreId) {
 async function handleUndo(choreId) {
   if (isBusy(choreId)) return;
   busyIds.value.add(choreId);
+  // Sofort (vor dem await) den Erfolgs-Overlay + Redirect-Timer stoppen:
+  // sonst räumt der ablaufende Timer die View weg, während undoDone noch läuft
+  // (Race bei der letzten Chore). Die zurückgeholte Chore muss wieder sichtbar sein.
+  if (successTimer) {
+    clearTimeout(successTimer);
+    successTimer = null;
+  }
+  showSuccess.value = false;
   try {
     await choreStore.undoDone(choreId);
     rebuildStack();
@@ -314,6 +342,10 @@ async function applySnooze(offsetDays, customDate) {
   try {
     await choreStore.snoozeChore(chore.id, newDate);
     rebuildStack();
+    // Aufgeschoben = nicht mehr aufzuholen: die gesnoozte Chore aus dem
+    // sichtbaren Stack entfernen (der Stack zeigt sonst auch zukuenftige
+    // Chores erneut im upcoming-Bucket an).
+    stack.value = stack.value.filter((c) => c.id !== chore.id);
     showToast(`Aufgeschoben auf ${formatNextDue(newDate)}`, null, null, 2500);
   } catch (err) {
     console.error("Failed to snooze chore in catchup:", err);
@@ -484,7 +516,7 @@ function handleEdit(chore) {
   padding: 10px 16px;
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
-  z-index: 1300;
+  z-index: 2100; /* über dem Success-Overlay (1400), damit UNDO immer klickbar bleibt */
   max-width: calc(100vw - 32px);
   font-size: 0.85rem;
 }
@@ -535,6 +567,10 @@ function handleEdit(chore) {
   background: rgba(31, 45, 44, 0.35);
   backdrop-filter: blur(4px);
   z-index: 1400;
+  /* Das Erfolgs-Overlay ist rein dekorativ und darf Klicks NIEMALS blockieren:
+     Der UNDO-Toast (z-index 2100) muss auch bei leerem Stack sofort nutzbar
+     sein, sonst gewinnt der Auto-Redirect das Race gegen das Rückgängig-Machen. */
+  pointer-events: none;
 }
 
 .success-check {

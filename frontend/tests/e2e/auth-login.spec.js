@@ -14,7 +14,7 @@ test.describe("Authentication Login Flow", () => {
 
     await expect(page).toHaveURL("/login");
     await expect(
-      page.locator("text=Manage your chores with ease"),
+      page.locator("text=Tactile Microservice Household Task Tracker"),
     ).toBeVisible();
 
     await page.click('button:has-text("Sign in")');
@@ -79,10 +79,12 @@ test.describe("Authentication Login Flow", () => {
       "developer@example.com",
     );
 
-    // Verify menu items
-    await expect(page.locator(".menu-item")).toHaveCount(2);
-    await expect(page.locator(".menu-item").nth(0)).toContainText("Settings");
-    await expect(page.locator(".menu-item").nth(1)).toContainText("Logout");
+    // Verify the menu items (redesigned header menu: 7 items incl. Logout)
+    await expect(page.locator(".menu-item")).toHaveCount(7);
+    await expect(page.locator(".menu-item").nth(0)).toContainText(
+      "Archived Chores",
+    );
+    await expect(page.locator(".menu-item").last()).toContainText("Logout");
   });
 
   test("should navigate to protected routes after login", async ({ page }) => {
@@ -92,19 +94,18 @@ test.describe("Authentication Login Flow", () => {
     await page.click('button[type="submit"]');
     await page.waitForURL("/");
 
-    // Navigate to Chores page
-    await page.click('a[href="/chores"]');
-    await page.waitForURL("/chores");
-    await expect(page).toHaveURL("/chores");
+    // After login the authenticated session (token) is stored -> protected
+    // routes must be reachable and must NOT bounce back to /login.
+    for (const path of ["/chores", "/logs", "/settings", "/catchup"]) {
+      await page.goto(path);
+      await page.waitForLoadState("domcontentloaded");
+      await expect(page).toHaveURL(path);
+      await expect(page.locator(".app-header,.main-content")).toBeAttached();
+    }
 
-    // Navigate to Logs page
-    await page.click('a[href="/logs"]');
-    await page.waitForURL("/logs");
-    await expect(page).toHaveURL("/logs");
-
-    // Navigate to Settings page
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
-    await expect(page).toHaveURL("/settings");
+    // Navigating to /login while authenticated redirects to Home (guest guard)
+    await page.goto("/login");
+    await page.waitForURL("/");
+    await expect(page).toHaveURL("/");
   });
 });

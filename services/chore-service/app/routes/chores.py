@@ -127,18 +127,23 @@ async def get_single_chore(
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
 
-    return ChoreResponse(
-        id=chore.id,
-        name=chore.name,
-        interval_days=chore.interval_days,
-        due_date=chore.due_date,
-        done=chore.done,
-        done_by=chore.done_by,
-        last_done=chore.last_done,
-        owner_email=chore.owner_email,
-        is_private=chore.is_private,
-        archived=chore.archived,
-    )
+        return ChoreResponse(
+            id=chore.id,
+            name=chore.name,
+            interval_days=chore.interval_days,
+            due_date=chore.due_date,
+            # Bei Done zieht die Recurrence die Fälligkeit nach vorn. Diese
+            # bereits vorgezogene due_date wird zusätzlich als new_due_date
+            # zurückgegeben, damit das Frontend den "Nächste Fälligkeit"-Toast
+            # anzeigen kann (store.markDone liest response.data.new_due_date).
+            new_due_date=chore.due_date,
+            done=chore.done,
+            done_by=chore.done_by,
+            last_done=chore.last_done,
+            owner_email=chore.owner_email,
+            is_private=chore.is_private,
+            archived=chore.archived,
+        )
 
 
 @router.put("/{chore_id}")
@@ -163,17 +168,39 @@ async def mark_chore_as_done(
 ):
     user_email = request.state.user_email
 
+    # `done_by` kann als Query-Param (Legacy-Clients) ODER im JSON-Body kommen
+    # (Frontend-Store markDone/undoDone senden `{ "done_by": ... }` im Body).
+    # Ohne diese Auflösung geht der Wert verloren → der UNDO-Zweig (done_by=="undo")
+    # im Backend würde nie greifen.
+    if not done_by:
+        try:
+            body = await request.json()
+            done_by = (body or {}).get("done_by")
+        except Exception:
+            done_by = None
+
     try:
         chore = mark_chore_done(db, chore_id, user_email, done_by)
         if not chore:
             raise HTTPException(status_code=404, detail="Chore not found")
 
-        return {
-            "message": f"Chore {chore_id} marked as done",
-            "new_due_date": chore.due_date.isoformat(),
-            "last_done": chore.last_done.isoformat(),
-            "done_by": chore.done_by,
-        }
+        # `new_due_date` liefert dem Frontend die durch die Recurrence
+        # vorgezogene nächste Fälligkeit (für den "Nächste Fälligkeit"-Toast).
+        # mark_chore_done setzt chore.due_date bereits auf das nächste Vorkommen;
+        # beim UNDO (done_by=="undo") gibt es keine neue Fälligkeit.
+        return ChoreResponse(
+            id=chore.id,
+            name=chore.name,
+            interval_days=chore.interval_days,
+            due_date=chore.due_date,
+            done=chore.done,
+            done_by=chore.done_by,
+            last_done=chore.last_done,
+            owner_email=chore.owner_email,
+            is_private=chore.is_private,
+            archived=chore.archived,
+            new_due_date=chore.due_date if done_by != "undo" else None,
+        )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 

@@ -8,12 +8,8 @@ test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
   let token = null;
   const createdIds = [];
 
+  // Lokale Datumkonstruktion (kein UTC) — konsistent zur App (localDateStr).
   const dueDateFor = (offsetDays) => {
-    const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
-    return d.toISOString().split("T")[0];
-  };
-
-  const dateForOffsetDays = (offsetDays) => {
     const d = new Date();
     const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
     out.setDate(out.getDate() + offsetDays);
@@ -22,6 +18,8 @@ test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
     const day = String(out.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   };
+
+  const dateForOffsetDays = (offsetDays) => dueDateFor(offsetDays);
 
   async function login(page) {
     await page.context().clearCookies();
@@ -71,6 +69,57 @@ test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
     }
   }
 
+  // Isolations-Helfer: beseitigt AKTIVE Chores des Mock-Users vor jedem Test,
+  // damit der CatchUp-Stack deterministisch nur die eigenen Chores enthält.
+  //
+  // Robust gegen Last-Aussetzer (siehe catchup.spec.js): nacktes list.json()
+  // crasht bei transienten leeren/5xx-Antworten mit "Unexpected end of JSON
+  // input" → HTTP-Check + defensives Parsen + Retry + Fallback [].
+  async function fetchChores(request, headers, page) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const list = await request.get(
+        `/api/chores/?page=${page}&limit=100`,
+        { headers },
+      );
+      const text = await list.text();
+      if (list.ok() && text) {
+        try {
+          return JSON.parse(text);
+        } catch {
+          /* fallthrough → retry */
+        }
+      }
+      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+    }
+    return [];
+  }
+
+  async function clearActiveChores(request) {
+    // Isolation muss ALLE aktiven Chores löschen, nicht nur die ersten 10
+    // (GET /api/chores/ ist paginiert, default limit=10). Reste aus vorherigen
+    // Tests/Specs (v.a. Zukunfts-Chores von Snooze-Tests mit späterem due_date)
+    // würden sonst den CatchUp-Stack verfälschen. Pagination durchlaufen.
+    const headers = { Authorization: `Bearer ${token}` };
+    for (let page = 1; page <= 50; page++) {
+      const chores = await fetchChores(request, headers, page);
+      if (!chores.length) break;
+      for (const c of chores) {
+        try {
+          await request.delete(`/api/chores/${c.id}`, { headers });
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+  }
+
+  // Login + Isolation pro Test: erst einloggen (Token setzen), dann den Stack
+  // leeren, damit die Tests deterministisch gegen einen sauberen Stack laufen.
+  test.beforeEach(async ({ page, request }) => {
+    await login(page);
+    await clearActiveChores(request);
+  });
+
   async function swipeDone(page, box) {
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
@@ -103,7 +152,6 @@ test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
     page,
     request,
   }) => {
-    await login(page);
     const stamp = Date.now();
     const name = `Snooze ${stamp}`;
     const chore = await createChore(request, name, 0); // heute fällig
@@ -143,7 +191,6 @@ test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
     page,
     request,
   }) => {
-    await login(page);
     const stamp = Date.now();
     const name = `Undo ${stamp}`;
     const chore = await createChore(request, name, 0); // heute fällig

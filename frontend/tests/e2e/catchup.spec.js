@@ -11,9 +11,15 @@ test.describe("CatchUp Stack", () => {
   let token = null;
   const createdIds = [];
 
+  // Lokale Datumkonstruktion (kein UTC) — konsistent zur App (localDateStr).
   const dueDateFor = (offsetDays) => {
-    const d = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
-    return d.toISOString().split("T")[0];
+    const d = new Date();
+    const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    out.setDate(out.getDate() + offsetDays);
+    const y = out.getFullYear();
+    const m = String(out.getMonth() + 1).padStart(2, "0");
+    const day = String(out.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
   };
 
   async function login(page) {
@@ -57,6 +63,61 @@ test.describe("CatchUp Stack", () => {
     }
   }
 
+  // Isolations-Helfer: beseitigt AKTIVE Chores des Mock-Users vor jedem Test,
+  // damit der CatchUp-Stack deterministisch nur die eigenen Chores enthält
+  // (andere Specs teilen sich dieselbe Test-DB).
+  //
+  // Robust gegen Last-Aussetzer: Unter paralleler Browser-Last (Chromium+Firefox
+  // gegen denselben Monolith) liefert GET /api/chores/ gelegentlich einen leeren
+  // Body oder einen 5xx. Ein nacktes `await list.json()` crasht dann mit
+  // "SyntaxError: Unexpected end of JSON input" → flaky. Daher: HTTP-Check +
+  // defensives Parsen + kurzer Retry + Fallback [].
+  async function fetchChores(request, headers, page) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const list = await request.get(
+        `/api/chores/?page=${page}&limit=100`,
+        { headers },
+      );
+      const text = await list.text();
+      if (list.ok() && text) {
+        try {
+          return JSON.parse(text);
+        } catch {
+          /* fallthrough → retry */
+        }
+      }
+      // Kurzer Backoff gegen transiente Monolith-Aussetzer
+      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+    }
+    return [];
+  }
+
+  async function clearActiveChores(request) {
+    // Isolation muss ALLE aktiven Chores löschen, nicht nur die ersten 10
+    // (GET /api/chores/ ist paginiert, default limit=10). Reste aus vorherigen
+    // Tests/Specs (v.a. Zukunfts-Chores von Snooze-Tests mit späterem due_date)
+    // würden sonst den CatchUp-Stack verfälschen. Pagination durchlaufen.
+    const headers = { Authorization: `Bearer ${token}` };
+    for (let page = 1; page <= 50; page++) {
+      const chores = await fetchChores(request, headers, page);
+      if (!chores.length) break;
+      for (const c of chores) {
+        try {
+          await request.delete(`/api/chores/${c.id}`, { headers });
+        } catch {
+          /* already gone */
+        }
+      }
+    }
+  }
+
+  // Login + Isolation pro Test: erst einloggen (Token setzen), dann den Stack
+  // leeren, damit die Tests deterministisch gegen einen sauberen Stack laufen.
+  test.beforeEach(async ({ page, request }) => {
+    await login(page);
+    await clearActiveChores(request);
+  });
+
   /**
    * Simuliert einen Swipe nach rechts (Done) auf der aktiven Card.
    * Verwendet Pointer-Events per locator.dispatchEvent direkt am Card-Element,
@@ -98,7 +159,6 @@ test.describe("CatchUp Stack", () => {
     request,
   }) => {
     // Login + Chores in verschiedenen Dringlichkeits-Stufen anlegen
-    await login(page);
     const stamp = Date.now();
     const a = `Sort-A ${stamp}`;
     const b = `Sort-B ${stamp}`;
@@ -113,7 +173,19 @@ test.describe("CatchUp Stack", () => {
 
     // Navigation zum CatchUp
     await page.goto("/catchup");
-    await page.waitForSelector(".catchup-card", { state: "visible" });
+    // Auf ALLE 5 eigenen Chores warten (nicht nur auf die erste Karte), sonst
+    // kann ein langsameres Rendering (Firefox) die nachfolgenden Assertions
+    // auf unvollständigem Stack race-artig fehlschlagen lassen.
+    await page.waitForFunction(
+      (s) => {
+        const titles = [
+          ...document.querySelectorAll(".catchup-card .chore-title"),
+        ].map((el) => el.textContent.trim());
+        return titles.filter((t) => t.includes(s)).length >= 5;
+      },
+      stamp,
+      { timeout: 8000 },
+    );
 
     // Alle 5 eigenen Chores sind im Stack
     const cardBodies = page.locator(".catchup-card");
@@ -149,7 +221,6 @@ test.describe("CatchUp Stack", () => {
     page,
     request,
   }) => {
-    await login(page);
     const stamp = Date.now();
     const firstName = `Swipe-A ${stamp}`;
     const secondName = `Swipe-B ${stamp}`;
@@ -157,7 +228,18 @@ test.describe("CatchUp Stack", () => {
     await createChore(request, secondName, 0);
 
     await page.goto("/catchup");
-    await page.waitForSelector(".catchup-card", { state: "visible" });
+    // Auf beide eigenen Chores warten, bevor auf die oberste Karte zugegriffen
+    // wird (sonst Race bei langsamem Rendering).
+    await page.waitForFunction(
+      (s) => {
+        const titles = [
+          ...document.querySelectorAll(".catchup-card .chore-title"),
+        ].map((el) => el.textContent.trim());
+        return titles.filter((t) => t.includes(s)).length >= 2;
+      },
+      stamp,
+      { timeout: 8000 },
+    );
 
     // Die aelteste/ueberfaellige Chore ist ganz oben (Sortier-Logik)
     const cardBodies = page.locator(".catchup-card");
@@ -192,7 +274,6 @@ test.describe("CatchUp Stack", () => {
     page,
     request,
   }) => {
-    await login(page);
     const stamp = Date.now();
     const onlyName = `Empty ${stamp}`;
     await createChore(request, onlyName, 0);

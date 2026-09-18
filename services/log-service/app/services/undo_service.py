@@ -1,10 +1,7 @@
-import os
-from typing import Optional
+import json
+
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import httpx
-import json
-import logging
 
 from app.services.log_service import create_log
 
@@ -27,54 +24,81 @@ async def undo_action(log_id: int, user_email: str, db: Session) -> dict:
     if isinstance(action_details, str):
         action_details = json.loads(action_details)
 
-    chore_service_url = os.getenv("CHORE_SERVICE_URL", "http://chore-service:8000/api")
+    # Undo führt die Chore-Zustandsänderungen DIREKT in der geteilten DB aus
+    # (Monolith: eine Engine/DB für alle Services) statt per HTTP-Round-Trip zu
+    # `CHORE_SERVICE_URL` (Standard "http://chore-service:8000/api" ist ein
+    # Kubernetes/Docker-DNS-Name, der im Monolith nicht auflösbar ist → 500
+    # "Name or service not known"). In-process-DB-Update funktioniert in beiden
+    # Deployment-Varianten (Standalone + Monolith) und ist nicht von Netzwerk/
+    # Hostname abhängig.
+    _archieve_owner = "AND owner_email = :owner"
 
     if action_type == "created":
         chore_id = action_details.get("id")
         if chore_id:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.put(
-                    f"{chore_service_url}/chores/{chore_id}/archive",
-                    headers={"X-User-Email": user_email},
-                )
-                logging.info(f"Archive response: {response.status_code}")
+            db.execute(
+                text(
+                    "UPDATE chores.chores SET archived = TRUE "
+                    "WHERE id = :cid " + _archieve_owner
+                ),
+                {"cid": chore_id, "owner": user_email},
+            )
+            db.commit()
 
     elif action_type == "updated":
         previous_state = action_details.get("previous_state", {})
-        if previous_state:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.put(
-                    f"{chore_service_url}/chores/{previous_state['id']}",
-                    headers={"X-User-Email": user_email},
-                    json={
-                        "name": previous_state.get("name"),
-                        "interval_days": previous_state.get("interval_days"),
-                        "due_date": previous_state.get("due_date"),
-                    },
-                )
+        pid = previous_state.get("id")
+        if previous_state and pid:
+            db.execute(
+                text(
+                    "UPDATE chores.chores SET name = :name, interval_days = :iv, "
+                    "due_date = :due, updated_at = CURRENT_TIMESTAMP "
+                    "WHERE id = :cid " + _archieve_owner
+                ),
+                {
+                    "name": previous_state.get("name"),
+                    "iv": previous_state.get("interval_days"),
+                    "due": previous_state.get("due_date"),
+                    "cid": pid,
+                    "owner": user_email,
+                },
+            )
+            db.commit()
 
     elif action_type == "marked_done":
         chore_id = action_details.get("chore_id")
         if chore_id:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                payload = {"done": False, "last_done": None, "done_by": None}
-                previous_due_date = action_details.get("previous_due_date")
-                if previous_due_date:
-                    payload["due_date"] = previous_due_date
-                await client.put(
-                    f"{chore_service_url}/chores/{chore_id}",
-                    headers={"X-User-Email": user_email},
-                    json=payload,
+            previous_due_date = action_details.get("previous_due_date")
+            if previous_due_date:
+                db.execute(
+                    text(
+                        "UPDATE chores.chores SET done = FALSE, last_done = NULL, "
+                        "done_by = NULL, due_date = :due "
+                        "WHERE id = :cid " + _archieve_owner
+                    ),
+                    {"due": previous_due_date, "cid": chore_id, "owner": user_email},
                 )
+            else:
+                db.execute(
+                    text(
+                        "UPDATE chores.chores SET done = FALSE, last_done = NULL, "
+                        "done_by = NULL WHERE id = :cid " + _archieve_owner
+                    ),
+                    {"cid": chore_id, "owner": user_email},
+                )
+            db.commit()
 
     elif action_type == "archived":
         chore_id = action_details.get("id")
         if chore_id:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.put(
-                    f"{chore_service_url}/chores/{chore_id}/unarchive",
-                    headers={"X-User-Email": user_email},
-                )
+            db.execute(
+                text(
+                    "UPDATE chores.chores SET archived = FALSE "
+                    "WHERE id = :cid " + _archieve_owner
+                ),
+                {"cid": chore_id, "owner": user_email},
+            )
+            db.commit()
 
     create_log(
         db, chore_id, user_email, "undo", {"action_type": action_type, "undone": True}

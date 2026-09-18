@@ -233,10 +233,17 @@ function moveGesture(clientX, clientY) {
     if (absDx < 6 && absDy < 6) return;
 
     if (absDy > absDx) {
-      // Vertikale Geste: nach oben (dy < 0) → Snooze, sonst Scroll
-      if (dy < 0 && absDy > UP_SWIPE_THRESHOLD) {
-        isUpSwipeLocked = true;
-        isSwiping.value = true;
+      // Vertikale Geste: nach oben (dy < 0) → Snooze, nach unten → Scroll.
+      // Wichtig: NACH OBEN wird NICHT sofort als Scroll gelockt, sonst wird
+      // jeder echte (inkrementelle) Up-Swipe schon beim ersten < 70px-Move
+      // als Scroll interpretiert und Snooze wuerde nie feuern. Der Kandidat
+      // bleibt offen, bis die Schwelle ueberschritten ist.
+      if (dy < 0) {
+        if (absDy > UP_SWIPE_THRESHOLD) {
+          isUpSwipeLocked = true;
+          isSwiping.value = true;
+        }
+        // unter Schwelle: Kandidat offen lassen, kein gleicher Scroll-Lock
       } else {
         isScrollLocked = true;
         isGestureActive = false;
@@ -440,6 +447,10 @@ function handleGlobalClick() {
   box-shadow: var(--shadow-md);
   user-select: none;
   cursor: grab;
+  /* Pointer-Events steuern die Geste; verhindert, dass der Browser den
+     pointerdown/move bei Touch als native Scroll-Geste übernimmt und ein
+     pointercancel auslöst (was doppelte/abgebrochene Swipes erzeugt). */
+  touch-action: pan-y;
   transition:
     box-shadow var(--transition-normal),
     transform var(--swipe-return-duration) var(--motion-rubber);

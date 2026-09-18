@@ -28,6 +28,9 @@ const normalizeChore = (raw) => {
 
 export const useChoreStore = defineStore("chores", () => {
   const chores = ref([]);
+  // Merkt beim markDone den ursprünglichen due_date pro Chore, damit undoDone
+  // ihn wiederherstellen kann (Backend zieht due_date beim Done nach vorn).
+  const pendingUndoDates = new Map();
   const archivedChores = ref([]);
   const loading = ref(false);
   const error = ref(null);
@@ -180,12 +183,19 @@ export const useChoreStore = defineStore("chores", () => {
       }
 
       const response = await choreApi.put(`/${id}`, payload);
-      const normalized = normalizeChore(response.data.chore || response.data);
+      // Die PUT-Update-Route liefert teils nur { message } ohne Chore-Objekt.
+      // In dem Fall NICHT mit einem leeren/partialen normalisierten Objekt
+      // überschreiben (sonst würde z.B. `name` auf undefined gesetzt und der
+      // CatchUp-Kartentitel nach Undo leer erscheinen). Nur mergen, wenn die
+      // Response tatsächlich ein gültiges Chore-Objekt enthält.
+      const updatedRaw =
+        response.data?.chore || (response.data?.id ? response.data : null);
+      const normalized = updatedRaw ? normalizeChore(updatedRaw) : null;
       const index = chores.value.findIndex((c) => c.id === id);
       if (index !== -1) {
         chores.value[index] = {
           ...chores.value[index],
-          ...normalized,
+          ...(normalized || {}),
           ...updates,
         };
       }
@@ -199,16 +209,21 @@ export const useChoreStore = defineStore("chores", () => {
 
   async function markDone(id, doneBy) {
     try {
-      const response = await choreApi.put(`/${id}/done`, { done_by: doneBy });
       const index = chores.value.findIndex((c) => c.id === id);
+      // Ursprünglichen due_date merken, damit undoDone ihn wiederherstellen kann
+      // (das Backend zieht due_date beim Done auf das nächste Recurrence-Vorkommen vor).
+      if (index !== -1) {
+        pendingUndoDates.set(id, chores.value[index].due_date);
+      }
+      const response = await choreApi.put(`/${id}/done`, { done_by: doneBy });
       if (index !== -1) {
         const updated = normalizeChore({
           ...chores.value[index],
           done: true,
-          dueDate: response.data.new_due_date,
-          due_date: response.data.new_due_date,
-          lastDone: response.data.last_done,
-          last_done: response.data.last_done,
+          dueDate: response.data.due_date ?? response.data.new_due_date,
+          due_date: response.data.due_date ?? response.data.new_due_date,
+          lastDone: response.data.last_done ?? response.data.lastDone,
+          last_done: response.data.last_done ?? response.data.lastDone,
           doneBy: response.data.done_by || doneBy,
           done_by: response.data.done_by || doneBy,
         });
@@ -223,19 +238,33 @@ export const useChoreStore = defineStore("chores", () => {
   }
 
   async function undoDone(id) {
-    // Backend resets done/done_by when done_by == "undo" (recurrence state
-    // und die bisherige due_date bleiben erhalten → Chore kommt zurück in den Stack).
+    // Backend setzt bei done_by == "undo" nur done=false/done_by=None, lässt aber
+    // die beim Done VORGEZOGENE due_date stehen. Damit die Chore an ihren
+    // ursprünglichen Termin zurückkehrt (CatchUp-Stack), stellen wir die zuvor
+    // gemerkte due_date explizit wieder her.
     try {
+      const storedOldDue = pendingUndoDates.get(id) || null;
       const response = await choreApi.put(`/${id}/done`, { done_by: "undo" });
       const index = chores.value.findIndex((c) => c.id === id);
       if (index !== -1) {
-        chores.value[index] = {
-          ...chores.value[index],
-          done: false,
-          doneBy: null,
-          done_by: null,
-        };
+        const restored = { ...chores.value[index] };
+        if (storedOldDue) {
+          restored.due_date = storedOldDue;
+          restored.dueDate = storedOldDue;
+        }
+        restored.done = false;
+        restored.doneBy = null;
+        restored.done_by = null;
+        chores.value[index] = restored;
       }
+      // Altdatum im Backend persistieren, falls gemerkt (nur wenn nötig)
+      if (storedOldDue && index !== -1) {
+        await updateChore(id, {
+          due_date: storedOldDue,
+          dueDate: storedOldDue,
+        });
+      }
+      pendingUndoDates.delete(id);
       await fetchChoreCounts();
       return response.data;
     } catch (err) {
