@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"auth-service/app/database"
 	"auth-service/app/dex"
@@ -17,6 +17,7 @@ import (
 	"auth-service/app/middleware"
 	"auth-service/app/routes"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -30,7 +31,9 @@ import (
 // `?token=` und warf "No token in callback URL" → echter Dex-Login scheiterte.
 //
 // Dieser Test treibt den ECHTEN (nicht Mock-)Callback gegen eine lokale,
-// in-memory OIDC-Provider-Attrappe (httptest) + echte lokale Postgres:
+// in-memory OIDC-Provider-Attrappe (httptest); die DB-Schicht (GetOrCreateUser)
+// wird per go-sqlmock gestubbt, damit der Test hermetisch und ohne echte
+// Postgres in CI läuft:
 //   - Login ruft GetAuthURL → oauth_state landet in der Session (Cookie).
 //   - Callback?code=..&state=<session-state> tauscht den Code und holt die
 //     Userinfo → erzeugt ein gültiges Choretwo-JWT und 303-redirectet auf
@@ -105,19 +108,27 @@ func TestOAuthCallbackIssuesJWTAndRedirects(t *testing.T) {
 		Endpoint:     provider.Endpoint(),
 	}
 
-	// --- 3. jwt + echte lokale Postgres initialisieren ---
+	// --- 3. jwt + DB-Schicht per sqlmock stubben (hermetisch, kein echtes Postgres) ---
 	jwt.InitJWT()
-	t.Setenv("DATABASE_URL", os.Getenv("CHORETWO_TEST_DATABASE_URL"))
-	dbURL := os.Getenv("CHORETWO_TEST_DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgresql://choretwo:choretwo_dev@127.0.0.1:5432/choretwo?sslmode=disable"
+	mockDB, dbMock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
 	}
-	t.Setenv("DATABASE_URL", dbURL)
-	database.InitDB()
-	defer database.CloseDB()
-	if err := database.RunMigrations(); err != nil {
-		t.Fatalf("migrations failed: %v", err)
-	}
+	origDB := database.DB
+	database.DB = mockDB
+	t.Cleanup(func() {
+		database.DB = origDB
+		_ = mockDB.Close()
+	})
+
+	userRows := sqlmock.NewRows([]string{"id", "email", "name", "created_at", "updated_at"}).
+		AddRow(1, "oauth.user@example.com", "OAuth Test User", time.Now(), time.Now())
+	dbMock.ExpectQuery(`SELECT id, email, name, created_at, updated_at\s+FROM auth\.users WHERE email = \$1`).
+		WithArgs("oauth.user@example.com").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "name", "created_at", "updated_at"}))
+	dbMock.ExpectQuery(`INSERT INTO auth\.users \(email, name\)\s+VALUES \(\$1, \$2\)\s+RETURNING id, email, name, created_at, updated_at`).
+		WithArgs("oauth.user@example.com", "OAuth Test User").
+		WillReturnRows(userRows)
 
 	// --- 4. Router mit Session + Login/Callback aufbauen ---
 	r := gin.New()
