@@ -2,7 +2,27 @@
 
 ## Last Updated
 **Date:** September 22, 2026
-**Session:** AI-Backend-Migration — adesso AI Hub → Synthetic (GLM-5.3-Flash)
+**Session:** CatchUp-E2E-Reparatur — GET-by-id null-Bug im chore-service behoben
+
+---
+
+## CatchUp-Fix: GET /api/chores/{id} lieferte null (22.09.2026)
+
+**Symptom:** CatchUp-Suite 22/22 failed (Chromium+Firefox). Zwei Fehlermuster:
+1. `SyntaxError: Unexpected end of JSON input` im Test-Setup — Ursache: kein Backend auf `:8000` (Vite-Proxy zeigt seit Modular-Monolith-Migration auf `localhost:8000`, nicht 8002). Dev-Stack ist `docker-compose -f docker-compose.yml -f docker-compose.monolith.yml --profile microservices up -d monolith` (Profile-Flag nötig, sonst Compose-Validierungsfehler `frontend depends on undefined service chore-service`).
+2. `TypeError: Cannot read properties of null (reading 'done'/'due_date')` in 8 Tests — Ursache: echter Produkt-Bug.
+
+**Root-Cause (`services/chore-service/app/routes/chores.py` `get_single_chore`, ~Zeile 130):**
+Das `return ChoreResponse(...)` war **eingerückt unter dem `if not chore:`-Block NACH dem `raise`** → toter Code. Bei existierendem Chore fiel die Funktion durch → implizites `None` → FastAPI antwortete **HTTP 200 mit Body `null`**. Jeder GET-by-id-Client bekam null (404 kam nur für wirklich gelöschte Chores). Fix: Einrückung eine Ebene raus (Return auf Funktionsebene). Gleicher Fix in `monolith/vendor/chore/app/routes/chores.py` (gitignored, wird via `sync_vendor.py` aus services/ generiert — Commit nur auf services/).
+
+**Verifikation:**
+- curl: `GET /api/chores/{id}` → vorher `null`, nachher volles Chore-Objekt (HTTP 200)
+- Realer Browser-E2E (CDP): Stack/Sortierung/Deck-Effekt, Swipe-done + Recurrence (+7d), Toast mit UNDO (position:fixed, display:flex, opacity:1), Snooze-Sheet (+3 Tage), Undo restored due_date — **alle UI-Flows funktional**, Page-Errors: 0
+- `npx playwright test catchup` → **22 passed (1.2m)** (vorher 8 failed / 14 passed mit korrektem Stack, 22 failed ohne Backend)
+
+**Nicht verschlechtert:** Gesamt-Suite 60 failed / 68 passed — Failures sind vorexistierender Test-Drift: Tests warten auf `.stats-grid` (existiert nicht im src-Code) und `Sign in with Google` (UI sagt "Sign in with Dex / OAuth"), fehlende Nav-Links. Logisch unabhängig vom Backend-Fix (Backend-only Änderung des Response-Bodys null→Objekt).
+
+**Commit:** `1c9a76b` fix(chore): return chore object from GET /chores/{id} instead of null (lokal, NICHT gepusht — paralleler Staging-Rollout läuft)
 
 ---
 
