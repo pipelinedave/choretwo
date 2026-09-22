@@ -12,6 +12,50 @@
       <div class="login-content">
         <LoadingSpinner v-if="authStore.loading" message="Authenticating..." />
 
+        <!-- Supabase mode: passwordless magic link (+ optional Google OAuth) -->
+        <div v-else-if="authStore.isSupabaseMode" class="login-actions">
+          <p class="login-message" v-if="authStore.error">
+            {{ authStore.error }}
+          </p>
+
+          <template v-if="!magicLinkSent">
+            <input
+              v-model="email"
+              type="email"
+              class="login-input"
+              placeholder="you@example.com"
+              autocomplete="email"
+              required
+              @keyup.enter="handleMagicLink"
+            />
+            <button
+              @click="handleMagicLink"
+              class="btn btn-primary btn-login"
+              :disabled="!email"
+            >
+              <span class="mdi mdi-email-outline"></span>
+              Send login link
+            </button>
+            <button
+              v-if="googleEnabled"
+              @click="handleGoogle"
+              class="btn btn-tonal btn-login"
+            >
+              <span class="mdi mdi-google"></span>
+              Sign in with Google
+            </button>
+            <p class="login-note">
+              We'll email you a passwordless login link.
+            </p>
+          </template>
+
+          <p class="login-note login-sent" v-else>
+            <span class="mdi mdi-email-check-outline"></span>
+            Login-Link wurde gesendet an {{ email }}. Bitte im Postfach öffnen.
+          </p>
+        </div>
+
+        <!-- Legacy mode: Go auth-service / Dex OIDC (local dev & E2E) -->
         <div v-else class="login-actions">
           <p class="login-message" v-if="authStore.error">
             {{ authStore.error }}
@@ -32,6 +76,7 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
@@ -39,9 +84,29 @@ import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 const route = useRoute();
 const authStore = useAuthStore();
 
+const email = ref("");
+const magicLinkSent = ref(false);
+// Google OAuth is opt-in via env (VITE_SUPABASE_GOOGLE_ENABLED=true) and
+// only rendered in Supabase mode.
+const googleEnabled =
+  authStore.isSupabaseMode &&
+  import.meta.env.VITE_SUPABASE_GOOGLE_ENABLED === "true";
+
 function handleLogin() {
   const redirect = route.query.redirect || "/";
   authStore.login(redirect);
+}
+
+async function handleMagicLink() {
+  if (!email.value) return;
+  const redirect = route.query.redirect || "/";
+  const sent = await authStore.login(email.value, redirect);
+  if (sent) magicLinkSent.value = true;
+}
+
+async function handleGoogle() {
+  const redirect = route.query.redirect || "/";
+  await authStore.loginWithGoogle(redirect);
 }
 </script>
 
@@ -101,6 +166,39 @@ function handleLogin() {
   padding: 0.85rem var(--space-md);
   font-size: 1rem;
   border-radius: var(--radius-md);
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.85rem var(--space-md);
+  font-size: 1rem;
+  font-family: inherit;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-surface-variant, rgba(0, 0, 0, 0.15));
+  background: var(--color-surface-light, #fff);
+  color: var(--color-text);
+  text-align: center;
+  outline: none;
+}
+
+.login-input:focus {
+  border-color: var(--color-primary);
+}
+
+.login-input:disabled {
+  opacity: 0.6;
+}
+
+.login-sent {
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.login-sent .mdi {
+  font-size: 1.4rem;
+  display: block;
+  margin-bottom: var(--space-xs);
+  color: var(--color-primary);
 }
 
 .login-message {

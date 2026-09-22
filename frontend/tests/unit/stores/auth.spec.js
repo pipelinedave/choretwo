@@ -52,4 +52,11 @@ describe("Auth Store", () => {
     expect(store.user).toBeNull();
     expect(store.token).toBeNull();
   });
+
+  it("runs in legacy mode when Supabase env vars are absent", () => {
+    // No VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY in the test environment
+    // → feature detection must fall back to the Go auth-service flow.
+    const store = useAuthStore();
+    expect(store.isSupabaseMode).toBe(false);
+  });
 });

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { supabase } from "./supabase";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const AUTH_BASE = import.meta.env.VITE_AUTH_BASE || "";
@@ -47,7 +48,22 @@ export const settingsApi = axios.create({
 });
 
 // JWT Token Interceptor
+// Supabase mode: resolve the (auto-refreshed) access token asynchronously
+// from the supabase-js session (returns a Promise). Legacy mode: synchronous
+// localStorage lookup (Go auth-service JWT) — behavior unchanged.
 const attachToken = (config) => {
+  if (supabase) {
+    return supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        const accessToken = data?.session?.access_token;
+        if (accessToken) {
+          config.headers.Authorization = `Bearer ${accessToken}`;
+        }
+        return config;
+      })
+      .catch(() => config);
+  }
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -67,9 +83,15 @@ apis.forEach((api) => {
     (response) => response,
     (error) => {
       if (error.response?.status === 401) {
-        // Token expired or invalid
+        // Token expired or invalid (supabase-js already attempted an
+        // automatic refresh before this request went out).
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        if (supabase) {
+          // Clear the Supabase session state as well so no stale tokens
+          // linger after the redirect.
+          supabase.auth.signOut().catch(() => {});
+        }
         window.location.href = "/login";
       }
       return Promise.reject(error);

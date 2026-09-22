@@ -42,6 +42,10 @@ if (process.env.NODE_ENV === "production") {
         navigateFallback: "/index.html",
         // Never treat /api/* navigations as SPA fallback — let the browser hit
         // the real backend (auth mock-login-page / callback) instead of Vue.
+        // NOTE: /auth-callback intentionally stays OUT of the denylist — it is
+        // a first-class SPA route, so navigateFallback serving index.html is
+        // correct. The magic-link fragment (#access_token=...) survives the
+        // navigation and is consumed by supabase-js detectSessionInUrl.
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
