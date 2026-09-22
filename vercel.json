@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && npm ci && npm run build && python3 monolith/sync_vendor.py",
+  "buildCommand": "cd frontend && npm ci && npm run build && cd .. && python3 monolith/sync_vendor.py",
   "rewrites": [
     {
       "source": "/health",
