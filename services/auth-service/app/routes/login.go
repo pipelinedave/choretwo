@@ -32,7 +32,18 @@ func Login(c *gin.Context) {
 	// State im Roundtrip doch im Session-Cookie mitkommt.
 	middleware.SetSessionValue(c, "oauth_state", state)
 
-	authURL := dex.GetAuthURL(state)
+	authURL, err := dex.GetAuthURL(state)
+	if err != nil {
+		// Dex-OAuth-Client nicht initialisiert (z.B. InitDex beim Start an
+		// transientem Netzwerkfehler gescheitert): sauberer 503 statt Panic.
+		// ensureInitialized() versucht on-demand ein Re-Init (gedrosselt),
+		// sobald der OIDC-Provider wieder erreichbar ist.
+		log.Printf("Login failed: %v", err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "Authentication service is temporarily unavailable. Please try again in a moment.",
+		})
+		return
+	}
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
 }
 

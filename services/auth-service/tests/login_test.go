@@ -74,6 +74,47 @@ func TestLoginNoPanic(t *testing.T) {
 	}
 }
 
+// TestLoginReturns503WhenDexNotInitialized ist der Regressionstest für den
+// Produktionsvorfall vom 22.09.2026: InitDex scheiterte beim Pod-Start an
+// einem transienten Cloudflare-522 (Dex-Discovery nicht erreichbar), main()
+// loggte nur "Falling back to mock auth" (ohne echten Fallback) und lief mit
+// dex.OAuth2Config == nil weiter. Jeder Login-Klick panickte dann in
+// dex.GetAuthURL (nil-pointer dereference) → Gin-Recovery → 500.
+//
+// Erwartetes Verhalten nach Fix: KEIN Panic, sondern ein sauberer 503 mit
+// verstaendlicher Fehlermeldung, solange der OAuth-Client nicht initialisiert
+// ist (ensureInitialized() retry't on-demand, sobald Dex erreichbar ist).
+func TestLoginReturns503WhenDexNotInitialized(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("USE_MOCK_AUTH", "false")
+	// Kein Client-Secret → InitDex scheitert sofort und OHNE Netzwerk-Call
+	// ("DEX_CLIENT_SECRET is required"), der Test bleibt hermetisch/schnell.
+	t.Setenv("DEX_CLIENT_SECRET", "")
+
+	// Zustand des Produktionsvorfalls reproduzieren: Config nil (z.B. nach
+	// fehlgeschlagenem InitDex beim Start).
+	dex.OAuth2Config = nil
+
+	r := gin.New()
+	r.Use(middleware.SessionMiddleware())
+	r.GET("/api/auth/login", routes.Login)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/login", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	if w.Code == http.StatusInternalServerError {
+		t.Fatalf("Login returned 500 (nil-config panic regression) - got code %d", w.Code)
+	}
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 while dex not initialized, got %d (body=%s)", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "temporarily unavailable") {
+		t.Fatalf("expected user-friendly 503 message, got body: %s", w.Body.String())
+	}
+}
+
 // TestLoginStatePersistedAcrossRequests prüft den kompletten Session-Roundtrip,
 // den OAuthCallback nach dem Login nutzt: Der beim Login per SetSessionValue
 // geschriebene oauth_state muss in einem Folge-Request mit dem Session-Cookie

@@ -17,9 +17,13 @@ func main() {
 	jwt.InitJWT()
 
 	if !dex.IsMockAuthEnabled() {
-		if err := dex.InitDex(); err != nil {
-			log.Printf("Warning: Dex initialization failed: %v", err)
-			log.Println("Falling back to mock auth")
+		if err := dex.InitDexWithRetry(); err != nil {
+			// Bewusst NICHT log.Fatal: Der Service bleibt erreichbar (/health),
+			// Login-Requests bekommen einen sauberen 503 und ensureInitialized()
+			// initialisiert on-demand neu, sobald der OIDC-Provider wieder
+			// erreichbar ist (kein nil-Config-Panic mehr).
+			log.Printf("Warning: Dex initialization failed after retries: %v", err)
+			log.Println("Login requests will return 503 until Dex becomes reachable (lazy re-init enabled)")
 		}
 	}
 
