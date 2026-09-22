@@ -81,7 +81,7 @@ def parse_due_date(message: str) -> Optional[str]:
                         year = match.group(3)
                     date_str = f"{year}-{match.group(2)}-{match.group(1)}"
                     return datetime.strptime(date_str, "%Y-%m-%d").isoformat()
-            except:
+            except Exception:
                 pass
 
     return None

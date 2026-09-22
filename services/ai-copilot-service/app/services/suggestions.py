@@ -77,15 +77,6 @@ async def generate_suggestions(user_email: str, chores: List) -> List[dict]:
 async def analyze_patterns(user_email: str, period: str = "30d") -> dict:
     """Analyze chore completion patterns"""
     # Parse period
-    if period == "7d":
-        days = 7
-    elif period == "30d":
-        days = 30
-    elif period == "90d":
-        days = 90
-    else:
-        days = 30
-
     # Placeholder for actual analysis
     # In production, this would query chore history
     return {

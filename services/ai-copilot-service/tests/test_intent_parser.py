@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock
 from app.nlp.intent_parser import parse_intent, validate_intent
 
 
