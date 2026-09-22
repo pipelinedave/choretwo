@@ -1,6 +1,49 @@
 # Choretwo - Current Session State
 
 ## Last Updated
+**Date:** September 22, 2026
+**Session:** AI-Backend-Migration — adesso AI Hub → Synthetic (GLM-5.3-Flash)
+
+---
+
+## AI Provider Migration (22.09.2026)
+
+Das AI-Backend (NLP-Intent-Parsing des Copilots) wurde vom adesso AI Hub
+Sovereign auf den Provider **Synthetic** (synthetic.new) mit **GLM-5.3-Flash**
+umgestellt — provider-agnostisch und env-getrieben:
+
+- **Neuer Client:** `services/ai-copilot-service/app/llm_client.py` (ersetzt
+  `aihub_client.py`). Env-Vars: `LLM_BASE_URL` (Default
+  `https://api.synthetic.new/openai/v1`, Basis-URL bis /v1 — der Client hängt
+  `/chat/completions` selbst an), `LLM_API_KEY` (Secret, leer = deterministischer
+  Regex-Fallback), `LLM_MODEL` (Default `hf:zai-org/GLM-5.3-Flash`).
+- **Backward-Compat:** Sind ALLE `LLM_*` unset, greift der Legacy-Fallback auf
+  `ADESSO_*` (adesso AI Hub Sovereign, Deprecated-Warnung im Log). Sobald eine
+  `LLM_*`-Var gesetzt ist, gelten ausschließlich die LLM_*-Vars.
+- **Status-Endpoint:** `/api/ai/status` liefert jetzt `llm_connected` +
+  `llm_provider` (statt `aihub_connected`). Frontend nutzt das Feld nicht
+  (verifiziert).
+- **Monolith:** Vendor-Kopie wird via `monolith/sync_vendor.py` generiert
+  (gitignored, läuft im Dockerfile-Build) — nur die Service-Quelle wurde
+  geändert und re-gesynced.
+- **Tests:** 50 passed (neu: `tests/test_llm_client.py` mit Env-Resolution,
+  URL-Normalisierung, HTTP-/Timeout-Fehlern, Codefence-JSON, Health-Semantik,
+  Fallback-Pfad). Ruff clean (inkl. 6 pre-existing Findings gefixt).
+- **Live-Verifikation:** Service lokal gegen Synthetic getestet — `/health` ok,
+  `/api/ai/status` → `llm_connected: true, llm_provider: api.synthetic.new`
+  (echtes Modell-Listing), 2 echte Intent-Parses über GLM (EN + DE, confidence
+  0.95, `response_format: json_object` funktioniert).
+- **K8s (k3s-config, Commit b2055e2):** `monolith/deployment.yaml` +
+  `ai-copilot-service/deployment.yaml` auf `LLM_*` migriert. Secret-Key
+  `llm-api-key` wurde in `choretwo-secrets` (beide Namespaces, manuell
+  verwaltetes Plain-Secret — kein SealedSecret im Repo) gepatcht.
+- **Commits:** `dc5d67b` (refactor ai client), `2c3f1c6` (compose/env),
+  `3153018` (tests), `9303777` (ruff fixes), `cc0e107` (docs).
+
+---
+
+## Previous Session
+
 **Date:** September 16, 2026
 **Session:** CatchUp (Aufholen) 2.0 — Bug-Fixes, E2E-Stabilität & drei aufeinanderfolgende grüne Läufe
 
