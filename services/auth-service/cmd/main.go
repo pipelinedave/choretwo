@@ -17,14 +17,16 @@ func main() {
 	jwt.InitJWT()
 
 	if !dex.IsMockAuthEnabled() {
-		if err := dex.InitDexWithRetry(); err != nil {
-			// Bewusst NICHT log.Fatal: Der Service bleibt erreichbar (/health),
-			// Login-Requests bekommen einen sauberen 503 und ensureInitialized()
-			// initialisiert on-demand neu, sobald der OIDC-Provider wieder
-			// erreichbar ist (kein nil-Config-Panic mehr).
-			log.Printf("Warning: Dex initialization failed after retries: %v", err)
-			log.Println("Login requests will return 503 until Dex becomes reachable (lazy re-init enabled)")
-		}
+		// Init im Hintergrund: Der HTTP-Server startet SOFORT, damit /health
+		// die Liveness-Probe bedient (Start-Retry duerfte das Liveness-Fenster
+		// von ~60s nicht blockieren). Login-Requests bekommen solange einen
+		// sauberen 503; ensureInitialized() initialisiert on-demand neu, sobald
+		// der OIDC-Provider erreichbar ist (self-healing ohne Pod-Restart).
+		go func() {
+			if err := dex.InitDexWithRetry(); err != nil {
+				log.Printf("Warning: Dex initialization failed after retries: %v (lazy re-init on login remains active)", err)
+			}
+		}()
 	}
 
 	redis.Init()
