@@ -55,6 +55,7 @@ class AnalysisResponse(BaseModel):
 
 class StatusResponse(BaseModel):
     status: str
-    aihub_connected: bool
+    llm_connected: bool
+    llm_provider: str
     available_models: List[str]
     current_model: str

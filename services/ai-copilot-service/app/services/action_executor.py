@@ -14,7 +14,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.aihub_client import AIHubError
+from app.llm_client import LLMError
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def find_chore_by_name(
         return None
     svc = _chore_service()
     if svc is None:
-        raise AIHubError("chore-service nicht im Prozess verfügbar")
+        raise LLMError("chore-service nicht im Prozess verfügbar")
     # get_chores liefert Seiten; hier pragmatisch die ersten 100 laden
     chores = svc.get_chores(db, user_email, page=1, limit=100)
     name_l = name.strip().lower()

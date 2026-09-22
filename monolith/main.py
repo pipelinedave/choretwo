@@ -103,14 +103,14 @@ async def startup_event() -> None:
         except Exception as exc:  # pragma: no cover - nicht deterministisch
             print(f"[WARN] Migration {package} fehlgeschlagen: {exc}")
 
-    # obligationen: AI-Hub-Client (AI) initialisieren, falls verfügbar
+    # obligationen: LLM-Client (AI) initialisieren, falls verfügbar
     try:
         ai_routes = importlib.import_module("ai.app.routes.ai")
-        if hasattr(ai_routes, "get_aihub_client"):
-            ai_routes.aihub_client = ai_routes.get_aihub_client()
-            print("[monolith] AI-Hub-Client initialisiert")
+        if hasattr(ai_routes, "get_llm_client"):
+            ai_routes.llm_client = ai_routes.get_llm_client()
+            print("[monolith] LLM-Client initialisiert")
     except Exception as exc:  # pragma: no cover
-        print(f"[WARN] AI/AI-Hub-Init fehlgeschlagen (degraded): {exc}")
+        print(f"[WARN] AI/LLM-Init fehlgeschlagen (degraded): {exc}")
 
 
 @app.get("/health")

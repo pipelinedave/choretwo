@@ -4,7 +4,7 @@ from typing import List, Optional
 import logging
 
 from app.database import get_db
-from app.aihub_client import AIHubClient
+from app.llm_client import LLMClient
 from app.nlp.intent_parser import parse_intent, validate_intent
 from app.schemas import (
     ChatRequest,
@@ -28,15 +28,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai")
 
-# Globaler AI-Hub-Client (initialisiert auf Startup)
-aihub_client: Optional[AIHubClient] = None
+# Globaler LLM-Client (initialisiert auf Startup)
+llm_client: Optional[LLMClient] = None
 
 
-def get_aihub_client() -> AIHubClient:
-    global aihub_client
-    if aihub_client is None:
-        aihub_client = AIHubClient()
-    return aihub_client
+def get_llm_client() -> LLMClient:
+    global llm_client
+    if llm_client is None:
+        llm_client = LLMClient()
+    return llm_client
 
 
 def _chore_service_available() -> bool:
@@ -60,13 +60,13 @@ async def chat_with_ai(
     request: Request,
     chat_request: ChatRequest,
     db: Session = Depends(get_db),
-    aihub: AIHubClient = Depends(get_aihub_client),
+    llm: LLMClient = Depends(get_llm_client),
 ):
     """Parse natural language command, return a Proposal (nie direkt ausführen)."""
     user_email = request.state.user_email
 
-    # Parse intent (AI Hub mit deterministischem Fallback)
-    parsed = await parse_intent(chat_request.message, aihub)
+    # Parse intent (LLM-Provider mit deterministischem Fallback)
+    parsed = await parse_intent(chat_request.message, llm)
 
     # Validieren
     is_valid = await validate_intent(
@@ -166,9 +166,9 @@ async def execute_proposal_endpoint(
     # Fallback: Intent ohne detail -> unknown / Fehler.
     from app.nlp.intent_parser import parse_intent_deterministic
 
-    aihub = get_aihub_client()
-    if aihub.configured:
-        parsed = await parse_intent(hist.original_message, aihub)
+    llm = get_llm_client()
+    if llm.configured:
+        parsed = await parse_intent(hist.original_message, llm)
     else:
         parsed = parse_intent_deterministic(hist.original_message)
     params = parsed.get("parameters", {})
@@ -239,23 +239,25 @@ async def analyze_chore_patterns(
 
 
 @router.get("/status", response_model=StatusResponse)
-async def get_ai_status(aihub: AIHubClient = Depends(get_aihub_client)):
-    """Get AI service status and AI-Hub connectivity"""
+async def get_ai_status(llm: LLMClient = Depends(get_llm_client)):
+    """Get AI service status and LLM provider connectivity"""
     try:
-        is_connected = await aihub.is_healthy()
-        models = await aihub.get_available_models() if is_connected else []
+        is_connected = await llm.is_healthy()
+        models = await llm.get_available_models() if is_connected else []
 
         return StatusResponse(
             status="healthy" if is_connected else "degraded",
-            aihub_connected=is_connected,
+            llm_connected=is_connected,
+            llm_provider=llm.provider,
             available_models=models,
-            current_model=aihub.model,
+            current_model=llm.model,
         )
     except Exception as e:
         logger.error(f"Status check error: {e}")
         return StatusResponse(
             status="unhealthy",
-            aihub_connected=False,
+            llm_connected=False,
+            llm_provider="unknown",
             available_models=[],
             current_model="unknown",
         )

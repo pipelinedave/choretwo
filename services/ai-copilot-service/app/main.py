@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.database import run_migrations
-from app.routes.ai import router as ai_router, get_aihub_client
+from app.routes.ai import router as ai_router, get_llm_client
 
 app = FastAPI(
     title="AI Copilot Service",
@@ -56,11 +56,11 @@ async def auth_middleware(request: Request, call_next):
 async def startup_event():
     run_migrations()
     try:
-        global aihub_client
-        aihub_client = get_aihub_client()
+        global llm_client
+        llm_client = get_llm_client()
     except Exception as e:
-        print(f"[WARN] AI-Hub client init failed: {e} (AI features degraded)")
-        aihub_client = None
+        print(f"[WARN] LLM client init failed: {e} (AI features degraded)")
+        llm_client = None
 
 
 @app.get("/health")

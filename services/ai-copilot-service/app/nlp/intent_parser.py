@@ -2,7 +2,7 @@ import logging
 import re
 from typing import Optional
 
-from app.aihub_client import AIHubClient, AIHubError
+from app.llm_client import LLMClient, LLMError
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ CHAT_SYSTEM_PROMPT = (
 )
 
 # --- Deterministischer Regex-Fallback (kein LLM nötig) ---------------------
-# greift, wenn der AI Hub nicht erreichbar ist, damit der Chat nie tot ist.
+# greift, wenn der LLM-Provider nicht erreichbar ist, damit der Chat nie tot ist.
 # Regex-Klassen ohne eingebettete doppelte Anführungszeichen, um String-
 # Terminierungsfehler zu vermeiden.
 
@@ -132,8 +132,8 @@ def parse_intent_deterministic(user_message: str) -> dict:
     return {"intent": "unknown", "parameters": {}, "confidence": 0.0}
 
 
-async def _parse_with_hub(user_message: str, client: AIHubClient) -> dict:
-    """Versucht die Intent-Parsing über den AI Hub Sovereign."""
+async def _parse_with_llm(user_message: str, client: LLMClient) -> dict:
+    """Versucht die Intent-Parsing über den konfigurierten LLM-Provider."""
     messages = [
         {
             "role": "system",
@@ -152,23 +152,25 @@ async def _parse_with_hub(user_message: str, client: AIHubClient) -> dict:
     }
 
 
-async def parse_intent(user_message: str, client: Optional[AIHubClient] = None) -> dict:
+async def parse_intent(user_message: str, client: Optional[LLMClient] = None) -> dict:
     """Parse user message to extract intent and parameters.
 
-    Versucht zuerst den AI Hub. Fällt bei nicht konfiguriertem/erreichbarem
-    Hub auf den deterministischen Regex-Fallback zurück, damit der Chat
-    funktioniert, ohne dass der AI Hub verfügbar sein muss.
+    Versucht zuerst den LLM-Provider. Fällt bei nicht konfiguriertem/
+    erreichbarem Provider auf den deterministischen Regex-Fallback zurück,
+    damit der Chat funktioniert, ohne dass der Provider verfügbar sein muss.
     """
     if client is None or not getattr(client, "configured", False):
         return parse_intent_deterministic(user_message)
 
     try:
-        return await _parse_with_hub(user_message, client)
-    except AIHubError as e:
-        logger.warning(f"AI Hub nicht verfügbar, nutze deterministischen Fallback: {e}")
+        return await _parse_with_llm(user_message, client)
+    except LLMError as e:
+        logger.warning(
+            f"LLM-Provider nicht verfügbar, nutze deterministischen Fallback: {e}"
+        )
         return parse_intent_deterministic(user_message)
     except Exception as e:  # defensiv: nie crashen
-        logger.warning(f"Intent-Parsing über AI Hub fehlgeschlagen: {e}")
+        logger.warning(f"Intent-Parsing über LLM-Provider fehlgeschlagen: {e}")
         return parse_intent_deterministic(user_message)
 
 
