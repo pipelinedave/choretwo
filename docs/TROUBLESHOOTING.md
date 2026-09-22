@@ -147,33 +147,54 @@ const queue = require('./app/queue');
 queue.getFailed().then(failed => console.log('Failed:', failed.length));
 "
 AI Copilot Service (Python)
-Issue: "Ollama not responding"
+Issue: "LLM provider rejects the API key (401/403)"
 Symptoms:
-- 503 Service Unavailable
-- "Model not found" error
+- /api/ai/status shows status "degraded" and llm_connected false
+- Log: "LLM-Provider ... lehnt den API-Key ab (401)"
 Solutions:
-# Check Ollama is running
-curl http://localhost:11434/api/version
-# Pull required model
-ollama pull llama2
-# Check service configuration
-docker-compose exec ai-copilot-service env | grep OLLAMA
-# Verify model name matches
-# Should be: OLLAMA_MODEL=llama2
+# Check the configured provider and whether a key is set
+docker-compose exec ai-copilot-service env | grep LLM_
+# Verify the key is valid (value must never be committed)
+curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $LLM_API_KEY" \
+  https://api.synthetic.new/openai/v1/models
+# 401/403 = key wrong or expired -> rotate the key in .env / k8s secret
+# In k8s the key lives in secret choretwo-secrets under key llm-api-key
+Issue: "LLM provider unreachable / timeout"
+Symptoms:
+- Log: "LLM-Provider nicht erreichbar: ..."
+- Chat still works but intents come from the deterministic fallback
+Solutions:
+# Check base URL (must point up to /v1, the client appends /chat/completions)
+docker-compose exec ai-copilot-service env | grep LLM_BASE_URL
+# Test connectivity from inside the container
+docker-compose exec ai-copilot-service python -c \
+  "import httpx; print(httpx.get('https://api.synthetic.new/openai/v1/models', timeout=5).status_code)"
+# Check DNS/egress from the cluster if this only fails in k3s
+Issue: "Copilot answers with low confidence / generic intents"
+Symptoms:
+- confidence always 0.5-0.6 (regex fallback values)
+- No LLM calls in the logs
+Solutions:
+# LLM_API_KEY is empty -> the deterministic regex fallback is active by design
+# Set the key and restart the service
+docker-compose restart ai-copilot-service
+# Verify via status endpoint
+curl -s -H "X-User-Email: you@example.com" http://localhost:8005/api/ai/status
 Issue: "NLP parsing fails"
 Symptoms:
 - Commands not recognized
 - Returns generic error
 Solutions:
-# Test NLP parser directly
+# Test the intent parser directly
 docker-compose exec ai-copilot-service python -c "
-from app.nlp.parser import parse_command
-result = parse_command('Mark dishes done')
+import asyncio
+from app.nlp.intent_parser import parse_intent_deterministic
+result = parse_intent_deterministic('Mark dishes done')
 print(result)
-# Should output: {'action': 'mark_done', 'chore_name': 'dishes'}
+# Should output: {'intent': 'mark_done', 'parameters': {'chore_name': 'dishes'}, 'confidence': 0.6}
 "
-# Check prompt templates
-cat services/ai-copilot-service/app/prompts/*.txt
+# If the LLM path fails, check the logs for LLMError warnings —
+# the deterministic fallback keeps the chat alive by design.
 Frontend (Vue)
 Issue: "White screen / blank page"
 Symptoms:

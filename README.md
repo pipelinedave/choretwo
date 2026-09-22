@@ -68,7 +68,7 @@ cd frontend && npm run dev
 | **Chore Service** | Python/FastAPI | 8002 | CRUD, recurrence, import/export |
 | **Log Service** | Python/FastAPI | 8003 | Audit trail, undo capability |
 | **Notification Service** | Node/Express | 8004 | Push notifications, preferences |
-| **AI Copilot Service** | Python/FastAPI | 8005 | NLP, suggestions, Ollama integration |
+| **AI Copilot Service** | Python/FastAPI | 8005 | NLP, suggestions, Synthetic GLM integration |
 | **Frontend** | Vue 3/Pinia | 3000 | Material You PWA |
 
 ## 🛠️ Tech Stack
@@ -151,7 +151,7 @@ make coverage-check
 ## 🐛 Known Issues
 
 - PWA icons are placeholders (generate with `npm run generate-icons`)
-- AI Copilot requires Ollama running locally or in cluster
+- AI Copilot requires `LLM_API_KEY` (Synthetic/GLM) — without it the deterministic regex fallback is used
 - Notification service needs Gotify server for push notifications
 
 ## 📄 License

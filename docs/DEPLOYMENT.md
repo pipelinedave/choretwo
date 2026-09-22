@@ -250,7 +250,42 @@ git push origin v1.0.0
 ### AI Copilot Service
 - **Port**: 8005
 - **Health Check**: `/health`
-- **Dependencies**: PostgreSQL, external AI APIs
+- **Dependencies**: PostgreSQL, external LLM provider (Synthetic/GLM)
+
+**LLM Provider Configuration (Synthetic / GLM):**
+
+The AI Copilot (and the monolith's vendored AI package) reads three env vars:
+
+| Var | Value | Source |
+|-----|-------|--------|
+| `LLM_BASE_URL` | `https://api.synthetic.new/openai/v1` | deployment.yaml (plain value) |
+| `LLM_API_KEY` | `syn_...` (secret) | Secret `choretwo-secrets`, key `llm-api-key` |
+| `LLM_MODEL` | `hf:zai-org/GLM-5.3-Flash` | deployment.yaml (plain value) |
+
+The base URL must point up to `/v1` — the client appends `/chat/completions`
+itself. Without a valid key the service stays up and answers via the
+deterministic regex fallback (`/api/ai/status` shows `llm_connected: false`).
+
+**Secret management:** `choretwo-secrets` is a plain Opaque secret that is
+managed manually in both namespaces (NOT via SealedSecret manifest in this
+repo). To add or rotate the LLM key:
+
+```bash
+# 1. Put the new key into a temp patch file (never commit it)
+python3 -c "import json; print(json.dumps({'stringData': {'llm-api-key': '<KEY>'}}))" \
+  > /tmp/llm-patch.json && chmod 600 /tmp/llm-patch.json
+
+# 2. Patch both namespaces
+kubectl patch secret choretwo-secrets -n choretwo-production --patch-file /tmp/llm-patch.json
+kubectl patch secret choretwo-secrets -n choretwo-staging --patch-file /tmp/llm-patch.json
+
+# 3. Delete the temp file and restart the workloads
+shred -u /tmp/llm-patch.json
+kubectl -n choretwo-staging rollout restart deployment/monolith
+```
+
+Legacy `ADESSO_*` env vars still work as a deprecated fallback (adesso AI Hub
+Sovereign) as long as ALL `LLM_*` vars are unset — useful for rollback.
 
 ### Frontend
 - **Port**: 80
