@@ -127,23 +127,23 @@ async def get_single_chore(
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
 
-        return ChoreResponse(
-            id=chore.id,
-            name=chore.name,
-            interval_days=chore.interval_days,
-            due_date=chore.due_date,
-            # Bei Done zieht die Recurrence die Fälligkeit nach vorn. Diese
-            # bereits vorgezogene due_date wird zusätzlich als new_due_date
-            # zurückgegeben, damit das Frontend den "Nächste Fälligkeit"-Toast
-            # anzeigen kann (store.markDone liest response.data.new_due_date).
-            new_due_date=chore.due_date,
-            done=chore.done,
-            done_by=chore.done_by,
-            last_done=chore.last_done,
-            owner_email=chore.owner_email,
-            is_private=chore.is_private,
-            archived=chore.archived,
-        )
+    return ChoreResponse(
+        id=chore.id,
+        name=chore.name,
+        interval_days=chore.interval_days,
+        due_date=chore.due_date,
+        # Bei Done zieht die Recurrence die Fälligkeit nach vorn. Diese
+        # bereits vorgezogene due_date wird zusätzlich als new_due_date
+        # zurückgegeben, damit das Frontend den "Nächste Fälligkeit"-Toast
+        # anzeigen kann (store.markDone liest response.data.new_due_date).
+        new_due_date=chore.due_date,
+        done=chore.done,
+        done_by=chore.done_by,
+        last_done=chore.last_done,
+        owner_email=chore.owner_email,
+        is_private=chore.is_private,
+        archived=chore.archived,
+    )
 
 
 @router.put("/{chore_id}")
