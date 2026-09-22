@@ -116,7 +116,10 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
                     imported_chores.append({"id": chore["id"], "status": "updated"})
                     continue
 
-            db.execute(
+            # RETURNING id statt separatem currval()-Call: pgbouncer/konforme
+            # Pooler (Supabase Transaction-Pooler :6543) garantieren keine
+            # Session-Pinning, currval wäre dort nicht zuverlässig.
+            new_id = db.execute(
                 text("""
                 INSERT INTO chores.chores (name, interval_days, due_date, archived, owner_email, is_private, last_done)
                 VALUES (:name, :interval_days, :due_date, :archived, :owner_email, :is_private, :last_done)
@@ -133,11 +136,7 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
                     "is_private": chore.get("is_private", False),
                     "last_done": chore.get("last_done"),
                 },
-            )
-
-            new_id = db.execute(
-                text("SELECT currval('chores.chores_id_seq')")
-            ).fetchone()[0]
+            ).scalar_one()
             imported_chores.append({"id": new_id, "status": "created"})
 
         except Exception as e:
