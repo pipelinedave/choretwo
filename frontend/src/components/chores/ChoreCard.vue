@@ -163,6 +163,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { isDoneToday as isChoreDoneToday } from "@/utils/choreBuckets";
 
 const props = defineProps({
   chore: { type: Object, required: true },
@@ -260,19 +261,7 @@ const isPrivate = computed(() => {
   return !!(props.chore.isPrivate ?? props.chore.is_private);
 });
 
-const isDoneToday = computed(() => {
-  if (!props.chore.lastDone && !props.chore.last_done) {
-    return !!props.chore.done;
-  }
-  const lastDoneStr = props.chore.lastDone || props.chore.last_done;
-  const todayStr = new Date().toISOString().split("T")[0];
-  return (
-    props.chore.done &&
-    (typeof lastDoneStr === "string"
-      ? lastDoneStr.split("T")[0] === todayStr
-      : false)
-  );
-});
+const isDoneToday = computed(() => isChoreDoneToday(props.chore));
 
 const rawDueDate = computed(() => {
   return props.chore.dueDate || props.chore.due_date;

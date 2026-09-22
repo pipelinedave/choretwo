@@ -6,7 +6,11 @@
  *
  * Priorität: overdue → today → tomorrow → thisWeek → upcoming
  */
-import { bucketChores, normalizeToLocalDate } from "@/utils/choreBuckets";
+import {
+  bucketChores,
+  isDoneToday,
+  normalizeToLocalDate,
+} from "@/utils/choreBuckets";
 
 /**
  * Filtere chores auf nicht-erledigte, nicht-archivierte und baue den CatchUp-Stack.
@@ -17,7 +21,9 @@ import { bucketChores, normalizeToLocalDate } from "@/utils/choreBuckets";
  */
 export function buildCatchUpStack(chores, now = new Date()) {
   // Vorfiltern: nur aktive chores (nicht done, nicht archived)
-  const active = (chores || []).filter((c) => !c.done && !c.archived);
+  const active = (chores || []).filter(
+    (c) => !(c.done && isDoneToday(c, now)) && !c.archived,
+  );
 
   // Bucketing mit vorhandener Utility
   const { buckets, counts } = bucketChores(active, now);

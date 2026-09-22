@@ -20,6 +20,17 @@ const buildBoundaries = (now = new Date()) => {
 
 const isSameDay = (left, right) => left?.getTime() === right?.getTime();
 
+export const isDoneToday = (chore, now = new Date()) => {
+  if (!chore) return false;
+  const lastDone = chore.lastDone || chore.last_done;
+  if (!lastDone) return !!chore.done;
+  const todayStr = now.toISOString().split("T")[0];
+  return (
+    !!chore.done &&
+    (typeof lastDone === "string" ? lastDone.split("T")[0] === todayStr : false)
+  );
+};
+
 export const bucketChores = (chores, now = new Date()) => {
   const { today, tomorrow, nextWeek } = buildBoundaries(now);
 
