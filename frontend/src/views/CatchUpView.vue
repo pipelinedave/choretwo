@@ -13,12 +13,6 @@
           {{ completedInSession }} von {{ originalTotal }} Chores geschafft
         </p>
       </div>
-
-      <!-- Stack icon -->
-      <span
-        class="stack-count-badge mdi mdi-stack-exchange"
-        :title="`${stackLength} übrig`"
-      ></span>
     </div>
 
     <!-- Filter Chips -->
@@ -62,18 +56,22 @@
       </template>
     </EmptyState>
 
-    <!-- Card Stack -->
+    <!-- Card Stack: nur die oberste Card + max. 1 Deck-Peek rendern.
+         Bei grossen Stacks (50+) war das Voll-Rendering der Perf-Killer
+         (Swipe-Handler + backdrop-filter pro Card). -->
     <div v-else class="stack-area" ref="stackAreaRef">
+      <div class="stack-counter" role="status" aria-live="polite">
+        Karte {{ currentCardNumber }} von {{ originalTotal }}
+      </div>
       <div class="stack-container" ref="containerRef">
         <CatchUpCard
-          v-for="(chore, index) in stack"
+          v-for="(chore, index) in visibleStack"
           :key="chore.id"
           :chore="chore"
           :position="index"
           :total="stackLength"
           :is-active="index === 0"
           @toggle="handleToggle"
-          @edit="handleEdit"
           @snooze="handleSnooze"
         />
       </div>
@@ -120,7 +118,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useChoreStore } from "@/stores/chore";
 import { useAuthStore } from "@/stores/auth";
@@ -153,6 +151,17 @@ const progressPct = computed(() => {
   return Math.round((completedInSession.value / originalTotal.value) * 100);
 });
 
+// Single-Card-Deck: nur die oberste Card + max. 1 Peek dahinter rendern.
+// Der Index im Slice entspricht dem echten Stack-Index (Sortierung bleibt
+// erhalten), damit Deck-Styling und Fortschritts-Banner stimmen.
+const visibleStack = computed(() => stack.value.slice(0, 2));
+
+// Fortschritts-Banner "Karte X von Y": X = Position der aktuellen Card
+// in der Session (erledigt + 1), Y = urspruengliche Stack-Groesse.
+const currentCardNumber = computed(() =>
+  Math.min(originalTotal.value, completedInSession.value + 1),
+);
+
 // Filter: "all" | "urgent" (nur Überfällig + Heute)
 const displayFilter = ref("all");
 
@@ -183,6 +192,20 @@ onMounted(async () => {
     console.error("Failed to fetch chores for catchup:", err);
   } finally {
     loading.value = false;
+  }
+});
+
+// Cleanup beim Verlassen: laufende Timer stoppen, sonst feuert der
+// Success-Timer nach dem Verlassen noch einen router.push("/") und
+// der Toast-Timer tickt ins Leere.
+onUnmounted(() => {
+  if (successTimer) {
+    clearTimeout(successTimer);
+    successTimer = null;
+  }
+  if (toastTimer.value) {
+    clearTimeout(toastTimer.value);
+    toastTimer.value = null;
   }
 });
 
@@ -354,13 +377,6 @@ async function applySnooze(offsetDays, customDate) {
     busyIds.value.delete(chore.id);
   }
 }
-
-function handleEdit(chore) {
-  router.push({
-    name: "Chores",
-    query: { editChore: String(chore.id) },
-  });
-}
 </script>
 
 <style scoped>
@@ -417,11 +433,6 @@ function handleEdit(chore) {
   margin: 2px 0 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
-}
-
-.stack-count-badge {
-  font-size: 1.6rem;
-  color: var(--color-text-dim);
 }
 
 /* Filter chips */
@@ -487,6 +498,19 @@ function handleEdit(chore) {
   flex-direction: column;
   align-items: center;
   padding: 0 var(--space-md);
+}
+
+/* Fortschritts-Banner "Karte X von Y" */
+.stack-counter {
+  margin-bottom: 14px;
+  padding: 6px 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  box-shadow: var(--shadow-md);
 }
 
 .stack-container {

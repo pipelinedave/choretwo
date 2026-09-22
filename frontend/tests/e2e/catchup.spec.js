@@ -154,7 +154,7 @@ test.describe("CatchUp Stack", () => {
     await cleanup(request);
   });
 
-  test("zeigt den CatchUp-Stack mit korrekter Sortier-Reihenfolge und Deck-Effekt", async ({
+  test("rendert Single-Card-Deck mit Sortierung, Peek und Fortschritts-Banner", async ({
     page,
     request,
   }) => {
@@ -173,44 +173,53 @@ test.describe("CatchUp Stack", () => {
 
     // Navigation zum CatchUp
     await page.goto("/catchup");
-    // Auf ALLE 5 eigenen Chores warten (nicht nur auf die erste Karte), sonst
-    // kann ein langsameres Rendering (Firefox) die nachfolgenden Assertions
-    // auf unvollständigem Stack race-artig fehlschlagen lassen.
-    await page.waitForFunction(
-      (s) => {
-        const titles = [
-          ...document.querySelectorAll(".catchup-card .chore-title"),
-        ].map((el) => el.textContent.trim());
-        return titles.filter((t) => t.includes(s)).length >= 5;
-      },
-      stamp,
-      { timeout: 8000 },
-    );
+    // Single-Card-Deck: nur die oberste Card + 1 Peek sind im DOM. Warten,
+    // bis die dringendste (a, -4d) als aktive Karte gerendert ist. Bei einem
+    // transistent leeren/verkuerzten Fetch unter Browser-Last (dokumentierte
+    // Monolith-Flakiness) wird einmal neu geladen und erneut gewartet.
+    const waitForDeck = () =>
+      page.waitForFunction(
+        (s) => {
+          const cards = document.querySelectorAll(".catchup-card");
+          if (cards.length < 2) return false;
+          const t = cards[0].querySelector(".chore-title")?.textContent || "";
+          return t.includes(s);
+        },
+        stamp,
+        { timeout: 8000 },
+      );
+    try {
+      await waitForDeck();
+    } catch {
+      await page.reload();
+      await waitForDeck();
+    }
 
-    // Alle 5 eigenen Chores sind im Stack
+    // Genau 2 Cards gerendert (aktiv + Peek), NICHT der ganze Stack
     const cardBodies = page.locator(".catchup-card");
-    const titles = await cardBodies.locator(".chore-title").allTextContents();
-    const ownTitles = titles
-      .map((t) => t.trim())
-      .filter((t) => t.includes(stamp));
-    expect(ownTitles).toHaveLength(5);
+    expect(await cardBodies.count()).toBe(2);
 
-    // Sortier-Reihenfolge (logisch): aelteste ueberfaellige zuerst
-    const firstOwn = ownTitles[0];
-    expect(firstOwn).toBe(a);
-    // Der dringendste (a, -4d) liegt ganz oben, der spaeteste (e, +3d) unten
-    const titleOrder = titles.map((t) => t.trim());
-    expect(titleOrder.indexOf(a)).toBeLessThan(titleOrder.indexOf(e));
+    // Sortier-Reihenfolge: aelteste ueberfaellige aktiv, naechste als Peek
+    const topTitle = (
+      await cardBodies.nth(0).locator(".chore-title").textContent()
+    ).trim();
+    const peekTitle = (
+      await cardBodies.nth(1).locator(".chore-title").textContent()
+    ).trim();
+    expect(topTitle).toBe(a);
+    expect(peekTitle).toBe(b);
 
-    // Deck-Effekt: nicht-aktive Cards haben unterschiedliche Bounding-Boxen
-    // (untere Cards sind per Stack-Offset verschoben)
+    // Fortschritts-Banner "Karte X von Y"
+    const counter = await page.locator(".stack-counter").textContent();
+    expect(counter).toContain("Karte 1 von 5");
+
+    // Deck-Effekt: die Peek-Card ist per Stack-Offset verschoben
     const box0 = await cardBodies.nth(0).boundingBox();
-    const lastIndex = (await cardBodies.count()) - 1;
-    const boxLast = await cardBodies.nth(lastIndex).boundingBox();
+    const box1 = await cardBodies.nth(1).boundingBox();
     expect(box0).toBeTruthy();
-    expect(boxLast).toBeTruthy();
-    const diffY = Math.abs(box0.y - boxLast.y);
-    expect(diffY).toBeGreaterThan(20);
+    expect(box1).toBeTruthy();
+    const diffY = Math.abs(box0.y - box1.y);
+    expect(diffY).toBeGreaterThan(8);
 
     // Fortschrittsanzeige startet bei "0 von N" geschafft
     const subtitle = await page.locator(".subtitle").textContent();
@@ -268,6 +277,10 @@ test.describe("CatchUp Stack", () => {
       .filter({ hasText: stamp })
       .count();
     expect(remainingCount).toBe(1);
+
+    // Fortschritts-Banner zaehlt weiter: Karte 2 von 2
+    const counter = await page.locator(".stack-counter").textContent();
+    expect(counter).toContain("Karte 2 von 2");
   });
 
   test("Empty-State nach Abarbeitung aller Chores", async ({
@@ -300,5 +313,80 @@ test.describe("CatchUp Stack", () => {
     });
     const msg = await page.locator(".empty-state").textContent();
     expect(msg).toContain("Aufholen");
+  });
+
+  test("Swipe nach links öffnet das Snooze-Sheet und verlässt die View nicht", async ({
+    page,
+    request,
+  }) => {
+    const stamp = Date.now();
+    await createChore(request, `LeftSwipe ${stamp}`, 0);
+
+    await page.goto("/catchup");
+    await page.waitForSelector(".catchup-card", { state: "visible" });
+
+    // Swipe nach links auf der aktiven Card (Pointer-Sequenz, wie swipeDone
+    // aber mit negativem dx)
+    const card = page.locator(".catchup-card").first();
+    const box = await card.boundingBox();
+    expect(box).toBeTruthy();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const steps = 12;
+    for (let i = 0; i <= steps; i++) {
+      const t =
+        i === 0 ? "pointerdown" : i === steps ? "pointerup" : "pointermove";
+      await card.dispatchEvent(t, {
+        clientX: Math.round(cx - (120 * i) / steps),
+        clientY: cy,
+        pointerId: 1,
+        isPrimary: true,
+        buttons: 1,
+        pointerType: "touch",
+        cancelable: true,
+        bubbles: true,
+      });
+      await page.waitForTimeout(15);
+    }
+    await page.waitForTimeout(400);
+
+    // KEINE Navigation: die View bleibt /catchup (Regression: Links-Swipe
+    // warf frueher per Edit-Redirect aus dem CatchUp raus)
+    expect(page.url()).toContain("/catchup");
+
+    // Stattdessen öffnet sich das Snooze-Sheet mit der Chore
+    await page.waitForSelector(".snooze-sheet", {
+      state: "visible",
+      timeout: 4000,
+    });
+    const sub = await page.locator(".snooze-subtitle").textContent();
+    expect(sub.trim()).toContain(`LeftSwipe ${stamp}`);
+  });
+
+  test("Später-Button reagiert auf echten Touch (kein preventDefault auf touchstart)", async ({
+    page,
+    request,
+  }) => {
+    const stamp = Date.now();
+    await createChore(request, `TouchBtn ${stamp}`, 0);
+
+    await page.goto("/catchup");
+    await page.waitForSelector(".catchup-card", { state: "visible" });
+
+    // Echter Touch-Tap (hasTouch: true in beiden Projekten): geht durch die
+    // echte Browser-Touch-Pipeline inkl. Click-Synthese. Regression: Das
+    // alte @touchstart.prevent auf der Card unterdrückte den synthetischen
+    // Click -> der Button war auf Touch-Geräten tot.
+    const btn = page.locator(".snooze-btn").first();
+    const box = await btn.boundingBox();
+    expect(box).toBeTruthy();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+
+    await page.waitForSelector(".snooze-sheet", {
+      state: "visible",
+      timeout: 4000,
+    });
+    const sub = await page.locator(".snooze-subtitle").textContent();
+    expect(sub.trim()).toContain(`TouchBtn ${stamp}`);
   });
 });

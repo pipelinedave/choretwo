@@ -3,10 +3,10 @@
     <!-- Swipe Background Layer (Gmail Style) -->
     <div class="swipe-background" :style="backgroundStyle">
       <div class="action-icon icon-left" :style="leftIconStyle">
-        <span class="mdi mdi-pencil"></span>
+        <span class="mdi mdi-check"></span>
       </div>
       <div class="action-icon icon-right" :style="rightIconStyle">
-        <span class="mdi mdi-check"></span>
+        <span class="mdi mdi-sleep"></span>
       </div>
     </div>
 
@@ -21,7 +21,7 @@
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerCancel"
-      @touchstart.prevent="handleTouchStart"
+      @touchstart="handleTouchStart"
       @touchmove.prevent="handleTouchMove"
       @touchend="handleTouchEnd"
       @mousedown="handleMouseDown"
@@ -69,17 +69,12 @@
         <span class="mdi mdi-sleep"></span>
         <span>Später</span>
       </button>
-
-      <!-- Card Position Indicator -->
-      <div class="card-position">
-        <span class="position-text">{{ positionLabel }}</span>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
 import { getBucketLabel } from "@/utils/catchUpStack";
 
 const props = defineProps({
@@ -89,7 +84,7 @@ const props = defineProps({
   isActive: { type: Boolean, default: true },
 });
 
-const emit = defineEmits(["toggle", "edit", "snooze"]);
+const emit = defineEmits(["toggle", "snooze"]);
 
 // Swipe Configuration
 const SWIPE_THRESHOLD = 80;
@@ -194,11 +189,13 @@ const friendlyDueDate = computed(() => {
   return `In ${diffDays}d`;
 });
 
-const positionLabel = computed(() =>
-  props.total > 1 ? `${props.position + 1} / ${props.total}` : "1 / 1",
-);
-
 // --- Pointer Gesture (same pattern as ChoreCard) ---
+// Swipe-Semantik im CatchUp-Deck:
+//   rechts  -> erledigt (emit toggle)
+//   links   -> aufschieben (Snooze-Sheet, wie der "Später"-Button)
+//   hoch    -> aufschieben (Snooze-Sheet)
+//   runter  -> Scroll (keine Aktion)
+// Links loest KEINE Navigation aus - Editieren gehoert nicht ins Deck.
 let startX = 0;
 let startY = 0;
 let isGestureActive = false;
@@ -208,6 +205,12 @@ let isUpSwipeLocked = false;
 let gestureSource = "";
 
 const UP_SWIPE_THRESHOLD = 70;
+
+// Interaktive Elemente (Spaeter-Button, Custom-Date-Input) nehmen an der
+// Swipe-Geste NICHT teil: Eine Geste duerfte ihre Klicks nicht abwuergen.
+function isInteractiveTarget(e) {
+  return !!(e.target && e.target.closest("button, a, input, label, select"));
+}
 
 function startGesture(clientX, clientY, source) {
   isGestureActive = true;
@@ -266,6 +269,7 @@ function moveGesture(clientX, clientY) {
 function handlePointerDown(e) {
   if (!props.isActive) return;
   if (!e.isPrimary) return;
+  if (isInteractiveTarget(e)) return;
 
   startGesture(e.clientX, e.clientY, "pointer");
   try {
@@ -304,6 +308,11 @@ function handleTouchStart(e) {
   if (!props.isActive) return;
   // Pointer hat auf modernen Browsern bereits übernommen
   if (isGestureActive) return;
+  // Klicks auf interaktive Elemente nicht abwuergen: preventDefault auf
+  // touchstart unterdrueckt das vom Browser synthetisierte click-Event
+  // (Buttons im Card waren dadurch auf Touch-Geraeten tot).
+  if (isInteractiveTarget(e)) return;
+  e.preventDefault();
   const t = e.touches && e.touches[0];
   if (!t) return;
   startGesture(t.clientX, t.clientY, "touch");
@@ -326,6 +335,7 @@ function handleTouchEnd() {
 function handleMouseDown(e) {
   if (!props.isActive) return;
   if (e.button !== 0) return;
+  if (isInteractiveTarget(e)) return;
   // Pointer hat auf modernen Browsern bereits übernommen
   if (isGestureActive) return;
   startGesture(e.clientX, e.clientY, "mouse");
@@ -351,7 +361,8 @@ function endGesture() {
     triggerSnooze();
   } else if (isSwipeLocked && Math.abs(swipeOffset.value) > SWIPE_THRESHOLD) {
     if (swipeOffset.value < 0) {
-      triggerEdit();
+      // Links = aufschieben (Snooze-Sheet), KEINE Navigation aus der View
+      triggerSnooze();
     } else {
       triggerDone();
     }
@@ -370,11 +381,6 @@ function triggerSnooze() {
   emit("snooze", props.chore);
 }
 
-function triggerEdit() {
-  swipeOffset.value = 0;
-  emit("edit", props.chore);
-}
-
 function triggerDone() {
   swipeOffset.value = 0;
   emit("toggle", props.chore.id);
@@ -386,19 +392,6 @@ function animateReturn() {
   setTimeout(() => {
     isReturning.value = false;
   }, RETURN_ANIMATION_MS);
-}
-
-onMounted(() => {
-  document.addEventListener("click", handleGlobalClick);
-});
-
-onUnmounted(() => {
-  document.removeEventListener("click", handleGlobalClick);
-});
-
-// Tap outside → deselect (not relevant here, but keep gesture clean)
-function handleGlobalClick() {
-  // No-op; active card is always top
 }
 </script>
 
@@ -604,22 +597,5 @@ function handleGlobalClick() {
 
 .snooze-btn .mdi {
   font-size: 1rem;
-}
-
-/* Bottom Position Indicator */
-.card-position {
-  display: flex;
-  justify-content: center;
-  margin-top: 6px;
-}
-
-.position-text {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--color-text-dim);
-  background: rgba(255, 255, 255, 0.45);
-  padding: 2px 12px;
-  border-radius: var(--radius-full);
-  backdrop-filter: blur(6px);
 }
 </style>
