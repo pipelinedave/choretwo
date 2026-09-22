@@ -2,7 +2,27 @@
 
 ## Last Updated
 **Date:** September 22, 2026
-**Session:** CatchUp-E2E-Reparatur — GET-by-id null-Bug im chore-service behoben
+**Session:** CatchUp stale-done Fix — Stack filterte erledigte Chores falsch
+
+---
+
+## CatchUp-Fix: Stale-done Chores fehlten im Stack (22.09.2026)
+
+**Symptom:** CatchUp-View zeigte 0 Chores, obwohl 71 aktive existieren (private Produktiv-Instanz).
+
+**Root-Cause (`frontend/src/utils/catchUpStack.js:20`):** Der Vorfilter `filter((c) => !c.done && !c.archived)` schloss ALLE done-Chores aus. DB-Realität: `mark_chore_done` setzt `done` nie zurück (kein Reset-Job), alle 71 Chores hingen auf `done=true` mit `last_done`~Mai 2026. App-Semantik anderswo: "done" zählt nur, wenn HEUTE erledigt (`ChoreCard.isDoneToday` = done && last_done == heute; Hauptliste im Store filtert nur `!archived`).
+
+**Fix:**
+- Neuer Shared-Helper `isDoneToday(chore, now)` in `frontend/src/utils/choreBuckets.js` (Semantik identisch zur bisherigen ChoreCard-Logik, inkl. Edge-Case done-ohne-last_done).
+- `catchUpStack.js`: Filter → `!(c.done && isDoneToday(c, now)) && !c.archived` — stale-done Chores erscheinen wieder im Stack, frisch erledigte (heute) bleiben draußen.
+- `ChoreCard.vue`: Computed nutzt jetzt denselben Helper (Duplikation vermieden, Import-Alias `isChoreDoneToday` wegen Namenskollision).
+
+**Verifikation:**
+- Unit: 30/30 grün; Production-Build grün; ESLint: nur pre-existing `no-empty`-Debt in ChoreCard-Pointer-Handlern (nicht im Diff).
+- `npx playwright test catchup` → **22/22 passed** (davor 3 Läufe mit rotierenden Einzel-Failures: Login-Race `/auth-callback`→`/login` unter Chromium+Firefox-Parallel-Last — dokumentierte Flakiness, alle in Isolation grün, Auth-Pfad, unabhängig vom Fix).
+- Realer Browser-E2E (CDP, lokal): Test-Chore angelegt → done markiert → `last_done` via psql auf gestern gesetzt (stale) → CatchUp zeigt Card ("0 von 1 Chores geschafft") → Swipe-Done → Toast "Erledigt ✓" + UNDO → Undo-Click → Card zurück, API `done=false`.
+
+**Deploy:** CI baut Images, danach workflow_dispatch "Deploy to Staging" mit neuem Short-SHA; Production rollt beobachtbar mit.
 
 ---
 
