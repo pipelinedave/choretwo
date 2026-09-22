@@ -51,6 +51,9 @@ services:
       USE_MOCK_AUTH: ${USE_MOCK_AUTH:-false}
       ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173"
       GATWAY_URL: ${GATWAY_URL:-http://gotify.stillon.top}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.synthetic.new/openai/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-hf:zai-org/GLM-5.3-Flash}
     depends_on:
       postgres:
         condition: service_healthy

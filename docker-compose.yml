@@ -126,8 +126,9 @@ services:
       - "8005:8000"
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-choretwo}:${POSTGRES_PASSWORD:-choretwo_dev}@postgres:5432/${POSTGRES_DB:-choretwo}?sslmode=disable"
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      OPENWEBUI_URL: ${OPENWEBUI_URL:-http://open-webui:8080}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.synthetic.new/openai/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-hf:zai-org/GLM-5.3-Flash}
       SERVER_URL: http://localhost:8005
     depends_on:
       postgres:
