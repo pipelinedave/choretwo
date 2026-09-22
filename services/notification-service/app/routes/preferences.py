@@ -1,3 +1,5 @@
+import hmac
+import os
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -6,18 +8,42 @@ from datetime import datetime
 from app.database import get_db
 from app.schemas import (
     NotificationPreferencesCreate,
-    NotificationPreferencesResponse,
     ScheduledNotificationCreate,
-    ScheduledNotificationResponse,
     TestNotificationRequest,
 )
+from app.services import notifier as notifier_module
 from app.services.scheduler import (
     create_scheduled_notification,
     get_user_scheduled_notifications,
+    mark_notification_sent,
 )
-from app.services.notifier import send_test_notification
+from app.services.notifier import (
+    send_chore_due_soon_notification,
+    send_chore_overdue_notification,
+    send_test_notification,
+)
 
 router = APIRouter(prefix="/api/notify")
+
+# Vercel-Cron-Secret (Vercel sendet `Authorization: Bearer $CRON_SECRET`).
+CRON_SECRET = os.getenv("CRON_SECRET", "")
+
+
+def _cron_authorized(request: Request) -> bool:
+    """Cron-Endpoint-Auth: AUSSCHLIESSLICH Bearer == CRON_SECRET.
+
+    Bewusst KEIN User-JWT-Pfad: Ein gültiger User-JWT würde jeden
+    angemeldeten User erlauben, den Batch für ALLE User zu triggern
+    (vorzeitiger Versand ohne Scope/Rate-Limit). Vercel Cron sendet
+    immer CRON_SECRET — mehr Auth-Fläche ist nicht nötig. Im Monolith
+    lässt die Auth-Middleware den Cron-Bearer nur auf genau diesem
+    Pfad durch (pfad-restrictierter Bypass); der Endpoint prüft hier
+    zusätzlich selbst (Defense in Depth).
+    """
+    auth_header = request.headers.get("Authorization", "")
+    return bool(CRON_SECRET) and hmac.compare_digest(
+        auth_header, f"Bearer {CRON_SECRET}"
+    )
 
 
 @router.get("/preferences")
@@ -173,3 +199,75 @@ async def send_test_notification_endpoint(
         return {"message": "Test notification sent successfully"}
     else:
         raise HTTPException(status_code=500, detail="Failed to send test notification")
+
+
+@router.api_route("/run-due", methods=["GET", "POST"])
+async def run_due_notifications(request: Request, db: Session = Depends(get_db)):
+    """Versendet alle fälligen Scheduled-Notifications (Vercel-Cron-Endpoint).
+
+    Ersetzt den früheren Celery-Worker: Vercel Cron triggert täglich
+    (vercel.json, Hobby-Plan erlaubt nur Daily-Crons) mit
+    `Authorization: Bearer $CRON_SECRET`. Ohne GOTIFY-Konfiguration
+    wird bewusst 200 + `skipped` geliefert statt zu crashen (Cron darf
+    nicht alarmieren).
+    """
+    if not _cron_authorized(request):
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    if not notifier_module.GOTIFY_TOKEN:
+        return {"skipped": "gotify_not_configured"}
+
+    rows = db.execute(
+        text("""
+        SELECT n.id, n.user_email, n.chore_id, n.scheduled_for, n.notification_type,
+               c.name AS chore_name
+        FROM notifications.scheduled_notifications n
+        LEFT JOIN chores.chores c ON c.id = n.chore_id
+        WHERE n.processed = FALSE AND n.scheduled_for <= :now
+        ORDER BY n.scheduled_for ASC
+        LIMIT 100
+    """),
+        {"now": datetime.utcnow()},
+    ).fetchall()
+
+    sent = 0
+    failed = 0
+    skipped_unknown_type = 0
+    for row in rows:
+        (
+            notification_id,
+            user_email,
+            chore_id,
+            scheduled_for,
+            notification_type,
+            chore_name,
+        ) = row
+        chore_label = chore_name or f"Chore #{chore_id}"
+        try:
+            if notification_type == "overdue":
+                ok = await send_chore_overdue_notification(user_email, chore_label)
+            elif notification_type == "soon":
+                ok = await send_chore_due_soon_notification(
+                    user_email, chore_label, str(scheduled_for)
+                )
+            else:
+                # Unbekannter Typ: als erledigt markieren (Poison-Row-Schutz),
+                # aber separat zählen statt als Versand zu verbuchen.
+                skipped_unknown_type += 1
+                ok = True
+
+            if ok:
+                mark_notification_sent(db, notification_id)
+                sent += 1
+            else:
+                failed += 1
+        except Exception as exc:  # noqa: BLE001 - Cron darf nicht abbrechen
+            print(f"[run-due] Versand fehlgeschlagen (id={notification_id}): {exc}")
+            failed += 1
+
+    return {
+        "due": len(rows),
+        "sent": sent,
+        "failed": failed,
+        "skipped_unknown_type": skipped_unknown_type,
+    }
