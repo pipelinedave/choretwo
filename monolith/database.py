@@ -16,14 +16,31 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Pool-Parameter env-driven (serverless-tauglich):
+# - Vercel/Supabase Transaction-Pooler (:6543/pgbouncer): DB_POOL_SIZE=1,
+#   DB_MAX_OVERFLOW=1 (jede Lambda-Instanz hält max. 2 Verbindungen).
+# - Lokal/Docker: Defaults 5/10 wie bisher.
+DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
+DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+DB_POOL_RECYCLE = int(os.getenv("DB_POOL_RECYCLE", "300"))
+
+# TLS außerhalb von localhost erzwingen (Supabase verlangt sslmode=require);
+# wenn die URL sslmode bereits selbst setzt, nicht überschreiben.
+_connect_args = {}
+_is_local = "localhost" in DATABASE_URL or "127.0.0.1" in DATABASE_URL
+if not _is_local and "sslmode=" not in DATABASE_URL:
+    _connect_args["sslmode"] = "require"
+
 # Single engine shared across all service modules
 engine = create_engine(
     DATABASE_URL,
     echo=False,
     future=True,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=DB_POOL_SIZE,
+    max_overflow=DB_MAX_OVERFLOW,
+    pool_recycle=DB_POOL_RECYCLE,
     pool_pre_ping=True,
+    connect_args=_connect_args,
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 

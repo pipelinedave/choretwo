@@ -6,14 +6,24 @@ Go-auth-service ausgestellt werden (HS256, JWT_SECRET, Issuer
 `choretwo-auth-service`, Audience `choretwo`).
 """
 
+import hmac
 import os
 
 import jwt
 from starlette.responses import JSONResponse
 
 JWT_SECRET = os.getenv("JWT_SECRET", "choretwo-dev-jwt-secret-change-in-production")
-ISSUER = "choretwo-auth-service"
-AUDIENCE = "choretwo"
+# Issuer/Audience env-flexibel: Go-auth-service (Default) vs. Supabase Auth
+# (JWT_ISSUER=https://<ref>.supabase.co/auth/v1, JWT_AUDIENCE=authenticated).
+JWT_ISSUER = os.getenv("JWT_ISSUER", "choretwo-auth-service")
+JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "choretwo")
+
+# Vercel-Cron: Wenn gesetzt, akzeptiert NUR der Cron-Endpoint
+# (/api/notify/run-due) `Authorization: Bearer $CRON_SECRET` statt eines
+# User-JWTs. Bewusst pfad-restrictiert, damit der Secret nie als
+# General-Passwort durch die Middleware schlüpft.
+CRON_SECRET = os.getenv("CRON_SECRET", "")
+CRON_PATH = "/api/notify/run-due"
 
 # Pfade, die keine Authentifizierung erfordern (egal ob GET/POST/...).
 EXEMPT_PATHS = {
@@ -56,8 +66,8 @@ def validate_token(token: str) -> dict:
         token,
         JWT_SECRET,
         algorithms=["HS256"],
-        issuer=ISSUER,
-        audience=AUDIENCE,
+        issuer=JWT_ISSUER,
+        audience=JWT_AUDIENCE,
     )
 
 
@@ -72,10 +82,24 @@ async def auth_middleware(request, call_next):
     if path in EXEMPT_PATHS:
         return await call_next(request)
 
+    auth_header = request.headers.get("Authorization", "")
+
+    # Vercel-Cron-Bypass: Bearer == CRON_SECRET auf dem Cron-Endpoint
+    # (Vercel Cron sendet GET + `Authorization: Bearer $CRON_SECRET`).
+    # Muss VOR der JWT-Prüfung stehen, sonst würde der Secret als
+    # ungültiges JWT 401en.
+    if (
+        CRON_SECRET
+        and path == CRON_PATH
+        and hmac.compare_digest(auth_header, f"Bearer {CRON_SECRET}")
+    ):
+        request.state.user_email = None
+        request.state.user_name = "vercel-cron"
+        return await call_next(request)
+
     user_email = None
     user_name = None
 
-    auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
         try:

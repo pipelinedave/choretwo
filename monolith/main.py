@@ -17,6 +17,7 @@ Endpunkte:
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
 
@@ -50,14 +51,23 @@ app = FastAPI(
 
 # Echte JWT-Auth-Middleware (innere Middleware)
 app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
-# CORS (äußere Middleware) -> OPTIONS-Preflight funktioniert, Auth bleibt innen
+# CORS (äußere Middleware) -> OPTIONS-Preflight funktioniert, Auth bleibt innen.
+# Origins env-driven (kommagetrennt), Default = bisherige hartkodierte Liste.
+# ACHTUNG: Ein gesetztes CORS_ORIGINS ERSETZT die Defaults komplett —
+# auf Vercel alle benötigten Origins (inkl. Vercel-Domains) kommagetrennt setzen.
+_CORS_DEFAULT = [
+    "http://localhost:3000",
+    "https://choretwo.stillon.top",
+    "https://choretwo-staging.stillon.top",
+]
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+] or _CORS_DEFAULT
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://choretwo.stillon.top",
-        "https://choretwo-staging.stillon.top",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -95,13 +105,24 @@ for _package, module_name, _svc in ROUTERS:
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """Führt die Migrationen aller vier Services aus (idempotent)."""
-    for package in ("chore", "log", "notify", "ai"):
-        db_mod = importlib.import_module(f"{package}.app.database")
-        try:
-            db_mod.run_migrations()
-        except Exception as exc:  # pragma: no cover - nicht deterministisch
-            print(f"[WARN] Migration {package} fehlgeschlagen: {exc}")
+    """Führt die Migrationen aller vier Services aus (idempotent).
+
+    Über `RUN_STARTUP_MIGRATIONS=false` abschaltbar (Vercel Serverless:
+    DDL gehört nicht in den Cold-Start-Hot-Path; dort wird die Migration
+    einmalig extern ausgeführt). Default "true" -> lokale Compose-Dev
+    bleibt unverändert.
+    """
+    if os.getenv("RUN_STARTUP_MIGRATIONS", "true").lower() != "false":
+        for package in ("chore", "log", "notify", "ai"):
+            db_mod = importlib.import_module(f"{package}.app.database")
+            try:
+                db_mod.run_migrations()
+            except Exception as exc:  # pragma: no cover - nicht deterministisch
+                print(f"[WARN] Migration {package} fehlgeschlagen: {exc}")
+    else:
+        print(
+            "[monolith] Startup-Migrationen übersprungen (RUN_STARTUP_MIGRATIONS=false)"
+        )
 
     # obligationen: LLM-Client (AI) initialisieren, falls verfügbar
     try:
