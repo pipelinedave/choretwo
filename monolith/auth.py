@@ -1,15 +1,22 @@
 """Nativer JWT-Validator für den Choretwo-Monolith.
 
 Ersetzt die frühere `verify_signature=False`-Middleware der Einzelservices
-durch eine echte Signatur-Prüfung. Kompatibel zu den JWTs, die vom
-Go-auth-service ausgestellt werden (HS256, JWT_SECRET, Issuer
-`choretwo-auth-service`, Audience `choretwo`).
+durch eine echte Signatur-Prüfung. Unterstützt zwei Token-Quellen:
+
+- Supabase Auth (Production): asymmetrische ES256-Signatur, verifiziert
+  über den öffentlichen JWKS-Endpoint (`JWT_JWKS_URL`). Neue Supabase-
+  Projekte signieren standardmäßig NICHT mehr HS256 mit dem Legacy-JWT-
+  Secret — daher JWKS statt Secret.
+- Go-auth-service / lokale Dev (Legacy): HS256 mit `JWT_SECRET`, Issuer
+  `choretwo-auth-service`, Audience `choretwo`. Wird genutzt, wenn kein
+  `JWT_JWKS_URL` gesetzt ist oder das JWKS keine passende Key liefert.
 """
 
 import hmac
 import os
 
 import jwt
+from jwt.exceptions import PyJWKClientError
 from starlette.responses import JSONResponse
 
 JWT_SECRET = os.getenv("JWT_SECRET", "choretwo-dev-jwt-secret-change-in-production")
@@ -17,6 +24,19 @@ JWT_SECRET = os.getenv("JWT_SECRET", "choretwo-dev-jwt-secret-change-in-producti
 # (JWT_ISSUER=https://<ref>.supabase.co/auth/v1, JWT_AUDIENCE=authenticated).
 JWT_ISSUER = os.getenv("JWT_ISSUER", "choretwo-auth-service")
 JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "choretwo")
+# JWKS-Endpoint für asymmetrische Signaturen (Supabase ES256). Leer =
+# reine HS256-Validierung (lokale Dev / Go-auth-service).
+JWT_JWKS_URL = os.getenv("JWT_JWKS_URL", "")
+
+_jwks_client = None
+
+
+def _get_jwks_client():
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = jwt.PyJWKClient(JWT_JWKS_URL, cache_keys=True)
+    return _jwks_client
+
 
 # Vercel-Cron: Wenn gesetzt, akzeptiert NUR der Cron-Endpoint
 # (/api/notify/run-due) `Authorization: Bearer $CRON_SECRET` statt eines
@@ -59,9 +79,27 @@ def is_public_read_get(request) -> bool:
 def validate_token(token: str) -> dict:
     """Validiert einen Bearer-Token mit echter Signatur-Prüfung.
 
+    Mit gesetztem `JWT_JWKS_URL` wird zuerst per JWKS (asymmetrisch,
+    z.B. ES256 von Supabase) validiert; schlägt das fehl (Key nicht
+    gefunden, Endpunkt nicht erreichbar), fällt die Prüfung auf HS256
+    mit `JWT_SECRET` zurück (Legacy-/Dev-Betrieb). Ohne JWKS-URL wird
+    ausschließlich HS256 geprüft.
+
     Wirft jwt.PyJWTError bei ungültigem/abgelaufenem Token.
     Gibt bei Erfolg die Claims zurück (enthält `email` und `name`).
     """
+    if JWT_JWKS_URL:
+        try:
+            signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
+            return jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["ES256"],
+                issuer=JWT_ISSUER,
+                audience=JWT_AUDIENCE,
+            )
+        except PyJWKClientError:
+            pass
     return jwt.decode(
         token,
         JWT_SECRET,
