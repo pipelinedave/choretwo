@@ -10,7 +10,7 @@
       <div class="catchup-title-area">
         <h1>Aufholen</h1>
         <p class="subtitle">
-          {{ completedInSession }} von {{ originalTotal }} Chores geschafft
+          {{ completedInSession }} von {{ progress.total }} Chores abgearbeitet
         </p>
       </div>
     </div>
@@ -43,35 +43,60 @@
       </button>
     </div>
 
-    <!-- Progress Bar -->
-    <div class="progress-bar" v-if="originalTotal > 0">
-      <div class="progress-fill" :style="{ width: progressPct + '%' }"></div>
-    </div>
-
     <!-- Loading -->
     <LoadingSpinner v-if="loading" class="loader-center" />
 
-    <!-- Empty State -->
+    <!-- Empty States. Der Grund unterscheidet, WAS der Nutzer sieht: eine
+         abgearbeitete Runde, ein Filter, der alles ausblendet, oder von
+         Anfang an nichts. -->
+    <CatchUpEmptyState
+      v-else-if="stackLength === 0 && emptyReason === 'nothing'"
+      icon="mdi-check-circle-outline"
+      title="Alles erledigt"
+      message="Keine offenen Chores. Du bist top! 🎉"
+      action-label="Chore anlegen"
+      action-icon="mdi-plus"
+      @action="$router.push('/chores')"
+    />
+
+    <CatchUpEmptyState
+      v-else-if="stackLength === 0 && emptyReason === 'filtered-out'"
+      icon="mdi-filter-remove-outline"
+      title="Filter blendet alles aus"
+      message="Es sind noch Chores offen, der Filter zeigt sie nicht."
+      action-label="Filter zurücksetzen"
+      action-icon="mdi-filter-off-outline"
+      @action="setFilter('all')"
+    />
+
+    <!-- Abgearbeitete Runde (Befund D1 ersetzt diesen Zweig durch die
+         Session-Zusammenfassung). -->
     <EmptyState
       v-else-if="stackLength === 0"
-      message="Keine chores zum Aufholen — du bist top! 🎉"
+      message="Alles geschafft — kein Chore mehr im Aufholen-Stapel! 🎉"
       :show-add-button="true"
       @add="$router.push('/chores')"
-    >
-      <template #icon>
-        <span
-          class="mdi mdi-check-circle-outline"
-          style="font-size: 64px; opacity: 0.5"
-        ></span>
-      </template>
-    </EmptyState>
+    />
 
     <!-- Card Stack: nur die oberste Card + max. 1 Deck-Peek rendern.
          Bei grossen Stacks (50+) war das Voll-Rendering der Perf-Killer
          (Swipe-Handler + backdrop-filter pro Card). -->
     <div v-else class="stack-area" ref="stackAreaRef">
+      <!-- Fortschritt als EIN Element: Position im Stapel + Balken. Vorher
+           standen drei Anzeigen fuer dieselbe Zahl (`.subtitle`,
+           `.stack-counter`, `.progress-bar`). Der Balken ist in den Counter
+           gewandert, damit er die Position visuell erklaert statt eine
+           eigene Zeile unter dem Deck zu belegen. -->
       <div class="stack-counter" role="status" aria-live="polite">
-        Karte {{ currentCardNumber }} von {{ originalTotal }}
+        <span class="stack-counter-label">
+          Karte {{ currentCardNumber }} von {{ progress.total }}
+        </span>
+        <span class="stack-counter-track" aria-hidden="true">
+          <span
+            class="stack-counter-fill"
+            :style="{ width: progressPct + '%' }"
+          ></span>
+        </span>
       </div>
       <div class="stack-container" ref="containerRef" role="list" aria-label="Aufholen-Stapel">
         <CatchUpCard
@@ -148,12 +173,18 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useChoreStore } from "@/stores/chore";
 import { useAuthStore } from "@/stores/auth";
-import { buildCatchUpStack, getBucketLabel } from "@/utils/catchUpStack";
+import {
+  applyCatchUpFilter,
+  buildSessionStack,
+  emptyDeckReason,
+  sessionProgress,
+} from "@/utils/catchUpStack";
 
 import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 import EmptyState from "@/components/chores/EmptyState.vue";
 import CatchUpCard from "@/components/chores/CatchUpCard.vue";
 import CatchUpActionBar from "@/components/chores/catchup/CatchUpActionBar.vue";
+import CatchUpEmptyState from "@/components/chores/catchup/CatchUpEmptyState.vue";
 import CatchUpShortcuts from "@/components/chores/catchup/CatchUpShortcuts.vue";
 import SnoozeSheet from "@/components/chores/SnoozeSheet.vue";
 
@@ -162,33 +193,49 @@ const choreStore = useChoreStore();
 const authStore = useAuthStore();
 
 const loading = ref(true);
-const stack = ref([]);
+// `sessionStack` ist der UNGEFILTERTE Stapel der laufenden Runde. Der Filter
+// aendert nur noch `visibleStack` — er fasst `sessionStack` nicht an. Damit
+// kann kein Filterklick den Fortschritt zuruecksetzen (Befund B4).
+const sessionStack = ref([]);
+// Groesse des Stapels beim Session-Start. Wird nur dort gesetzt und bei einer
+// neuen Runde ("Weitere Runde") neu bestimmt.
+const sessionTotal = ref(0);
 const containerRef = ref(null);
 const stackAreaRef = ref(null);
 
-// Stabilisierter Fortschritts-Zähler: originalTotal wird beim (gefilterten)
-// Aufbau gesetzt, Fortschritt = originalTotal - aktuelle Stack-Größe.
-let sessionBaseline = null;
-const originalTotal = ref(0);
-const stackLength = computed(() => stack.value.length);
-const completedInSession = computed(() =>
-  Math.max(0, originalTotal.value - stackLength.value),
-);
-const progressPct = computed(() => {
-  if (originalTotal.value === 0) return 0;
-  return Math.round((completedInSession.value / originalTotal.value) * 100);
-});
+// IDs der in dieser Runde aufgeschobenen Chores. Runde-Zustand, weil eine
+// verschobene Chore offen bleibt und ohne diese Merkung nach dem naechsten
+// Stack-Neubau in "upcoming" wieder im Deck auftauchen wuerde.
+const snoozedIds = ref(new Set());
 
-// Single-Card-Deck: nur die oberste Card + max. 1 Peek dahinter rendern.
-// Der Index im Slice entspricht dem echten Stack-Index (Sortierung bleibt
-// erhalten), damit Deck-Styling und Fortschritts-Banner stimmen.
-const visibleStack = computed(() => stack.value.slice(0, 2));
-
-// Fortschritts-Banner "Karte X von Y": X = Position der aktuellen Card
-// in der Session (erledigt + 1), Y = urspruengliche Stack-Groesse.
-const currentCardNumber = computed(() =>
-  Math.min(originalTotal.value, completedInSession.value + 1),
+// Fortschritt relativ zur GESAMTEN Runde (Befund B4). `remaining` ist bewusst
+// die ungefilterte Menge: ein Filter darf Fortschritt anzeigen, aber nicht
+// veraendern.
+const progress = computed(() =>
+  sessionProgress(sessionTotal.value, sessionStack.value.length),
 );
+const completedInSession = computed(() => progress.value.resolved);
+const progressPct = computed(() => progress.value.pct);
+const currentCardNumber = computed(() => progress.value.currentCardNumber);
+
+// Warum ist das Deck leer? Sonst kann ein Filter "Ende der Runde" vortaeuschen.
+const emptyReason = computed(() =>
+  emptyDeckReason({
+    remaining: sessionStack.value.length,
+    sessionTotal: sessionTotal.value,
+  }),
+);
+
+// Sichtbare Menge: Filter auf den Session-Stapel, dann die Ein-Karte-plus-Peek-
+// Optimierung. Der Index im Slice entspricht dem echten Stack-Index
+// (Sortierung bleibt erhalten), damit Deck-Styling und Zaehler stimmen.
+const filteredStack = computed(() =>
+  applyCatchUpFilter(sessionStack.value, displayFilter.value),
+);
+const visibleStack = computed(() => filteredStack.value.slice(0, 2));
+// Alles, was der Filter gerade zeigt — steuert Empty-State, Filterleiste und
+// den z-index der Karten.
+const stackLength = computed(() => filteredStack.value.length);
 
 // Filter: "all" | "urgent" (nur Überfällig + Heute)
 const displayFilter = ref("all");
@@ -341,25 +388,25 @@ function onKeydown(e) {
   }
 }
 
-function isUrgent(chore) {
-  const label = getBucketLabel(chore);
-  return label === "Überfällig" || label === "Heute";
-}
-
-function rebuildStack(resetBaseline = false) {
-  const result = buildCatchUpStack(choreStore.chores);
-  const full = result.stack;
-  stack.value = displayFilter.value === "urgent" ? full.filter(isUrgent) : full;
-
-  if (resetBaseline || sessionBaseline === null) {
-    sessionBaseline = stack.value.length;
-    originalTotal.value = stack.value.length;
+/**
+ * Baut den Session-Stapel neu auf.
+ *
+ * @param {boolean} resetSession - nur beim Session-Start und bei einer neuen
+ *   Runde. `setFilter()` ruft rebuildStack() OHNE dieses Flag: die Filterung
+ *   darf die Basis der Fortschrittsanzeige nicht verschieben (Befund B4).
+ */
+function rebuildStack(resetSession = false) {
+  const { stack } = buildSessionStack(choreStore.chores, {
+    excludeIds: [...snoozedIds.value],
+  });
+  sessionStack.value = stack;
+  if (resetSession) {
+    sessionTotal.value = stack.length;
   }
 }
 
 function setFilter(filter) {
   displayFilter.value = filter;
-  rebuildStack(true);
 }
 
 // --- Date helpers (lokale Zeit, YYYY-MM-DD wie bestehende Chores) ---
@@ -417,13 +464,41 @@ function triggerAction() {
   if (handler) handler();
 }
 
-// --- Interactions ---
+// --- Interactions -------------------------------------------------------
+
+/**
+ * Die Server-Aufrufe sind von der UI-Logik getrennt, damit ein Fehler in der
+ * UI nicht als Server-Fehler gemeldet wird.
+ *
+ * Vorher umschloss EIN try/catch in handleToggle den kompletten Ablauf —
+ * markDone, rebuildStack, showToast und den Erfolgstimer. Ein ReferenceError
+ * im Rebuild (aufgetreten bei dieser Umstellung) landete damit als "Fehler
+ * beim Erledigen" beim Nutzer, obwohl die Chore erledigt war. Die Meldung
+ * "Fehler beim Erledigen" ist nur dann wahr, wenn der Server nicht
+ * geantwortet hat.
+ *
+ * Rueckgabe `null` = Fehlerfall, bereits gemeldet. `undefined` ist als
+ * Antwortwert nicht zu erwarten (der Store liefert `response.data`).
+ */
+async function callStore(action, errorMessage) {
+  try {
+    return await action();
+  } catch (err) {
+    console.error(`CatchUp: ${errorMessage}`, err);
+    showToast(errorMessage, null, null, 3000);
+    return null;
+  }
+}
 
 async function handleToggle(choreId) {
   if (isBusy(choreId)) return;
   pending.value = { id: choreId, kind: "done" };
+  const response = await callStore(
+    () => choreStore.markDone(choreId, authStore.user?.email),
+    "Fehler beim Erledigen",
+  );
   try {
-    const response = await choreStore.markDone(choreId, authStore.user?.email);
+    if (!response) return;
     rebuildStack();
 
     // Recurrence-Hinweis, falls vorhanden
@@ -433,7 +508,7 @@ async function handleToggle(choreId) {
       : `Erledigt ✓`;
     showToast(msg, "UNDO", () => handleUndo(choreId));
 
-    if (stack.value.length === 0) {
+    if (sessionStack.value.length === 0) {
       showSuccess.value = true;
       if (successTimer) clearTimeout(successTimer);
       successTimer = setTimeout(() => {
@@ -442,9 +517,6 @@ async function handleToggle(choreId) {
         setTimeout(() => router.push("/"), 500);
       }, 1300);
     }
-  } catch (err) {
-    console.error("Failed to mark chore done in catchup:", err);
-    showToast("Fehler beim Erledigen", null, null, 3000);
   } finally {
     pending.value = null;
   }
@@ -461,13 +533,14 @@ async function handleUndo(choreId) {
     successTimer = null;
   }
   showSuccess.value = false;
+  const result = await callStore(
+    () => choreStore.undoDone(choreId),
+    "Fehler beim Rückgängig machen",
+  );
   try {
-    await choreStore.undoDone(choreId);
+    if (!result) return;
     rebuildStack();
     showToast("Chore wieder geöffnet", null, null, 2500);
-  } catch (err) {
-    console.error("Failed to undo chore in catchup:", err);
-    showToast("Fehler beim Rückgängig machen", null, null, 3000);
   } finally {
     pending.value = null;
   }
@@ -494,17 +567,19 @@ async function applySnooze(offsetDays, customDate) {
       return localDateStr(d);
     })();
 
+  const result = await callStore(
+    () => choreStore.snoozeChore(chore.id, newDate),
+    "Fehler beim Aufschieben",
+  );
   try {
-    await choreStore.snoozeChore(chore.id, newDate);
+    if (!result) return;
+    // Aufgeschoben = in dieser Runde erledigt. Die Chore bleibt am Backend
+    // offen und wandert nur in einen spaeteren Bucket — im Deck der aktuellen
+    // Runde steht sie damit nicht mehr (und wird beim naechsten Rebuild nicht
+    // wieder aufgenommen).
+    snoozedIds.value = new Set([...snoozedIds.value, chore.id]);
     rebuildStack();
-    // Aufgeschoben = nicht mehr aufzuholen: die gesnoozte Chore aus dem
-    // sichtbaren Stack entfernen (der Stack zeigt sonst auch zukuenftige
-    // Chores erneut im upcoming-Bucket an).
-    stack.value = stack.value.filter((c) => c.id !== chore.id);
     showToast(`Aufgeschoben auf ${formatNextDue(newDate)}`, null, null, 2500);
-  } catch (err) {
-    console.error("Failed to snooze chore in catchup:", err);
-    showToast("Fehler beim Aufschieben", null, null, 3000);
   } finally {
     pending.value = null;
   }
@@ -616,25 +691,51 @@ async function applySnooze(offsetDays, customDate) {
   font-size: 0.95rem;
 }
 
-/* Progress Bar */
-.progress-bar {
-  height: 6px;
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
-  border-radius: var(--md-sys-radius-full);
-  overflow: hidden;
-  margin-bottom: 20px;
+/* Fortschritts-Anzeige "Karte X von Y" + Balken (Befund C5).
+   Der Balken ist Teil des Counters und erklaert die Position, statt als
+   eigene, fast randlose Zeile unter dem Header zu liegen — die App hatte
+   drei Fortschrittsanzeigen fuer eine Zahl. */
+.stack-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--md-sys-spacing-xs);
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: var(--md-sys-spacing-md);
 }
 
-.progress-fill {
+.stack-counter-label {
+  padding: 4px 18px;
+  border-radius: var(--md-sys-radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-accent);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  box-shadow: var(--shadow-md);
+}
+
+.stack-counter-track {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--md-sys-radius-full);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  overflow: hidden;
+}
+
+.stack-counter-fill {
+  display: block;
   height: 100%;
+  border-radius: var(--md-sys-radius-full);
   background: linear-gradient(
     90deg,
     var(--color-primary),
     var(--color-success)
   );
-  border-radius: var(--md-sys-radius-full);
-  transition: width 0.4s var(--motion-soft);
+  transition: width var(--transition-normal) var(--motion-soft);
 }
+
 
 /* Loading */
 .loader-center {
@@ -652,18 +753,7 @@ async function applySnooze(offsetDays, customDate) {
   padding: 0 var(--md-sys-spacing-md);
 }
 
-/* Fortschritts-Banner "Karte X von Y" */
-.stack-counter {
-  margin-bottom: 14px;
-  padding: 6px 18px;
-  border-radius: var(--md-sys-radius-full);
-  background: var(--color-primary);
-  color: var(--color-on-accent);
-  font-size: 0.9rem;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  box-shadow: var(--shadow-md);
-}
+/* Fortschritts-Anzeige: siehe .stack-counter (Befund C5). */
 
 .stack-container {
   position: relative;

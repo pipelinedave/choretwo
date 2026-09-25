@@ -82,10 +82,9 @@ test.describe("CatchUp ohne Geste (Maus + Tastatur)", () => {
   // damit "clearActiveChores" nicht flaky wird und den Rest nicht mitzieht.
   async function fetchChores(request, headers, page) {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const list = await request.get(
-        `/api/chores/?page=${page}&limit=100`,
-        { headers },
-      );
+      const list = await request.get(`/api/chores/?page=${page}&limit=100`, {
+        headers,
+      });
       const text = await list.text();
       if (list.ok() && text) {
         try {
