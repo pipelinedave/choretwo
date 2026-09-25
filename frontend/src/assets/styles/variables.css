@@ -67,17 +67,47 @@
      bleibt daher eigenstaendig definiert. */
   --space-xxs: 0.25rem;
 
-  /* Elevation / Shadows */
-  --shadow-sm: 0 4px 14px rgba(31, 45, 44, 0.07);
-  --shadow-md: 0 8px 24px rgba(31, 45, 44, 0.11);
-  --shadow-lg: 0 14px 38px rgba(31, 45, 44, 0.16);
+  /* === Alpha-Basis: RGB-Triplets =========================================
+     Ersetzen die rgba()-Literale in den Komponenten. Statt
+     `rgba(31, 45, 44, 0.12)` steht dort `rgb(var(--md-sys-color-ink-rgb) / 0.12)`.
+     Zwei Gewinne: die Basisfarbe ist nur noch an einer Stelle justierbar,
+     und sie folgt ueber das Dark-Mode-Override automatisch dem Theme. */
+  --md-sys-color-white-rgb: 255 255 255;
+  --md-sys-color-ink-rgb: 31 45 44; /* entspricht --color-text im Light Mode */
+  --md-sys-color-primary-rgb: 47 111 111;
+  --md-sys-color-shadow-rgb: 31 45 44;
+  --md-sys-color-accent-warm-rgb: 253 232 213;
+  --md-sys-color-accent-cool-rgb: 189 233 221;
+
+  /* === Semantische Border-/State-Achse (Befund 3) ======================
+     Die Karten der App sind Frosted Glass ueber einem Pastell-Verlauf.
+     Ihre Haarlinie ist im Light Mode weiss (Highlight) und im Dark Mode
+     ebenfalls weiss, aber mit deutlich geringerer Deckkraft — sonst legt
+     sich eine grelle Linie auf die dunklen Surfaces. `--color-border-glass`
+     benennt also die Flaechenart (Glas), nicht den Theme-Zustand.
+     Ink-getoente Kanten (Chips, Inputs) entstehen per color-mix() direkt
+     aus `--color-text` und brauchen kein eigenes Token. */
+  --color-border-glass: rgb(var(--md-sys-color-white-rgb) / 0.7);
+  --color-border-glass-subtle: rgb(var(--md-sys-color-white-rgb) / 0.6);
+  --color-surface-overlay-soft: rgb(var(--md-sys-color-white-rgb) / 0.3);
+  --color-overlay-scrim: rgb(var(--md-sys-color-ink-rgb) / 0.45);
+  --color-primary-subtle: rgb(var(--md-sys-color-primary-rgb) / 0.12);
+  --color-danger-subtle: rgb(231 99 99 / 0.15);
+  --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.2);
+
+  /* === Elevation / Shadows ==============================================
+     Aufgebaut auf dem Shadow-RGB-Triplet, damit die Tiefenachse Light/Dark
+     nur an einer Stelle umschaltet wird. */
+  --shadow-sm: 0 4px 14px rgb(var(--md-sys-color-shadow-rgb) / 0.07);
+  --shadow-md: 0 8px 24px rgb(var(--md-sys-color-shadow-rgb) / 0.11);
+  --shadow-lg: 0 14px 38px rgb(var(--md-sys-color-shadow-rgb) / 0.16);
 
   --md-sys-elevation-1: var(--shadow-sm);
   --md-sys-elevation-2: var(--shadow-md);
   --md-sys-elevation-3: var(--shadow-lg);
   /* In ChatWidget (chat-button:hover) referenziert, war aber nicht
      definiert — `box-shadow` fiel dadurch auf `none`. */
-  --md-sys-elevation-4: 0 18px 48px rgba(31, 45, 44, 0.2);
+  --md-sys-elevation-4: 0 18px 48px rgb(var(--md-sys-color-shadow-rgb) / 0.2);
 
   /* Animation & Motion */
   --transition-fast: 150ms ease;
@@ -204,10 +234,23 @@
   --color-due-far-future: #305c5c;
   --color-archived: #424a49;
 
-  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.45);
-  --md-sys-elevation-4: 0 18px 48px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 4px 14px rgb(var(--md-sys-color-shadow-rgb) / 0.25);
+  --shadow-md: 0 8px 24px rgb(var(--md-sys-color-shadow-rgb) / 0.35);
+  --shadow-lg: 0 14px 38px rgb(var(--md-sys-color-shadow-rgb) / 0.45);
+  --md-sys-elevation-4: 0 18px 48px rgb(var(--md-sys-color-shadow-rgb) / 0.5);
+
+  /* Dark-Mode-Varianten der semantischen Achse: die Light-Mode-Werte waeren
+     auf dunklen Surfaces entweder unsichtbar oder zu grell. */
+  --md-sys-color-ink-rgb: 255 255 255; /* Tint-Basis folgt jetzt dem Text */
+  --md-sys-color-primary-rgb: 77 170 160;
+  --md-sys-color-shadow-rgb: 0 0 0;
+  --color-border-glass: rgb(var(--md-sys-color-white-rgb) / 0.18);
+  --color-border-glass-subtle: rgb(var(--md-sys-color-white-rgb) / 0.14);
+  --color-surface-overlay-soft: rgb(var(--md-sys-color-white-rgb) / 0.1);
+  --color-overlay-scrim: rgb(0 0 0 / 0.55);
+  --color-primary-subtle: rgb(var(--md-sys-color-primary-rgb) / 0.18);
+  --color-danger-subtle: rgb(231 99 99 / 0.22);
+  --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.35);
 
   /* Dark-Mode-Varianten der ergaenzten MD-Sys-Rollen: die Light-Mode-Werte
      waeren auf dunklen Surfaces entweder unsichtbar (Container) oder zu
