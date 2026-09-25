@@ -31,6 +31,16 @@
       >
         Überfällig + Heute
       </button>
+      <!-- Tastatur ist der zweite vollwertige Bedienweg, deshalb gehoert ihr
+           Einstieg (Taste "?") neben die Filter, nicht in ein Menue. -->
+      <button
+        class="filter-chip shortcuts-trigger"
+        aria-keyshortcuts="?"
+        @click="helpOpen = true"
+      >
+        <span class="mdi mdi-keyboard-outline"></span>
+        Tastatur
+      </button>
     </div>
 
     <!-- Progress Bar -->
@@ -63,7 +73,7 @@
       <div class="stack-counter" role="status" aria-live="polite">
         Karte {{ currentCardNumber }} von {{ originalTotal }}
       </div>
-      <div class="stack-container" ref="containerRef">
+      <div class="stack-container" ref="containerRef" role="list" aria-label="Aufholen-Stapel">
         <CatchUpCard
           v-for="(chore, index) in visibleStack"
           :key="chore.id"
@@ -92,6 +102,13 @@
       :chore-name="snoozeChoreName"
       @select="applySnooze"
       @close="snoozeOpen = false"
+    />
+
+    <!-- Tastatur-Kurzhilfe -->
+    <CatchUpShortcuts
+      v-if="helpOpen"
+      :shortcuts="shortcutHelp"
+      @close="helpOpen = false"
     />
 
     <!-- Action Toast (Done / Undo / Snooze) -->
@@ -137,6 +154,7 @@ import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 import EmptyState from "@/components/chores/EmptyState.vue";
 import CatchUpCard from "@/components/chores/CatchUpCard.vue";
 import CatchUpActionBar from "@/components/chores/catchup/CatchUpActionBar.vue";
+import CatchUpShortcuts from "@/components/chores/catchup/CatchUpShortcuts.vue";
 import SnoozeSheet from "@/components/chores/SnoozeSheet.vue";
 
 const router = useRouter();
@@ -191,6 +209,17 @@ const snoozeOpen = ref(false);
 const snoozeChore = ref(null);
 const snoozeChoreName = computed(() => snoozeChore.value?.name || "");
 
+// Tastatur-Kurzhilfe (Befund A2)
+const helpOpen = ref(false);
+// Anzeige und Tastatur-Handler teilen sich diese Liste, damit die Doku nicht
+// veralten kann, solange jemand sie pflegt.
+const shortcutHelp = [
+  { keys: ["Eingabe", "␣", "1"], text: "Aktuelle Chore erledigen" },
+  { keys: ["2"], text: "Aktuelle Chore aufschieben" },
+  { keys: ["Esc"], text: "Offenes Fenster schließen" },
+  { keys: ["?"], text: "Diese Übersicht" },
+];
+
 // Toast
 const toast = ref({ visible: false, message: "", action: null, handler: null });
 const toastTimer = ref(null);
@@ -210,12 +239,14 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
+  document.addEventListener("keydown", onKeydown);
 });
 
 // Cleanup beim Verlassen: laufende Timer stoppen, sonst feuert der
 // Success-Timer nach dem Verlassen noch einen router.push("/") und
 // der Toast-Timer tickt ins Leere.
 onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown);
   if (successTimer) {
     clearTimeout(successTimer);
     successTimer = null;
@@ -225,6 +256,90 @@ onUnmounted(() => {
     toastTimer.value = null;
   }
 });
+
+// --- Tastatursteuerung (Befund A2) -------------------------------------
+// Vorher gab es zwar `tabindex="0"` auf der Karte, aber keinen keydown-Handler:
+// Enter und Space taten nichts, die pure Tastaturnutzung war blind.
+//
+// EIN Handler auf document-Ebene statt einer Handkante je Karte: die Karten
+// werden bei jedem Swipe neu gerendert, ein Karte-lokaler Handler muesste also
+// an jedem Kartenwechsel neu gebunden werden. Zusaetzlich ist eine einzige
+// Quelle leichter zu pruefen als N.
+const DECK_FOCUS = ".stack-area, .catchup-actions";
+
+/** Text-Eingaben gehoeren dem Dokument, nicht dem Deck. */
+function isTextEntry(el) {
+  return !!(
+    el &&
+    el.closest &&
+    el.closest("input, textarea, select, [contenteditable='true']")
+  );
+}
+
+/**
+ * Darf eine Aktionstaste greifen? Ja, wenn nichts fokussiert ist (der Fokus
+ * liegt dann auf der View) oder wenn der Fokus im Deck liegt. Steht der Fokus
+ * z. B. auf der Bottom-Nav, gehoert die Taste dorthin und nicht hierher.
+ */
+function hasDeckFocus() {
+  const el = document.activeElement;
+  if (!el || el === document.body) return true;
+  return !!(el.closest && el.closest(DECK_FOCUS));
+}
+
+/** Overlay obenauf? Dann hat es eigene Bedienung (inkl. Escape). */
+function isOverlayOpen() {
+  return snoozeOpen.value || helpOpen.value;
+}
+
+/** Schliesst das oberste Overlay, sonst nichts. */
+function closeTopOverlay() {
+  if (snoozeOpen.value) {
+    snoozeOpen.value = false;
+    return true;
+  }
+  if (helpOpen.value) {
+    helpOpen.value = false;
+    return true;
+  }
+  return false;
+}
+
+function onKeydown(e) {
+  if (e.defaultPrevented) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  // Escape hat Vorrang und greift auch aus dem Datumseingabefeld des
+  // Snooze-Sheets: dort ist das Schliessen der einzige sinnvolle Ausgang.
+  if (e.key === "Escape") {
+    if (closeTopOverlay()) e.preventDefault();
+    return;
+  }
+
+  if (isTextEntry(e.target)) return;
+  if (isOverlayOpen()) return;
+  if (!hasDeckFocus()) return;
+  if (pending.value) return;
+
+  const top = visibleStack.value[0];
+
+  if (e.key === "Enter" || e.key === " " || e.key === "1") {
+    if (!top) return;
+    e.preventDefault();
+    handleToggle(top.id);
+    return;
+  }
+  if (e.key === "2") {
+    if (!top) return;
+    e.preventDefault();
+    handleSnooze(top);
+    return;
+  }
+  if (e.key === "?") {
+    e.preventDefault();
+    helpOpen.value = true;
+  }
+}
 
 function isUrgent(chore) {
   const label = getBucketLabel(chore);
@@ -485,6 +600,20 @@ async function applySnooze(offsetDays, customDate) {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-on-accent);
+}
+
+/* Der Einstieg in die Tastaturhilfe ist ein Chip, aber kein Filter: er traegt
+   kein Icon-Label-Paar wie die beiden Filter und sitzt daher am Ende. */
+.shortcuts-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--color-primary);
+}
+
+.shortcuts-trigger .mdi {
+  font-size: 0.95rem;
 }
 
 /* Progress Bar */

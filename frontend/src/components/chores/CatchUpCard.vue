@@ -23,6 +23,7 @@
       @pointercancel="handlePointerCancel"
       role="listitem"
       tabindex="0"
+      :aria-label="ariaLabel"
     >
       <!-- Priority Badge -->
       <div class="priority-badge">{{ bucketLabel }}</div>
@@ -157,6 +158,21 @@ const choreClass = computed(() => {
 
 // --- Friendly labels ---
 const bucketLabel = computed(() => getBucketLabel(props.chore));
+
+// Befund A2: `role="listitem"` stand ohne `role="list"` am Container und ohne
+// `aria-label` — fuer Screenreader war die Karte eine unbenannte
+// Listenposition. Der Label nennt Chore, Faelligkeit und Bedienung, damit die
+// Tastatursteuerung nicht undokumentiert bleibt. Der Container traegt die
+// Rolle `list` (CatchUpView, .stack-container).
+const ariaLabel = computed(() => {
+  const parts = [props.chore.name, friendlyDueDate.value, bucketLabel.value]
+    .filter(Boolean)
+    .join(", ");
+  if (!props.isActive) {
+    return `${parts}. Position ${props.position + 1} im Stapel.`;
+  }
+  return `${parts}. Erledigen: Eingabetaste oder Taste 1. Aufschieben: Taste 2.`;
+});
 
 const friendlyDueDate = computed(() => {
   const raw = props.chore.dueDate || props.chore.due_date;
