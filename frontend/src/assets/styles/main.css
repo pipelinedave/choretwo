@@ -82,7 +82,34 @@ h3 {
   box-shadow: var(--shadow-md);
 }
 
-/* Button Styles */
+/* === Button-Primitive (Befund 4) ========================================
+   Der Element-Selektor traegt nur noch Typografie, Layout und
+   Interaktions-Feedback — bewusst KEINE Flaeche, keinen Schatten und
+   kein backdrop-filter.
+
+   Vorher standen hier `background: var(--color-surface-light)`,
+   `box-shadow: var(--shadow-sm)` und `backdrop-filter: blur(10px)`.
+   Damit erbten alle 76 <button> der App dieselbe Frosted-Glass-
+   Komponente. Zwei Folgen, beide in (auditierbaren) Ziffern:
+
+     1. Komponenten, die nur `background: none; border: none` setzen,
+        erbten trotzdem Schatten UND Blur. Sichtbar wurde das dort, wo
+        eine Komponente die Farbe wegschaltet, die Optik aber nicht:
+        .back-btn und .filter-chip (CatchUpView), .toast-action
+        (CatchUpView), .menu-item (AppHeader), .feedback-close
+        (CopilotBar), .close-btn (LogOverlay). Ergebnis war eine
+        geblurrte, ungetoenete Rechteckflaeche ohne erkennbare
+        Absicht — bei .menu-item ein Blur ueber der kompletten
+        Dropdown-Flaeche.
+     2. `backdrop-filter: blur(10px)` erzeugt auf JEDEM Element einen
+        eigenen Backdrop-Snapshot. 76 Buttons bezahlen das, davon ~30
+        Icon-Buttons, die mit 32-56px Kantenlaenge den teuersten
+        Snapshot pro Pixel verursachen und ihn nie sichtbar nutzen
+        (ihre eigene Flaeche liegt mit >= 0.85 Deckkraft darueber).
+
+   Die dekorative Optik liegt jetzt bei der Komponente, die sie
+   braucht: `.btn` (Standard-Glasflaeche), `.btn-icon` (Icon-Knopf),
+   `.btn-text` (Text-Knopf) und die gefuellten Varianten unten. */
 button, .btn {
   cursor: pointer;
   font-family: 'Space Grotesk', 'Manrope', sans-serif;
@@ -92,10 +119,8 @@ button, .btn {
   padding: var(--md-sys-spacing-sm) var(--md-sys-spacing-md);
   font-size: 0.9rem;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
-  background: var(--color-surface-light);
+  background: none;
   color: var(--color-text);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(10px);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -103,52 +128,125 @@ button, .btn {
   text-decoration: none;
 }
 
+/* Standardvariante: die Glasflaeche, die vorher pauschal erzwungen war.
+   Bewusst als Klasse statt als Element-Selektor — so erreicht sie die
+   42 <button class="btn ..."> und keine der 34 nackten Buttons, die
+   ihre Optiz selbst bestimmen. */
+.btn {
+  background: var(--color-surface-light);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+}
+
 button:hover, .btn:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
 }
 
 button:active, .btn:active {
   transform: scale(0.98);
 }
 
-.btn-primary, .btn-filled, button.primary {
-  background-color: var(--color-primary);
-  color: var(--color-on-accent);
+.btn:hover {
+  box-shadow: var(--shadow-md);
 }
 
-.btn-primary:hover, .btn-filled:hover, button.primary:hover {
+/* Icon-Knopf. `.btn-icon` existierte bisher AUSSCHLIESSLICH im
+   scoped-Block von AppHeader.vue — Vue-Scoped-CSS greift nur auf die
+   eigenen Elemente, also bekamen die vier anderen Verwendungen
+   (ChatWidget: Chat-Close + Senden, UndoBanner: Dismiss,
+   NotificationSettings: Zeit entfernen, AIView: Senden) ueberhaupt
+   keine eigene Regel und fielen auf den globalen `button`-Block
+   zurueck: ein breites Text-Pill statt eines Icon-Knopfs. Jetzt
+   global, in genau der Groesse und Optik, die AppHeader bereits
+   etabliert hat (40px Kreis, Glasflaeche, Haarlinie, Elevation-1).
+   `.btn-icon` hat bewusst KEIN backdrop-filter: die Flaeche liegt bei
+   0.85 Deckkraft, ein Blur darunter waere nie sichtbar. */
+.btn-icon {
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  min-width: var(--icon-button-size);
+  padding: 0;
+  border-radius: var(--md-sys-radius-full);
+  background: var(--color-surface);
+  border: var(--border-hairline) solid var(--color-border-glass-subtle);
+  box-shadow: var(--shadow-sm);
+  font-size: 1.25rem;
+  backdrop-filter: none;
+}
+
+/* Text-Knopf. `btn-text` war in vier Komponenten im Einsatz, aber
+   nirgends definiert — die Buttons bekamen dadurch genau die
+   Glasflaeche, die ihr Name ausschliesst. */
+.btn-text {
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  color: var(--color-primary);
+  padding-left: var(--md-sys-spacing-sm);
+  padding-right: var(--md-sys-spacing-sm);
+}
+
+.btn-text:hover {
+  background: var(--color-primary-subtle);
+  box-shadow: none;
+}
+
+/* Gefuellte Varianten. `backdrop-filter: none`, weil die Flaeche
+   deckend ist — der Blur waere dort wirkungslos und nur Kosten. Die
+   Elevation bleibt, sie ist bei gefuellten Flaechen der einzige
+   Hinweis auf Abheben vom Untergrund. */
+.btn-primary, .btn-filled {
+  background-color: var(--color-primary);
+  color: var(--color-on-accent);
+  backdrop-filter: none;
+}
+
+.btn-primary:hover, .btn-filled:hover {
   background-color: var(--color-primary-hover);
   color: var(--color-on-accent);
 }
 
-.btn-danger, button.danger {
+.btn-danger {
   background-color: var(--color-danger);
   color: var(--color-on-accent);
+  backdrop-filter: none;
 }
 
-.btn-danger:hover, button.danger:hover {
+.btn-danger:hover {
   background-color: var(--color-danger-hover);
 }
 
-.btn-warning, button.warning {
+.btn-warning {
   background-color: var(--color-warning);
   color: #3b2b1a;
+  backdrop-filter: none;
 }
 
-.btn-warning:hover, button.warning:hover {
+.btn-warning:hover {
   background-color: var(--color-warning-hover);
 }
 
 .btn-tonal {
   background-color: var(--color-surface-variant);
   color: var(--color-text);
+  backdrop-filter: none;
 }
 
 .btn-sm {
   padding: 4px 10px;
   font-size: 0.8rem;
   border-radius: var(--md-sys-radius-small);
+}
+
+/* Deaktiviert: acht Buttons (Export/Import, Speichern, Testen,
+   Magic-Link, Senden) hatten keine :disabled-Regel und waren damit
+   visuell von einem aktiven Primaer-Button nicht zu unterscheiden.
+   Komponenten mit eigener Regel (`.revert-btn:disabled`,
+   `.btn-send:disabled`, `.chat-send:disabled`, `.confirm-btn:disabled`)
+   behalten sie — Scoped-CSS schlaegt hier (0,2,0) gegen (0,1,1). */
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* Links */

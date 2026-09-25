@@ -149,6 +149,19 @@
   --md-sys-zindex-modal: 2000;
   --md-sys-zindex-toast: 2200;
 
+  /* === Komponenten-Token-Layer (Befund 10) ==============================
+     Nur Achsen, die sich mit >= 3 realen Verwendungen belegen lassen.
+     Bewusst kein Refactor-Marathon: die 19 Komponenten, die noch
+     hartkodierte Werte tragen, bleiben unangetastet und ziehen in
+     STAGE 2 nach. */
+
+  /* 48x `1px solid` in 19 Dateien. */
+  --border-hairline: 1px;
+
+  /* Sechs quadratische Icon-Knöpfe auf 40px (AppHeader .btn-icon,
+     CatchUpCard, SnoozeSheet, ArchivedChoresModal, LogOverlay). */
+  --icon-button-size: 40px;
+
   /* === MD-Sys-Farbrollen =================================================
      Die Alias-Zeilen darunter verweisen auf die `--color-*`-Rolle.
      Die hier ergaenzten secondary/tertiary/error/inverse-Rollen waren in
