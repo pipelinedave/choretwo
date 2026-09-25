@@ -24,11 +24,14 @@ export const isDoneToday = (chore, now = new Date()) => {
   if (!chore) return false;
   const lastDone = chore.lastDone || chore.last_done;
   if (!lastDone) return !!chore.done;
-  const todayStr = now.toISOString().split("T")[0];
-  return (
-    !!chore.done &&
-    (typeof lastDone === "string" ? lastDone.split("T")[0] === todayStr : false)
-  );
+  // Datumsgrenzen ueber buildBoundaries/normalizeToLocalDate, damit der
+  // Vergleich in der Zeitzone des Clients laeuft. `now.toISOString()` waere
+  // UTC und liefert nach 22:00/23:00 Ortszeit (UTC+1/+2) den Vortag — dann
+  // galt eine heute erledigte Chore als "nicht heute erledigt" und blieb im
+  // CatchUp-Stack stehen. `last_done` kommt vom Backend als lokales
+  // YYYY-MM-DD, ein UTC-Vergleich passt also systematisch nicht darauf.
+  const { today } = buildBoundaries(now);
+  return !!chore.done && isSameDay(normalizeToLocalDate(lastDone), today);
 };
 
 export const bucketChores = (chores, now = new Date()) => {
