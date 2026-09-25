@@ -21,12 +21,6 @@
       @pointermove="handlePointerMove"
       @pointerup="handlePointerUp"
       @pointercancel="handlePointerCancel"
-      @touchstart="handleTouchStart"
-      @touchmove.prevent="handleTouchMove"
-      @touchend="handleTouchEnd"
-      @mousedown="handleMouseDown"
-      @mousemove="handleMouseMove"
-      @mouseup="handleMouseUp"
       role="listitem"
       tabindex="0"
     >
@@ -189,35 +183,49 @@ const friendlyDueDate = computed(() => {
   return `In ${diffDays}d`;
 });
 
-// --- Pointer Gesture (same pattern as ChoreCard) ---
+// --- Pointer-Geste ------------------------------------------------------
 // Swipe-Semantik im CatchUp-Deck:
 //   rechts  -> erledigt (emit toggle)
 //   links   -> aufschieben (Snooze-Sheet, wie der "Später"-Button)
 //   hoch    -> aufschieben (Snooze-Sheet)
 //   runter  -> Scroll (keine Aktion)
 // Links loest KEINE Navigation aus - Editieren gehoert nicht ins Deck.
+//
+// Warum NUR Pointer Events (Befund B1): vorher liefen drei Handler parallel
+// (pointer + touch + mouse, ~200 Zeilen). Pointer Events sind seit iOS 13
+// Baseline und loesen Maus UND Touch ab, die Maus- und Touch-Handler waren
+// also reine Doppelabdeckung — mit zwei Fehlerklassen als Folge:
+//   1. `@touchmove.prevent` stand DAUERHAFT auf der Karte und widersprach dem
+//      `touch-action: pan-y` darunter: der Browser durfte scrollen, das
+//      preventDefault hinderte daran, und die Karte wurde bei jedem
+//      Scrollversuch "stecken" gelassen.
+//   2. `preventDefault()` auf `touchstart` unterdrueckt das vom Browser
+//      synthetisierte `click` — damit waren die Aktions-Buttons der Karte auf
+//      Touch-Geraeten tot (dokumentiert im E2E-Test "Später-Button reagiert
+//      auf echten Touch").
 let startX = 0;
 let startY = 0;
 let isGestureActive = false;
 let isScrollLocked = false;
 let isSwipeLocked = false;
 let isUpSwipeLocked = false;
-let gestureSource = "";
 
 const UP_SWIPE_THRESHOLD = 70;
 
-// Interaktive Elemente (Spaeter-Button, Custom-Date-Input) nehmen an der
-// Swipe-Geste NICHT teil: Eine Geste duerfte ihre Klicks nicht abwuergen.
+// Interaktive Elemente nehmen an der Swipe-Geste NICHT teil: Eine Geste
+// duerfte ihren Klicks nicht abwuergen. Mit Pointer Events ist das nur noch
+// eine Absicherung (die Karte hat aktuell keine Knöpfe mehr, die Aktionen
+// liegen in der Aktionsleiste unter der Karte) — aber sie kostet nichts und
+// schuetzt, falls die Karte wieder bedienbare Elemente bekommt.
 function isInteractiveTarget(e) {
   return !!(e.target && e.target.closest("button, a, input, label, select"));
 }
 
-function startGesture(clientX, clientY, source) {
+function startGesture(clientX, clientY) {
   isGestureActive = true;
   isScrollLocked = false;
   isSwipeLocked = false;
   isUpSwipeLocked = false;
-  gestureSource = source;
   startX = clientX;
   startY = clientY;
   isReturning.value = false;
@@ -269,9 +277,10 @@ function moveGesture(clientX, clientY) {
 function handlePointerDown(e) {
   if (!props.isActive) return;
   if (!e.isPrimary) return;
+  if (e.button != null && e.button !== 0) return;
   if (isInteractiveTarget(e)) return;
 
-  startGesture(e.clientX, e.clientY, "pointer");
+  startGesture(e.clientX, e.clientY);
   try {
     e.target.setPointerCapture(e.pointerId);
   } catch (_err) {
@@ -303,56 +312,6 @@ function handlePointerCancel(e) {
   }
 }
 
-// --- Touch fallback (mobile; no pointer events emitted) ---
-function handleTouchStart(e) {
-  if (!props.isActive) return;
-  // Pointer hat auf modernen Browsern bereits übernommen
-  if (isGestureActive) return;
-  // Klicks auf interaktive Elemente nicht abwuergen: preventDefault auf
-  // touchstart unterdrueckt das vom Browser synthetisierte click-Event
-  // (Buttons im Card waren dadurch auf Touch-Geraeten tot).
-  if (isInteractiveTarget(e)) return;
-  e.preventDefault();
-  const t = e.touches && e.touches[0];
-  if (!t) return;
-  startGesture(t.clientX, t.clientY, "touch");
-}
-
-function handleTouchMove(e) {
-  if (gestureSource !== "touch") return;
-  const t = e.touches && e.touches[0];
-  if (!t) return;
-  moveGesture(t.clientX, t.clientY);
-}
-
-function handleTouchEnd() {
-  if (gestureSource !== "touch") return;
-  if (!isGestureActive) return;
-  endGesture();
-}
-
-// --- Mouse fallback (desktop without pointer events) ---
-function handleMouseDown(e) {
-  if (!props.isActive) return;
-  if (e.button !== 0) return;
-  if (isInteractiveTarget(e)) return;
-  // Pointer hat auf modernen Browsern bereits übernommen
-  if (isGestureActive) return;
-  startGesture(e.clientX, e.clientY, "mouse");
-}
-
-function handleMouseMove(e) {
-  if (gestureSource !== "mouse") return;
-  if (!isGestureActive) return;
-  moveGesture(e.clientX, e.clientY);
-}
-
-function handleMouseUp() {
-  if (gestureSource !== "mouse") return;
-  if (!isGestureActive) return;
-  endGesture();
-}
-
 function endGesture() {
   isGestureActive = false;
   isSwiping.value = false;
@@ -373,7 +332,6 @@ function endGesture() {
   isScrollLocked = false;
   isSwipeLocked = false;
   isUpSwipeLocked = false;
-  gestureSource = "";
 }
 
 function triggerSnooze() {
