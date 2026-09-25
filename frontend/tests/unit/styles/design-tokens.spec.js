@@ -89,7 +89,9 @@ function parseRules(css) {
   return rules;
 }
 
-const ALL_RULES = STYLESHEETS.flatMap((f) => parseRules(readFileSync(f, "utf8")));
+const ALL_RULES = STYLESHEETS.flatMap((f) =>
+  parseRules(readFileSync(f, "utf8")),
+);
 
 /** Nur Custom Properties einer Regel. */
 function parseDecls(decls) {
@@ -115,7 +117,8 @@ function collect({ contrast }) {
   const dark = {};
   for (const rule of ALL_RULES) {
     if (/prefers-contrast:\s*more/.test(rule.media) !== contrast) continue;
-    if (/prefers-reduced-motion|@keyframes|@media \(max-width/.test(rule.media)) continue;
+    if (/prefers-reduced-motion|@keyframes|@media \(max-width/.test(rule.media))
+      continue;
     const targetsDark = rule.selector
       .split(",")
       .some((s) => /^\[data-theme=["']dark["']\]/.test(s.trim()));
@@ -133,7 +136,12 @@ const DARK_OVERRIDES = PLAIN.dark;
 const DARK = { ...PLAIN.base, ...PLAIN.dark };
 
 const LIGHT_CONTRAST = { ...PLAIN.base, ...CONTRAST.base };
-const DARK_CONTRAST = { ...PLAIN.base, ...PLAIN.dark, ...CONTRAST.base, ...CONTRAST.dark };
+const DARK_CONTRAST = {
+  ...PLAIN.base,
+  ...PLAIN.dark,
+  ...CONTRAST.base,
+  ...CONTRAST.dark,
+};
 
 /* ---------------------------------------------------------------------- *
  * Aufloesung: var()-Ketten rekursiv, mit Zyklenerkennung.
@@ -241,7 +249,9 @@ describe("Token-Schicht: Vollstaendigkeit", () => {
  * ====================================================================== */
 describe("Token-Schicht: keine undefinierten Referenzen", () => {
   it("kennt jede in src/ per var() referenzierte Token-Definition", () => {
-    const undefinedTokens = [...REFERENCED.keys()].filter((t) => !(t in LIGHT)).sort();
+    const undefinedTokens = [...REFERENCED.keys()]
+      .filter((t) => !(t in LIGHT))
+      .sort();
     expect(undefinedTokens).toEqual([]);
   });
 
@@ -262,11 +272,14 @@ describe("Token-Schicht: semantische Achsen im Dark Mode", () => {
     "--color-on-accent",
   ];
 
-  it.each(MUST_DIFFER)("%s unterscheidet sich zwischen Light und Dark", (token) => {
-    expect(LIGHT[token]).toBeDefined();
-    expect(DARK[token]).toBeDefined();
-    expect(resolve(token, LIGHT)).not.toBe(resolve(token, DARK));
-  });
+  it.each(MUST_DIFFER)(
+    "%s unterscheidet sich zwischen Light und Dark",
+    (token) => {
+      expect(LIGHT[token]).toBeDefined();
+      expect(DARK[token]).toBeDefined();
+      expect(resolve(token, LIGHT)).not.toBe(resolve(token, DARK));
+    },
+  );
 
   it("--color-on-accent ist in Dark Mode dunkel, in Light Mode hell", () => {
     // Sonst haetten die gefuellten Buttons nur 2.6:1 Kontrast.
@@ -319,20 +332,30 @@ describe("Token-Schicht: Alias-Achsen", () => {
     "--radius-full": "--md-sys-radius-full",
   };
   const CANONICAL = [
-    "--md-sys-spacing-xs", "--md-sys-spacing-sm", "--md-sys-spacing-md",
-    "--md-sys-spacing-lg", "--md-sys-spacing-xl", "--md-sys-spacing-2xl",
-    "--md-sys-radius-small", "--md-sys-radius-medium", "--md-sys-radius-large",
-    "--md-sys-radius-full", "--md-sys-radius-extra-large",
+    "--md-sys-spacing-xs",
+    "--md-sys-spacing-sm",
+    "--md-sys-spacing-md",
+    "--md-sys-spacing-lg",
+    "--md-sys-spacing-xl",
+    "--md-sys-spacing-2xl",
+    "--md-sys-radius-small",
+    "--md-sys-radius-medium",
+    "--md-sys-radius-large",
+    "--md-sys-radius-full",
+    "--md-sys-radius-extra-large",
   ];
 
   it.each(Object.entries(ALIASES))("%s zeigt auf %s", (alias, canonical) => {
     expect(LIGHT[alias]).toBe(`var(${canonical})`);
   });
 
-  it.each(Object.entries(ALIASES))("%s loest in Light und Dark gleich auf", (alias, canonical) => {
-    expect(resolve(alias, LIGHT)).toBe(resolve(canonical, LIGHT));
-    expect(resolve(alias, DARK)).toBe(resolve(canonical, DARK));
-  });
+  it.each(Object.entries(ALIASES))(
+    "%s loest in Light und Dark gleich auf",
+    (alias, canonical) => {
+      expect(resolve(alias, LIGHT)).toBe(resolve(canonical, LIGHT));
+      expect(resolve(alias, DARK)).toBe(resolve(canonical, DARK));
+    },
+  );
 
   it("haelt jede kanonische Stufe in beiden Themes identisch", () => {
     // Eine Achse, die im Dark Mode aus dem Raster faellt, faellt hier auf.
@@ -384,8 +407,12 @@ describe("Token-Schicht: Pastell-Verlauf", () => {
   it("behaelt die Warm-/Kuelt-Farben, die der Verlauf schon immer hatte", () => {
     // #fde8d5 bzw. #bde9dd — Regressionstest gegen eine stille
     // Aenderung der Palette.
-    expect(resolve("--md-sys-color-accent-warm-rgb", LIGHT)).toBe("253 232 213");
-    expect(resolve("--md-sys-color-accent-cool-rgb", LIGHT)).toBe("189 233 221");
+    expect(resolve("--md-sys-color-accent-warm-rgb", LIGHT)).toBe(
+      "253 232 213",
+    );
+    expect(resolve("--md-sys-color-accent-cool-rgb", LIGHT)).toBe(
+      "189 233 221",
+    );
   });
 });
 
@@ -394,12 +421,12 @@ describe("Token-Schicht: Pastell-Verlauf", () => {
  * ====================================================================== */
 describe("Token-Schicht: prefers-contrast", () => {
   it("schaerft die Outline-Achse in beiden Themes nach", () => {
-    expect(alphaOf(resolve("--md-sys-color-outline", LIGHT_CONTRAST))).toBeGreaterThan(
-      alphaOf(resolve("--md-sys-color-outline", LIGHT)),
-    );
-    expect(alphaOf(resolve("--md-sys-color-outline", DARK_CONTRAST))).toBeGreaterThan(
-      alphaOf(resolve("--md-sys-color-outline", DARK)),
-    );
+    expect(
+      alphaOf(resolve("--md-sys-color-outline", LIGHT_CONTRAST)),
+    ).toBeGreaterThan(alphaOf(resolve("--md-sys-color-outline", LIGHT)));
+    expect(
+      alphaOf(resolve("--md-sys-color-outline", DARK_CONTRAST)),
+    ).toBeGreaterThan(alphaOf(resolve("--md-sys-color-outline", DARK)));
   });
 
   it("gibt der Dark-Variante eine eigene Border statt der Light-Werte", () => {
@@ -407,6 +434,8 @@ describe("Token-Schicht: prefers-contrast", () => {
     expect(resolve("--color-border-glass", LIGHT_CONTRAST)).not.toBe(
       resolve("--color-border-glass", DARK_CONTRAST),
     );
-    expect(alphaOf(resolve("--color-border-glass", DARK_CONTRAST))).toBeLessThanOrEqual(0.75);
+    expect(
+      alphaOf(resolve("--color-border-glass", DARK_CONTRAST)),
+    ).toBeLessThanOrEqual(0.75);
   });
 });
