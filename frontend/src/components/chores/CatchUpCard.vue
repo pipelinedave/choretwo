@@ -80,6 +80,33 @@ const emit = defineEmits(["toggle", "snooze"]);
 // Swipe Configuration
 const SWIPE_THRESHOLD = 80;
 const UP_SWIPE_THRESHOLD = 70;
+
+const HAPTIC_MS = 12;
+
+/**
+ * Kurzer Vibrationsimpuls, wenn die Schwelle ueberschritten wird (Befund A4).
+ *
+ * Feature-Detection per `typeof`, nicht per try/catch: Firefox implementiert
+ * `navigator.vibrate` gar nicht, die Playwright-Suite laeuft aber in BEIDEN
+ * Browsern — ein Aufruf ohne Guard waere im Firefox ein TypeError im
+ * Event-Handler. Das try/catch deckt den anderen Fall ab: Browser, die
+ * `vibrate` kennen, aber eine User-Aktivierung verlangen und dann werfen.
+ *
+ * Ein Impuls pro Geste, mehr nicht. Das Einrasten der Schwelle ist das
+ * Signal ("jetzt passiert etwas"); ein zweites Vibrieren bei der Aktion waere
+ * nur Larm. Dass die Sperre genau einmal greift, ist strukturell garantiert:
+ * der Achsen-Lock sitzt im Block `if (!isSwipeLocked && !isUpSwipeLocked)`
+ * und wird von `startGesture` zurueckgesetzt.
+ */
+function buzz() {
+  if (typeof navigator === "undefined") return;
+  if (typeof navigator.vibrate !== "function") return;
+  try {
+    navigator.vibrate(HAPTIC_MS);
+  } catch (_err) {
+    /* User-Aktivierung fehlt — der Impuls ist entbehrlich, nicht der Swipe. */
+  }
+}
 const MAX_RETURN_DISTANCE = 160;
 const RETURN_ANIMATION_MS = 480;
 
@@ -302,6 +329,7 @@ function moveGesture(clientX, clientY) {
           isUpSwipeLocked = true;
           isSwiping.value = true;
           gestureAxis.value = "y";
+          buzz();
         }
       } else {
         isScrollLocked = true;
@@ -311,6 +339,7 @@ function moveGesture(clientX, clientY) {
       isSwipeLocked = true;
       isSwiping.value = true;
       gestureAxis.value = "x";
+      buzz();
     }
   }
 
