@@ -15,8 +15,8 @@ async function mk(name, off) {
   const d = await r.json(); created.push(d.id); return d;
 }
 // Bewusst: kurzer Name (Referenzfall) und sehr langer Name + Recurrence (Problemfall C2)
-await mk("Kurz", -1);
-await mk("Ein sehr langer Chore-Name, der ueber zwei Zeilen umbricht und die Karte deutlich hoeher macht", -4);
+await mk("Kurz", -4);
+await mk("Ein sehr langer Chore-Name, der ueber zwei Zeilen umbricht und die Karte deutlich hoeher macht", -1);
 
 const { chromium } = await import("@playwright/test");
 const b = await chromium.launch();
@@ -31,7 +31,8 @@ const m = await p.evaluate(() => {
   const cards = [...document.querySelectorAll(".catchup-card")];
   const r = (el) => { const b = el.getBoundingClientRect(); return { x:+b.x.toFixed(1), y:+b.y.toFixed(1), w:+b.width.toFixed(1), h:+b.height.toFixed(1) }; };
   return {
-    containerH: cont.clientHeight,
+    containerH: cont.getBoundingClientRect().height,
+    inlineH: cont.style.height || "(nicht gesetzt)",
     containerRect: r(cont),
     cardCount: cards.length,
     cards: cards.map(c => ({ h: +c.getBoundingClientRect().height.toFixed(1), transform: getComputedStyle(c).transform, opacity: getComputedStyle(c).opacity })),

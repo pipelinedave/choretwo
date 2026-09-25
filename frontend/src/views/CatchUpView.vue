@@ -125,7 +125,13 @@
           ></span>
         </span>
       </div>
-      <div class="stack-container" ref="containerRef" role="list" aria-label="Aufholen-Stapel">
+      <div
+        class="stack-container"
+        ref="containerRef"
+        role="list"
+        aria-label="Aufholen-Stapel"
+        :style="stackHeight ? { height: stackHeight + 'px' } : null"
+      >
         <CatchUpCard
           v-for="(chore, index) in visibleStack"
           :key="chore.id"
@@ -200,7 +206,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { useChoreStore } from "@/stores/chore";
 import { useAuthStore } from "@/stores/auth";
 import {
@@ -328,6 +334,68 @@ async function startNextRound() {
 // Filter: "all" | "urgent" (nur Überfällig + Heute)
 const displayFilter = ref("all");
 
+/**
+ * C2: Der Container muss so hoch sein wie sein Inhalt.
+ *
+ * Die Karten sind `position: absolute`, sie tragen zur Hoehe ihres Containers
+ * also nichts bei. Stand dort ein fester Wert, war er in BEIDEN Richtungen
+ * falsch — gemessen im Browser:
+ *
+ *   kurzer Name   Karte  92px  ->  52px tote Hoehe unter dem Stapel
+ *   langer Name   Karte 181px  ->  33px Ueberhang; die Karte ragte aus dem
+ *                                 Container heraus und in die Aktionsleiste
+ *
+ * CSS kann diese Hoehe hier nicht kennen: sie haengt an Name, Zeilenumbruch
+ * und Recurrence-Hint. Deshalb wird sie gemessen — aber bewusst NICHT ueber
+ * `getBoundingClientRect()` der aktiven Karte: deren Rechteck waere waehrend
+ * eines Wischs um bis zu `MAX_RETURN_DISTANCE` verschoben, der Container
+ * wuerde bei jedem Geste mitwachsen. `offsetHeight` ignoriert Transforms
+ * strukturell.
+ *
+ * Gemessen wird die KARTE, nicht der Wrapper: der Stapel-Transform
+ * (`translate`/`rotate`/`scale`) sitzt auf `.catchup-card`, der Wrapper ist nur
+ * der absolut positionierte Rahmen. Ein Rect des Wrappers ignoriert den
+ * Transform und damit genau den Peek-Versatz, den man reservieren will.
+ *
+ * `min-height` ist hier bewusst KEINE Loesung: es klemmt eine kleinere
+ * gemessene `height` ab, unabhaengig von der Spezifitaet. Der Startwert 120px
+ * ist stattdessen ein plausibler Vorlauf, der sofort von der Messung ersetzt
+ * wird — so gibt es weder ein Kollabieren noch eine Klemmung.
+ */
+const stackHeight = ref(120);
+let stackObserver = null;
+
+function measureStack() {
+  const container = containerRef.value;
+  if (!container) return;
+  const containerTop = container.getBoundingClientRect().top;
+  let bottom = 0;
+  const cards = container.querySelectorAll(".catchup-card");
+  cards.forEach((card, index) => {
+    const edge =
+      index === 0
+        ? card.offsetHeight
+        : card.getBoundingClientRect().bottom - containerTop;
+    bottom = Math.max(bottom, edge);
+  });
+  const next = Math.ceil(bottom);
+  if (next !== stackHeight.value) stackHeight.value = next;
+}
+
+/** Beobachtet die gerenderten Karten und bindet den Observer neu, wenn der
+ *  Stapel wechselt (v-for ersetzt die Wrapper). Nur die Karten, NIE den
+ *  Container selbst — sonst loest die gesetzte Hoehe ihren eigenen Resize aus. */
+function observeStack() {
+  if (stackObserver) stackObserver.disconnect();
+  const container = containerRef.value;
+  if (!container) return;
+  stackObserver = new ResizeObserver(() => measureStack());
+  container
+    .querySelectorAll(".catchup-card")
+    .forEach((card) => stackObserver.observe(card));
+  measureStack();
+}
+
 // Pending-Aktion: der Busy-Guard war vorher ein `Set` ohne jedes Template-
 // Binding (Befund B3) — geschuetzt wurde, sichtbar war nichts. Jetzt EIN
 // Zustand statt einer Menge: das Deck zeigt immer nur eine Karte, es kann
@@ -422,13 +490,29 @@ onMounted(async () => {
     loading.value = false;
   }
   document.addEventListener("keydown", onKeydown);
+  // C2: Hoehe des Stapel-Containers messen. `nextTick`, weil die Karten erst
+  // nach dem ersten Render im DOM sind. Zusaetzlich nach den Webfonts: die
+  // haben eine eigene Breite und koennen den Zeilenumbruch des Namens
+  // verschieben, der Heap-Fall von C2 also genau dann auftritt, wenn die
+  // Schrift spaeter als die Messung eintrifft.
+  nextTick(observeStack);
+  document.fonts?.ready.then(() => nextTick(measureStack)).catch(() => {});
 });
+
+// Jeder Wechsel des Stapels ersetzt die Wrapper (v-for auf `key`), der
+// Observer muss also neu gebunden werden. `flush: "post"` laeszt das DOM
+// zuerst aktualisieren.
+watch(visibleStack, () => nextTick(observeStack), { flush: "post" });
 
 // Cleanup beim Verlassen: laufende Timer stoppen, sonst tickt der
 // Laufzeit-Zaehler nach dem Verlassen weiter und der Toast-Timer tickt ins
 // Leere.
 onUnmounted(() => {
   document.removeEventListener("keydown", onKeydown);
+  if (stackObserver) {
+    stackObserver.disconnect();
+    stackObserver = null;
+  }
   if (elapsedTimer) {
     clearInterval(elapsedTimer);
     elapsedTimer = null;
@@ -1017,12 +1101,17 @@ async function applySnooze(offsetDays, customDate) {
 
 /* Fortschritts-Anzeige: siehe .stack-counter (Befund C5). */
 
+/* C2: Die Hoehe kommt aus der Messung (`stackHeight` in CatchUpView) und
+   nicht mehr aus einem festen Wert. Bewusst KEIN `min-height`: es wuerde eine
+   kleinere gemessene `height` unabhaengig von der Spezifitaet abklemmen. Der
+   Vorlauf steckt stattdessen im Startwert von `stackHeight` (120px), der
+   sofort ersetzt wird. */
 .stack-container {
   position: relative;
   width: 100%;
   max-width: 420px;
-  min-height: 160px;
   margin: 0 auto;
+  transition: height var(--transition-normal) var(--motion-soft);
 }
 
 /* Empty State Override */
