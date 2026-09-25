@@ -348,6 +348,6 @@
   --md-sys-color-on-error-container: #ffd9d7;
   --md-sys-color-inverse-surface: #e8f0ee;
   --md-sys-color-inverse-on-surface: #12201f;
-  --md-sys-color-outline-variant: rgb(255, 255, 255, 0.22);
-  --md-sys-color-outline: rgb(255, 255, 255, 0.38);
+  --md-sys-color-outline-variant: rgb(255 255 255 / 0.22);
+  --md-sys-color-outline: rgb(255 255 255 / 0.38);
 }
