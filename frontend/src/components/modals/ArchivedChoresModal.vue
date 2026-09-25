@@ -99,7 +99,7 @@ async function handleUpdate(choreData) {
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000;
+  z-index: var(--md-sys-zindex-modal);
   padding: 1rem;
 }
 

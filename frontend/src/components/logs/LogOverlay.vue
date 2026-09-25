@@ -204,7 +204,7 @@ async function handleRevert(entry) {
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-bottom: none;
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1000;
+  z-index: var(--md-sys-zindex-overlay);
   max-height: 64px;
   overflow: hidden;
   backdrop-filter: blur(16px);

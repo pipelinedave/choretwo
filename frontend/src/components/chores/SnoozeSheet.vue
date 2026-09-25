@@ -88,7 +88,7 @@ function onCustomDate(e) {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
-  z-index: 1200;
+  z-index: var(--md-sys-zindex-sheet);
   display: flex;
   align-items: flex-end;
   justify-content: center;

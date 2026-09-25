@@ -18,6 +18,10 @@
   --color-primary-hover: #285f5f;
   --color-primary-container: #d2e8e4;
   --color-on-primary-container: #103838;
+  /* Text auf gefuellten Flaechen (Primary/Danger/Warning-Buttons). Im Dark
+     Mode ist `--color-primary` ein helles Aqua, daher braucht es dort eine
+     dunkle statt weisse Beschriftung — sonst 2.6:1 Kontrast. */
+  --color-on-accent: #fdfbf7;
   --color-danger: #e76363;
   --color-danger-hover: #cc4f4f;
   --color-warning: #f6c572;
@@ -71,6 +75,9 @@
   --md-sys-elevation-1: var(--shadow-sm);
   --md-sys-elevation-2: var(--shadow-md);
   --md-sys-elevation-3: var(--shadow-lg);
+  /* In ChatWidget (chat-button:hover) referenziert, war aber nicht
+     definiert — `box-shadow` fiel dadurch auf `none`. */
+  --md-sys-elevation-4: 0 18px 48px rgba(31, 45, 44, 0.2);
 
   /* Animation & Motion */
   --transition-fast: 150ms ease;
@@ -101,9 +108,42 @@
   --radius-lg: var(--md-sys-radius-large);
   --radius-full: var(--md-sys-radius-full);
 
+  /* === Z-Index-Achse ====================================================
+     Bisher standen 15 z-index-Werte hartcodiert in den Komponenten, drei
+     davon ueber undefinierte Tokens (`--md-sys-zindex-modal/-overlay/-toast`),
+     wodurch `z-index` auf `auto` fiel. Die Werte unten bilden exakt die
+     bestehende Hierarchie ab (Header < Sheet < Modal < Dialog < Toast). */
+  --md-sys-zindex-sticky: 100;
+  --md-sys-zindex-overlay: 1000;
+  --md-sys-zindex-sheet: 1200;
+  --md-sys-zindex-modal: 2000;
+  --md-sys-zindex-toast: 2200;
+
+  /* === MD-Sys-Farbrollen =================================================
+     Die Alias-Zeilen darunter verweisen auf die `--color-*`-Rolle.
+     Die hier ergaenzten secondary/tertiary/error/inverse-Rollen waren in
+     20 Komponenten referenziert, aber nicht definiert — `background-color`
+     fiel dadurch auf `transparent`, `border` auf `none` und `color` auf
+     den geerbten Wert. Werte an der bestehenden Teal-/Pastell-Palette
+     ausgerichtet, nicht an der geloeschten Purple-Palette. */
+  --md-sys-color-secondary: #5b7f7c;
+  --md-sys-color-secondary-container: #e2ece9;
+  --md-sys-color-on-secondary-container: var(--color-text);
+  --md-sys-color-tertiary-container: #f2e6d6;
+  --md-sys-color-on-tertiary-container: #3b2b1a;
+  --md-sys-color-error: var(--color-danger);
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: rgb(231 99 99 / 0.16);
+  --md-sys-color-on-error-container: #7a2323;
+  --md-sys-color-inverse-surface: #f5eff7;
+  --md-sys-color-inverse-on-surface: #322f35;
+  --md-sys-color-outline-variant: rgb(31 45 44 / 0.15);
+  --md-sys-color-nav-active: var(--color-primary);
+  --md-sys-color-nav-inactive: var(--color-text-muted);
+
   /* MD Sys color aliases */
   --md-sys-color-primary: var(--color-primary);
-  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-on-primary: var(--color-on-accent);
   --md-sys-color-primary-container: var(--color-primary-container);
   --md-sys-color-on-primary-container: var(--color-on-primary-container);
   --md-sys-color-background: var(--color-background);
@@ -112,7 +152,7 @@
   --md-sys-color-on-surface: var(--color-text);
   --md-sys-color-surface-variant: var(--color-surface-variant);
   --md-sys-color-on-surface-variant: var(--color-text-muted);
-  --md-sys-color-outline: rgba(31, 45, 44, 0.2);
+  --md-sys-color-outline: rgb(31 45 44 / 0.2);
   --md-sys-color-overdue: var(--color-overdue);
   --md-sys-color-due-soon: var(--color-due-soon);
   --md-sys-color-due-later: var(--color-due-far-future);
@@ -151,6 +191,7 @@
   --color-primary-hover: #5fc2b7;
   --color-primary-container: #204c47;
   --color-on-primary-container: #c4ece6;
+  --color-on-accent: #06201d;
 
   --color-overdue: #82403b;
   --color-due-today: #804e38;
@@ -166,4 +207,21 @@
   --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.45);
+  --md-sys-elevation-4: 0 18px 48px rgba(0, 0, 0, 0.5);
+
+  /* Dark-Mode-Varianten der ergaenzten MD-Sys-Rollen: die Light-Mode-Werte
+     waeren auf dunklen Surfaces entweder unsichtbar (Container) oder zu
+     kontrastarm (Text darauf). */
+  --md-sys-color-secondary: #8fb3af;
+  --md-sys-color-secondary-container: #2c3f3d;
+  --md-sys-color-on-secondary-container: #d6e3e0;
+  --md-sys-color-tertiary-container: #3d3327;
+  --md-sys-color-on-tertiary-container: #f0e2d0;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: rgb(231 99 99 / 0.28);
+  --md-sys-color-on-error-container: #ffd9d7;
+  --md-sys-color-inverse-surface: #e8f0ee;
+  --md-sys-color-inverse-on-surface: #12201f;
+  --md-sys-color-outline-variant: rgb(255, 255, 255, 0.22);
+  --md-sys-color-outline: rgb(255, 255, 255, 0.38);
 }

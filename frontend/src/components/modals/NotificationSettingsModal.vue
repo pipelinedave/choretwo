@@ -180,7 +180,7 @@ async function sendTestNotification() {
   bottom: 0;
   background: rgba(31, 45, 44, 0.45);
   backdrop-filter: blur(4px);
-  z-index: 2000;
+  z-index: var(--md-sys-zindex-modal);
   display: flex;
   align-items: center;
   justify-content: center;

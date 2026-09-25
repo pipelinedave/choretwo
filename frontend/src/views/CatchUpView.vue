@@ -540,7 +540,7 @@ async function applySnooze(offsetDays, customDate) {
   padding: 10px 16px;
   border-radius: var(--md-sys-radius-full);
   box-shadow: var(--shadow-lg);
-  z-index: 2100; /* über dem Success-Overlay (1400), damit UNDO immer klickbar bleibt */
+  z-index: var(--md-sys-zindex-toast); /* über dem Success-Overlay (1400), damit UNDO immer klickbar bleibt */
   max-width: calc(100vw - 32px);
   font-size: 0.85rem;
 }

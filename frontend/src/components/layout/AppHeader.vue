@@ -215,7 +215,7 @@ async function installPwa() {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--md-sys-zindex-sticky);
   margin-bottom: var(--md-sys-spacing-md);
   backdrop-filter: blur(16px);
 }
@@ -319,7 +319,7 @@ async function installPwa() {
   box-shadow: var(--shadow-lg);
   border: 1px solid rgba(255, 255, 255, 0.7);
   padding: 8px 0;
-  z-index: 1000;
+  z-index: var(--md-sys-zindex-overlay);
   overflow: hidden;
   backdrop-filter: blur(20px);
 }
