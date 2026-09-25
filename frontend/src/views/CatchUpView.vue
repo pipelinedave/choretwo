@@ -94,13 +94,15 @@
       @action="setFilter('all')"
     />
 
-    <!-- Abgearbeitete Runde (Befund D1 ersetzt diesen Zweig durch die
-         Session-Zusammenfassung). -->
-    <EmptyState
-      v-else-if="stackLength === 0"
-      message="Alles geschafft — kein Chore mehr im Aufholen-Stapel! 🎉"
-      :show-add-button="true"
-      @add="$router.push('/chores')"
+    <!-- Session-Ende (Befund D1): Zusammenfassung statt Auto-Redirect. -->
+    <CatchUpSummary
+      v-else-if="stackLength === 0 && emptyReason === 'complete'"
+      :summary="summary"
+      :last-entry="history[0] || null"
+      :busy="historyBusyId !== null"
+      @continue="startNextRound"
+      @exit="$router.push('/')"
+      @undo="undoHistoryEntry"
     />
 
     <!-- Card Stack: nur die oberste Card + max. 1 Deck-Peek rendern.
@@ -182,29 +184,21 @@
         <button v-if="toast.action" class="toast-action" @click="triggerAction">
           {{ toast.action }}
         </button>
-        <span class="toast-close mdi mdi-close" @click="hideToast"></span>
-      </div>
-    </transition>
-
-    <!-- Success overlay when stack fully done -->
-    <transition name="confetti-fade">
-      <div
-        v-if="showSuccess"
-        class="success-overlay"
-        :aria-hidden="!showSuccess"
-      >
-        <div class="success-check">
-          <span class="mdi mdi-check"></span>
-        </div>
-        <p class="success-text">Alles geschafft! 🎉</p>
+        <span
+          class="toast-close mdi mdi-close"
+          role="button"
+          tabindex="0"
+          aria-label="Hinweis schließen"
+          @click="hideToast"
+          @keydown.enter.prevent="hideToast"
+        ></span>
       </div>
     </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useChoreStore } from "@/stores/chore";
 import { useAuthStore } from "@/stores/auth";
 import {
@@ -215,15 +209,14 @@ import {
 } from "@/utils/catchUpStack";
 
 import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
-import EmptyState from "@/components/chores/EmptyState.vue";
 import CatchUpCard from "@/components/chores/CatchUpCard.vue";
 import CatchUpActionBar from "@/components/chores/catchup/CatchUpActionBar.vue";
 import CatchUpEmptyState from "@/components/chores/catchup/CatchUpEmptyState.vue";
 import CatchUpHistoryPanel from "@/components/chores/catchup/CatchUpHistoryPanel.vue";
+import CatchUpSummary from "@/components/chores/catchup/CatchUpSummary.vue";
 import CatchUpShortcuts from "@/components/chores/catchup/CatchUpShortcuts.vue";
 import SnoozeSheet from "@/components/chores/SnoozeSheet.vue";
 
-const router = useRouter();
 const choreStore = useChoreStore();
 const authStore = useAuthStore();
 
@@ -272,6 +265,63 @@ const visibleStack = computed(() => filteredStack.value.slice(0, 2));
 // Alles, was der Filter gerade zeigt — steuert Empty-State, Filterleiste und
 // den z-index der Karten.
 const stackLength = computed(() => filteredStack.value.length);
+
+// Bilanz der Runde fuer die Zusammenfassung (Befund D1). Bewusst Zaehler und
+// nicht die Historie: die Historie ist auf 20 Eintraege gedeckelt, die Bilanz
+// darf es nicht sein — bei 30 Aktionen zeigte eine Zaehlung der Liste
+// "10 erledigt" fuer eine Runde mit 30.
+const tally = ref({ done: 0, snoozed: 0 });
+const countTally = (kind, delta) => {
+  tally.value = { ...tally.value, [kind]: tally.value[kind] + delta };
+};
+
+// Laufzeit der Runde. Die Uhr laeuft nur, solange der Session-Ende-Screen
+// sichtbar ist — ein Intervall, das im Leerlauf ueber eine nicht gelesene
+// Ref tickt, waere Energie ohne Information.
+const startedAt = ref(Date.now());
+const elapsedMs = ref(0);
+let elapsedTimer = null;
+const tickElapsed = () => {
+  elapsedMs.value = Date.now() - startedAt.value;
+};
+
+const showSummary = computed(() => emptyReason.value === "complete");
+
+const summary = computed(() => ({
+  ...tally.value,
+  remaining: sessionStack.value.length,
+  total: sessionTotal.value,
+  elapsedMs: elapsedMs.value,
+}));
+
+watch(showSummary, (isShown) => {
+  if (isShown) {
+    tickElapsed();
+    if (!elapsedTimer) elapsedTimer = setInterval(tickElapsed, 1000);
+  } else if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+});
+
+/**
+ * Naechste Runde: Stapel frisch vom Server holen, Filter und Bilanz
+ * zuruecksetzen. Der Neuaufruf ist noetig, weil waehrend der Runde Chores
+ * hinzugekommen sein koennen (anderes Geraet, Kopilot) und der
+ * `snoozedIds`-Satz der Runde fuer eine neue Runde nicht gilt.
+ */
+async function startNextRound() {
+  const loaded = await callStore(() => choreStore.fetchChores(), "");
+  if (loaded === null) return;
+  history.value = [];
+  tally.value = { done: 0, snoozed: 0 };
+  snoozedIds.value = new Set();
+  setFilter("all");
+  startedAt.value = Date.now();
+  elapsedMs.value = 0;
+  rebuildStack(true);
+  focusDeck();
+}
 
 // Filter: "all" | "urgent" (nur Überfällig + Heute)
 const displayFilter = ref("all");
@@ -360,12 +410,6 @@ async function undoHistoryEntry(id) {
 const toast = ref({ visible: false, message: "", action: null, handler: null });
 const toastTimer = ref(null);
 
-// Success effect
-const showSuccess = ref(false);
-// Timer für das Erfolgs-Routing – wird beim UNDO abgebrochen, damit die View
-// nicht wegnavigiert, solange der User noch rückgängig machen kann.
-let successTimer = null;
-
 onMounted(async () => {
   try {
     await choreStore.fetchChores();
@@ -378,14 +422,14 @@ onMounted(async () => {
   document.addEventListener("keydown", onKeydown);
 });
 
-// Cleanup beim Verlassen: laufende Timer stoppen, sonst feuert der
-// Success-Timer nach dem Verlassen noch einen router.push("/") und
-// der Toast-Timer tickt ins Leere.
+// Cleanup beim Verlassen: laufende Timer stoppen, sonst tickt der
+// Laufzeit-Zaehler nach dem Verlassen weiter und der Toast-Timer tickt ins
+// Leere.
 onUnmounted(() => {
   document.removeEventListener("keydown", onKeydown);
-  if (successTimer) {
-    clearTimeout(successTimer);
-    successTimer = null;
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
   }
   if (toastTimer.value) {
     clearTimeout(toastTimer.value);
@@ -644,16 +688,7 @@ async function handleToggle(choreId) {
       icon: "mdi-check-bold",
       undo: () => handleUndo(choreId),
     });
-
-    if (sessionStack.value.length === 0) {
-      showSuccess.value = true;
-      if (successTimer) clearTimeout(successTimer);
-      successTimer = setTimeout(() => {
-        showSuccess.value = false;
-        successTimer = null;
-        setTimeout(() => router.push("/"), 500);
-      }, 1300);
-    }
+    countTally("done", 1);
   } finally {
     pending.value = null;
   }
@@ -662,14 +697,6 @@ async function handleToggle(choreId) {
 async function handleUndo(choreId) {
   if (isBusy(choreId)) return;
   pending.value = { id: choreId, kind: "done" };
-  // Sofort (vor dem await) den Erfolgs-Overlay + Redirect-Timer stoppen:
-  // sonst räumt der ablaufende Timer die View weg, während undoDone noch läuft
-  // (Race bei der letzten Chore). Die zurückgeholte Chore muss wieder sichtbar sein.
-  if (successTimer) {
-    clearTimeout(successTimer);
-    successTimer = null;
-  }
-  showSuccess.value = false;
   const result = await callStore(
     () => choreStore.undoDone(choreId),
     "Fehler beim Rückgängig machen",
@@ -677,6 +704,7 @@ async function handleUndo(choreId) {
   try {
     if (!result) return false;
     rebuildStack();
+    countTally("done", -1);
     showToast("Chore wieder geöffnet", null, null, 2500);
     return true;
   } finally {
@@ -705,6 +733,7 @@ async function handleSnoozeUndo(choreId, prevDue, choreName) {
       [...snoozedIds.value].filter((id) => id !== choreId),
     );
     rebuildStack();
+    countTally("snoozed", -1);
     showToast(`${choreName} zurück im Aufholen-Stapel`, null, null, 2500);
     return true;
   } finally {
@@ -762,6 +791,7 @@ async function applySnooze(offsetDays, customDate) {
       icon: "mdi-clock-outline",
       undo: () => handleSnoozeUndo(chore.id, prevDue, chore.name),
     });
+    countTally("snoozed", 1);
   } finally {
     pending.value = null;
   }
@@ -1055,70 +1085,4 @@ async function applySnooze(offsetDays, customDate) {
   transform: translateX(-50%) translateY(10px);
 }
 
-/* Success overlay */
-.success-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-overlay-scrim);
-  backdrop-filter: blur(4px);
-  z-index: 1400;
-  /* Das Erfolgs-Overlay ist rein dekorativ und darf Klicks NIEMALS blockieren:
-     Der UNDO-Toast (z-index 2100) muss auch bei leerem Stack sofort nutzbar
-     sein, sonst gewinnt der Auto-Redirect das Race gegen das Rückgängig-Machen. */
-  pointer-events: none;
-}
-
-.success-check {
-  width: 84px;
-  height: 84px;
-  border-radius: 50%;
-  background: var(--color-success);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-on-accent);
-  font-size: 3rem;
-  animation: successPop 0.5s var(--motion-emphasized);
-}
-
-.success-text {
-  /* Sitzt auf dem Scrim (nicht auf dem gruenen Kreis) — der Scrim ist in
-     beiden Themes dunkel, also bleibt die Schrift hell. */
-  color: #ffffff;
-  font-size: 1.3rem;
-  font-weight: 800;
-  margin-top: 16px;
-  text-shadow: 0 2px 8px rgb(var(--md-sys-color-shadow-rgb) / 0.3);
-}
-
-@keyframes successPop {
-  0% {
-    transform: scale(0.4);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.confetti-fade-enter-active,
-.confetti-fade-leave-active {
-  transition: opacity var(--transition-slow);
-}
-
-.confetti-fade-enter-from,
-.confetti-fade-leave-to {
-  opacity: 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .success-check {
-    animation: none;
-  }
-}
 </style>
