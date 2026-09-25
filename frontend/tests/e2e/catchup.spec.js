@@ -6,6 +6,12 @@
  * auf), Fortschrittsanzeige und Empty-State.
  */
 import { test, expect } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
+
+// Eigene Test-Adresse: diese Spec und die beiden anderen CatchUp-Specs teilen
+// sich die DB, legen aber Chores unter verschiedenen `user_email` an. Sonst
+// mischen sich die Stacks der Specs gegenseitig.
+const USER = specEmail("catchup");
 
 test.describe("CatchUp Stack", () => {
   let token = null;
@@ -22,13 +28,9 @@ test.describe("CatchUp Stack", () => {
     return `${y}-${m}-${day}`;
   };
 
+  // JWT-Injection statt OIDC-Flow — siehe helpers/auth.js fuer die Begruendung.
   async function login(page) {
-    await page.context().clearCookies();
-    await page.goto("/login");
-    await page.click(".btn-login");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/");
-    token = await page.evaluate(() => localStorage.getItem("token"));
+    token = await e2eLogin(page, { email: USER, name: "CatchUp" });
     expect(token).toBeTruthy();
   }
 

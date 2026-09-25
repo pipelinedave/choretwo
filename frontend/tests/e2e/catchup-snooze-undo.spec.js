@@ -3,6 +3,10 @@
  * Snooze (Aufschieben per Button) und Undo (Chore nach "erledigt" wieder oeffnen).
  */
 import { test, expect } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
+
+// Eigene Test-Adresse pro Spec — siehe catchup-edge-cases.spec.js.
+const USER = specEmail("catchup-snooze");
 
 test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
   let token = null;
@@ -21,13 +25,9 @@ test.describe("CatchUp 2.0 (Snooze & Undo)", () => {
 
   const dateForOffsetDays = (offsetDays) => dueDateFor(offsetDays);
 
+  // JWT-Injection statt OIDC-Flow — siehe helpers/auth.js fuer die Begruendung.
   async function login(page) {
-    await page.context().clearCookies();
-    await page.goto("/login");
-    await page.click(".btn-login");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/");
-    token = await page.evaluate(() => localStorage.getItem("token"));
+    token = await e2eLogin(page, { email: USER, name: "CatchUp Snooze" });
     expect(token).toBeTruthy();
   }
 

@@ -6,6 +6,11 @@
  * Filter "Überfällig + Heute" und den Fortschrittszähler nach done/undo.
  */
 import { test, expect } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
+
+// Eigene Test-Adresse pro Spec — verhindert, dass sich die CatchUp-Stacks der
+// drei CatchUp-Specs in der geteilten Test-DB gegenseitig verunreinigen.
+const USER = specEmail("catchup-edge");
 
 test.describe("CatchUp 2.0 Edge-Cases", () => {
   let token = null;
@@ -22,20 +27,10 @@ test.describe("CatchUp 2.0 Edge-Cases", () => {
     return `${y}-${m}-${day}`;
   };
 
+  // JWT-Injection statt OIDC-Flow — siehe helpers/auth.js fuer die Begruendung.
+  // Das Warten auf den persistierten Token ist in `e2eLogin` enthalten.
   async function login(page) {
-    await page.context().clearCookies();
-    await page.goto("/login");
-    await page.click(".btn-login");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/");
-    // Robustheit: auf den tatsächlich in localStorage persistierten Token warten
-    // (nicht nur auf die Navigation). Sonst kann ein Race dazu führen, dass die
-    // nachfolgende Navigation zu /catchup noch ohne Token läuft und auf /login
-    // zurückgeworfen wird — vor allem unter Last im kombinierten Lauf.
-    await page.waitForFunction(() => !!localStorage.getItem("token"), null, {
-      timeout: 5000,
-    });
-    token = await page.evaluate(() => localStorage.getItem("token"));
+    token = await e2eLogin(page, { email: USER, name: "CatchUp Edge" });
     expect(token).toBeTruthy();
   }
 
