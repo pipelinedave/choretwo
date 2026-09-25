@@ -1,25 +1,24 @@
 import { test, expect } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
+
+
+// Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
+// dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
+const USER = specEmail("filter-pills");
 
 test.describe("FilterPills E2E", () => {
   test.beforeEach(async ({ context, page }) => {
     await context.clearCookies();
     await context.addCookies([]);
 
-    // Step 1: Navigate to mock login API endpoint
-    await page.goto("/api/auth/login");
-    await page.waitForURL("**/mock-login-page*");
+    // Login per JWT-Injection; `e2eLogin` wartet auf den persistierten Token.
+    await e2eLogin(page, { email: USER, name: "FilterPills" });
 
-    // Step 2: Submit the mock login form
-    await page.click('button[type="submit"]');
-
-    // Step 3: Wait for the auth-callback with token
-    await page.waitForURL("**/auth-callback?token=*");
-
-    // Step 4: Home page loads — wait for stats grid (proves callback finished)
-    await page.waitForSelector(".stats-grid");
-
-    // Step 5: Navigate to chores page
-    await page.click('a[href="/chores"]');
+    // Chores-Ansicht. Die alte Spec wartete hier auf `.stats-grid` — das
+    // Element existiert im src nicht (dokumentierte Test-Drift in
+    // SESSION_STATE.md). Ersatz: die Filter-Pills selbst sind das Signal,
+    // dass die Chores-Ansicht gemountet ist.
+    await page.goto("/chores");
     await page.waitForSelector(".filter-pills");
     await page.waitForTimeout(500);
   });
@@ -41,8 +40,9 @@ test.describe("FilterPills E2E", () => {
     const clearBtn = page.locator(".clear-btn");
     await expect(clearBtn).toBeVisible();
 
-    const icon = clearBtn.locator("i");
-    await expect(icon).toHaveClass(/mdi-close/);
+    // Das MDI-Icon ist ein <span class="mdi mdi-close"> (FilterPills.vue:12),
+    // kein <i> — die Spec suchte noch nach der aelteren Auszeichnung.
+    await expect(clearBtn.locator("span.mdi-close")).toBeVisible();
   });
 
   test("clear button clears filter", async ({ page }) => {
@@ -67,13 +67,16 @@ test.describe("FilterPills E2E", () => {
   });
 
   test("chip counts display correctly", async ({ page }) => {
-    const pills = page.locator(".filter-pills .chip");
     const countBadges = page.locator(".chip-count");
     await expect(countBadges).not.toHaveCount(0);
 
-    for (const badge of countBadges.all()) {
-      const text = await badge.textContent();
-      expect(text).toMatch(/\d+/);
+    // `locator.all()` gibt es in aktuellen Playwright-Versionen nicht mehr
+    // (entfernt, nicht nur deprecated) — stattdessen ueber die Zahl iterieren
+    // und mit nth() zulaeufig locaten.
+    const total = await countBadges.count();
+    for (let i = 0; i < total; i++) {
+      const text = await countBadges.nth(i).textContent();
+      expect(text, `chip-count #${i} sollte eine Zahl enthalten`).toMatch(/\d+/);
     }
   });
 });

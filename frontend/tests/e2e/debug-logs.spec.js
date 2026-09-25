@@ -1,13 +1,15 @@
 import { test } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
+
+// Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
+// dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
+const USER = specEmail("debug-logs");
 test("debug: what action_types exist for done events?", async ({
   page,
   request,
 }) => {
-  await page.goto("/login");
-  await page.click(".btn-login");
-  await page.click('button[type="submit"]');
-  await page.waitForURL("/");
+  await e2eLogin(page, { email: USER, name: "debug-logs" });
 
   const token = await page.evaluate(() => localStorage.getItem("token"));
 

@@ -1,26 +1,22 @@
 import { test, expect, request } from "@playwright/test";
+import { makeToken, specEmail } from "./helpers/auth.js";
 
+// Diese Spec ist eine reine API-Spec (kein Browser). Sie lief urspruenglich
+// gegen den Microservice-Stack mit drei Ports (8001 auth, 8002 chore, 8003 log).
+// Der Monolith bietet dieselben Endpunkte unter einem Port; die Aufteilung ist
+// seit der Modular-Monolith-Migration ueberholt. Zusaetzlich ist der
+// mock-callback-Token weggefallen — der Token entsteht jetzt lokal, siehe
+// helpers/auth.js.
+const MONOLITH = "http://127.0.0.1:8000";
 const BASE = {
-  chore: "http://localhost:8002",
-  log: "http://localhost:8003",
+  chore: MONOLITH,
+  log: MONOLITH,
 };
 
-async function getToken() {
-  const ctx = await request.newContext();
-  const data = new URLSearchParams({
-    email: "developer@example.com",
-    name: "Test Developer",
-  }).toString();
-  const resp = await ctx.post("http://localhost:8001/api/auth/mock-callback", {
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    data,
-    maxRedirects: 0,
-  });
-  const loc = resp.headers()["location"] || "";
-  const match = loc.match(/token=([^&]+)/);
-  const token = match ? match[1] : null;
-  await ctx.dispose();
-  return token;
+const USER = specEmail("undo-fix-verify");
+
+function getToken() {
+  return makeToken(USER, { name: "Undo Verify" });
 }
 
 async function api(method, baseUrl, path, body, token) {
@@ -49,14 +45,13 @@ test.describe("Undo marked_done Bug Fix", () => {
   let token;
 
   test.beforeAll(async () => {
-    token = await getToken();
+    token = getToken();
     expect(token).toBeDefined();
-    console.log(`\n✅ Token: ${token.substring(0, 40)}...\n`);
   });
 
   test("undo marked_done resets due_date, last_done, done_by", async () => {
     const today = new Date().toISOString().split("T")[0];
-    const email = "developer@example.com";
+    const email = USER;
 
     // 1. Create chore
     console.log(`[1] Create chore (due_date=${today})`);

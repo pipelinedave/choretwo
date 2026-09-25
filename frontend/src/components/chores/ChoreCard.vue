@@ -173,7 +173,6 @@ const props = defineProps({
 const emit = defineEmits([
   "toggle",
   "markAsDone",
-  "edit",
   "updateChore",
   "archive",
   "archiveChore",
@@ -437,7 +436,13 @@ function enterEditMode() {
     archived: !!props.chore.archived,
   };
   editMode.value = true;
-  emit("edit", props.chore.id);
+  // KEIN emit("edit") hier: ChoresView oeffnet daraufhin ein zweites
+  // AddChoreForm-Modal ueber dem Inline-Editor. Ergebnis waren zwei
+  // konkurrierende Edit-Oberflaechen gleichzeitig, whereby das Modal den
+  // Inline-Archive-Button nicht klickbar liess (dokumentiert in
+  // swipe-interactions.spec.js "swipe+edit archive removes chore").
+  // HomeView bindet kein @edit und nutzt ohnehin nur den Inline-Editor —
+  // das Entfernen macht beide Views einheitlich.
 }
 
 function cancelEditMode() {

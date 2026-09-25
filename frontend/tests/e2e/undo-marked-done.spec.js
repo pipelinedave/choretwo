@@ -1,15 +1,17 @@
 import { test, expect } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
+
+// Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
+// dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
+const USER = specEmail("undo-marked-done");
 test.describe("Undo marked_done fix", () => {
   test("undo should reset chore to incomplete state with correct due_date", async ({
     page,
     request,
   }) => {
     // Login via the same flow as other passing tests
-    await page.goto("/login");
-    await page.click(".btn-login");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/");
+    await e2eLogin(page, { email: USER, name: "undo-marked-done" });
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
     const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -98,10 +100,7 @@ test.describe("Undo marked_done fix", () => {
     request,
   }) => {
     // Login
-    await page.goto("/login");
-    await page.click(".btn-login");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/");
+    await e2eLogin(page, { email: USER, name: "undo-marked-done" });
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
     const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)

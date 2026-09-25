@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
+import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
+
+// Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
+// dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
+const USER = specEmail("settings-notifications");
 test.describe("Settings — Notification Draft & Save", () => {
   test.beforeEach(async ({ context, page }) => {
     await context.clearCookies();
-    await page.goto("/login");
-    await page.click(".btn-login");
-    await page.click('button[type="submit"]');
-    await page.waitForURL("/", { timeout: 15000 });
+    await e2eLogin(page, { email: USER, name: "settings-notifications" });
   });
 
   test("toggling enable notifications should show save bar", async ({

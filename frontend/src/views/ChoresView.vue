@@ -30,7 +30,7 @@
         :key="chore.id"
         :chore="chore"
         @toggle="handleToggle"
-        @edit="handleEdit"
+        @updateChore="handleUpdateChore"
         @archive="handleArchive"
       />
     </div>
@@ -40,14 +40,6 @@
       v-if="showAddForm"
       @submit="handleAddChore"
       @close="showAddForm = false"
-    />
-
-    <!-- Edit chore form modal -->
-    <AddChoreForm
-      v-if="showEditForm && editingChore"
-      :chore="editingChore"
-      @submit="handleUpdateChore"
-      @close="showEditForm = false"
     />
 
     <!-- Undo banner -->
@@ -71,8 +63,6 @@ const choreStore = useChoreStore();
 const authStore = useAuthStore();
 
 const showAddForm = ref(false);
-const showEditForm = ref(false);
-const editingChore = ref(null);
 
 const filterMessage = computed(() => {
   const filter = choreStore.filter;
@@ -97,10 +87,9 @@ async function handleToggle(choreId) {
   }
 }
 
-function handleEdit(choreId) {
-  editingChore.value = choreStore.chores.find((c) => c.id === choreId);
-  showEditForm.value = true;
-}
+// Kein eigenes Edit-Modal mehr: die ChoreCard editiert inline und emittiert
+// `updateChore`. Das Modal lag ueber dem Inline-Editor und blockierte dessen
+// Buttons — siehe ChoreCard.vue, Kommentar an der entfernten emit("edit").
 
 async function handleArchive(choreId) {
   try {
@@ -122,8 +111,6 @@ async function handleAddChore(formData) {
 async function handleUpdateChore(formData) {
   try {
     await choreStore.updateChore(formData.id, formData);
-    showEditForm.value = false;
-    editingChore.value = null;
   } catch (err) {
     console.error("Failed to update chore:", err);
   }
