@@ -127,7 +127,7 @@ async function handleGoogle() {
   background: var(--color-surface);
   border-radius: var(--md-sys-radius-large);
   box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   backdrop-filter: blur(20px);
 }
 
@@ -174,7 +174,7 @@ async function handleGoogle() {
   font-size: 1rem;
   font-family: inherit;
   border-radius: var(--md-sys-radius-medium);
-  border: 1px solid var(--color-surface-variant, rgba(0, 0, 0, 0.15));
+  border: 1px solid var(--color-surface-variant, color-mix(in srgb, var(--color-text) 15%, transparent));
   background: var(--color-surface-light, #fff);
   color: var(--color-text);
   text-align: center;
@@ -203,7 +203,7 @@ async function handleGoogle() {
 
 .login-message {
   padding: 0.5rem 1rem;
-  background-color: rgba(231, 99, 99, 0.15);
+  background-color: var(--color-danger-subtle);
   color: var(--color-danger);
   border-radius: var(--md-sys-radius-small);
   font-size: 0.85rem;

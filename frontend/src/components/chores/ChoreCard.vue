@@ -529,7 +529,7 @@ function handleArchive() {
   cursor: grab;
   transition: box-shadow var(--transition-normal);
   color: var(--color-text);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  border: 1px solid var(--color-border-glass-subtle);
   backdrop-filter: blur(14px);
 }
 
@@ -649,7 +649,7 @@ function handleArchive() {
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
-  background: rgba(31, 45, 44, 0.12);
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
   border-radius: 11px;
   font-size: 0.75rem;
   font-weight: 700;

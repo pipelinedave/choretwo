@@ -171,7 +171,7 @@ async function handleFileSelected(event) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(31, 45, 44, 0.45);
+  background: var(--color-overlay-scrim);
   backdrop-filter: blur(4px);
   z-index: var(--md-sys-zindex-modal);
   display: flex;
@@ -198,7 +198,7 @@ async function handleFileSelected(event) {
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -240,15 +240,15 @@ async function handleFileSelected(event) {
 }
 
 .status-msg.success {
-  background: rgba(72, 187, 120, 0.15);
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
   color: #2e7d32;
-  border: 1px solid rgba(72, 187, 120, 0.3);
+  border: 1px solid color-mix(in srgb, var(--color-success) 30%, transparent);
 }
 
 .status-msg.error {
-  background: rgba(231, 99, 99, 0.15);
+  background: var(--color-danger-subtle);
   color: var(--color-danger);
-  border: 1px solid rgba(231, 99, 99, 0.3);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
 }
 
 .modal-footer {
@@ -256,6 +256,6 @@ async function handleFileSelected(event) {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid var(--color-surface-lighter);
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-surface-overlay-soft);
 }
 </style>

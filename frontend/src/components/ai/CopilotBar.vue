@@ -142,7 +142,7 @@ async function handleSubmit() {
   align-items: center;
   gap: 10px;
   background: var(--color-surface);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   border-radius: var(--md-sys-radius-medium);
   padding: 6px 12px;
   box-shadow: var(--shadow-sm);
@@ -192,7 +192,7 @@ async function handleSubmit() {
 .ai-feedback {
   margin-top: 8px;
   padding: 8px 14px;
-  background: rgba(47, 111, 111, 0.12);
+  background: var(--color-primary-subtle);
   border-radius: var(--md-sys-radius-small);
   display: flex;
   justify-content: space-between;
@@ -204,7 +204,7 @@ async function handleSubmit() {
 }
 
 .ai-feedback.error {
-  background: rgba(231, 99, 99, 0.15);
+  background: var(--color-danger-subtle);
   color: var(--color-danger);
 }
 
@@ -245,8 +245,8 @@ async function handleSubmit() {
 .spinner-sm {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: white;
+  border: 2px solid color-mix(in srgb, var(--color-on-accent) 40%, transparent);
+  border-top-color: var(--color-on-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

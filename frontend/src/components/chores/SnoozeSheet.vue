@@ -87,7 +87,7 @@ function onCustomDate(e) {
 .snooze-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--color-overlay-scrim);
   z-index: var(--md-sys-zindex-sheet);
   display: flex;
   align-items: flex-end;

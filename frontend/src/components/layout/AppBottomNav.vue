@@ -45,7 +45,7 @@ const isActive = (path) => {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 -2px 8px rgb(var(--md-sys-color-shadow-rgb) / 0.1);
   z-index: var(--md-sys-zindex-overlay);
   padding-bottom: env(safe-area-inset-bottom);
 }

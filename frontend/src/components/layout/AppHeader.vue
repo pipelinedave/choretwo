@@ -255,7 +255,7 @@ async function installPwa() {
   border-radius: 50%;
   background: var(--color-surface);
   color: var(--color-text);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--color-border-glass-subtle);
   font-size: 1.25rem;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -317,7 +317,7 @@ async function installPwa() {
     );
   border-radius: var(--md-sys-radius-medium);
   box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   padding: 8px 0;
   z-index: var(--md-sys-zindex-overlay);
   overflow: hidden;
@@ -357,7 +357,7 @@ async function installPwa() {
 }
 
 .menu-item:hover {
-  background: rgba(47, 111, 111, 0.12);
+  background: var(--color-primary-subtle);
   transform: none;
 }
 

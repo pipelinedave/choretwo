@@ -94,7 +94,7 @@ async function handleUpdate(choreData) {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(31, 45, 44, 0.45);
+  background: var(--color-overlay-scrim);
   backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
@@ -124,7 +124,7 @@ async function handleUpdate(choreData) {
   display: flex;
   flex-direction: column;
   color: var(--color-text);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   overflow: hidden;
 }
 
@@ -174,6 +174,6 @@ async function handleUpdate(choreData) {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid var(--color-surface-lighter);
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-surface-overlay-soft);
 }
 </style>

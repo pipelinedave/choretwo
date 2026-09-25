@@ -416,7 +416,7 @@ async function applySnooze(offsetDays, customDate) {
 }
 
 .back-btn:hover {
-  background: rgba(47, 111, 111, 0.1);
+  background: var(--color-primary-subtle);
 }
 
 .catchup-title-area {
@@ -445,7 +445,7 @@ async function applySnooze(offsetDays, customDate) {
 
 .filter-chip {
   padding: 6px 14px;
-  border: 1px solid rgba(31, 45, 44, 0.15);
+  border: 1px solid color-mix(in srgb, var(--color-text) 15%, transparent);
   background: var(--color-surface);
   color: var(--color-text-muted);
   border-radius: var(--md-sys-radius-full);
@@ -461,13 +461,13 @@ async function applySnooze(offsetDays, customDate) {
 .filter-chip.active {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 /* Progress Bar */
 .progress-bar {
   height: 6px;
-  background: rgba(31, 45, 44, 0.08);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
   border-radius: var(--md-sys-radius-full);
   overflow: hidden;
   margin-bottom: 20px;
@@ -506,7 +506,7 @@ async function applySnooze(offsetDays, customDate) {
   padding: 6px 18px;
   border-radius: var(--md-sys-radius-full);
   background: var(--color-primary);
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: 0.9rem;
   font-weight: 800;
   letter-spacing: 0.3px;
@@ -535,8 +535,11 @@ async function applySnooze(offsetDays, customDate) {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Der Toast invertiert gegen --color-text: im Light Mode dunkler
+     Hintergrund/helle Schrift, im Dark Mode heller Hintergrund/dunkle
+     Schrift. Ein festes #ffffff waere im Dark Mode unsichtbar. */
   background: var(--color-text);
-  color: #ffffff;
+  color: var(--color-background);
   padding: 10px 16px;
   border-radius: var(--md-sys-radius-full);
   box-shadow: var(--shadow-lg);
@@ -588,7 +591,7 @@ async function applySnooze(offsetDays, customDate) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(31, 45, 44, 0.35);
+  background: var(--color-overlay-scrim);
   backdrop-filter: blur(4px);
   z-index: 1400;
   /* Das Erfolgs-Overlay ist rein dekorativ und darf Klicks NIEMALS blockieren:
@@ -605,17 +608,19 @@ async function applySnooze(offsetDays, customDate) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--color-on-accent);
   font-size: 3rem;
   animation: successPop 0.5s var(--motion-emphasized);
 }
 
 .success-text {
+  /* Sitzt auf dem Scrim (nicht auf dem gruenen Kreis) — der Scrim ist in
+     beiden Themes dunkel, also bleibt die Schrift hell. */
   color: #ffffff;
   font-size: 1.3rem;
   font-weight: 800;
   margin-top: 16px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 8px rgb(var(--md-sys-color-shadow-rgb) / 0.3);
 }
 
 @keyframes successPop {

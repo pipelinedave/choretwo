@@ -68,8 +68,8 @@
   --space-xxs: 0.25rem;
 
   /* === Alpha-Basis: RGB-Triplets =========================================
-     Ersetzen die rgba()-Literale in den Komponenten. Statt
-     `rgba(31, 45, 44, 0.12)` steht dort `rgb(var(--md-sys-color-ink-rgb) / 0.12)`.
+     Ersetzen die rgba()-Literale in den Komponenten. Statt eines
+     hardcodierten Ink-Werts steht dort `rgb(var(--md-sys-color-ink-rgb) / 0.12)`.
      Zwei Gewinne: die Basisfarbe ist nur noch an einer Stelle justierbar,
      und sie folgt ueber das Dark-Mode-Override automatisch dem Theme. */
   --md-sys-color-white-rgb: 255 255 255;

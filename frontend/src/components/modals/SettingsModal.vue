@@ -111,7 +111,7 @@ function savePreferences() {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(31, 45, 44, 0.45);
+  background: var(--color-overlay-scrim);
   backdrop-filter: blur(4px);
   z-index: var(--md-sys-zindex-modal);
   display: flex;
@@ -138,7 +138,7 @@ function savePreferences() {
   width: 100%;
   max-width: 440px;
   box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -194,6 +194,6 @@ function savePreferences() {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid var(--color-surface-lighter);
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--color-surface-overlay-soft);
 }
 </style>

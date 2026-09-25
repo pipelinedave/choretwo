@@ -447,7 +447,7 @@ function animateReturn() {
   transition:
     box-shadow var(--transition-normal),
     transform var(--swipe-return-duration) var(--motion-rubber);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   overflow: hidden;
@@ -495,7 +495,7 @@ function animateReturn() {
   letter-spacing: 0.5px;
   padding: 2px 10px;
   border-radius: var(--md-sys-radius-full);
-  background: rgba(255, 255, 255, 0.5);
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
   color: var(--color-text);
   backdrop-filter: blur(6px);
 }
@@ -550,7 +550,7 @@ function animateReturn() {
   min-width: 22px;
   height: 22px;
   padding: 0 6px;
-  background: rgba(31, 45, 44, 0.12);
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
   border-radius: 11px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -582,7 +582,7 @@ function animateReturn() {
   padding: 6px 16px;
   border: none;
   border-radius: var(--md-sys-radius-full);
-  background: rgba(31, 45, 44, 0.1);
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
   color: var(--color-text);
   font-size: 0.82rem;
   font-weight: 700;
@@ -592,7 +592,7 @@ function animateReturn() {
 }
 
 .snooze-btn:hover {
-  background: rgba(31, 45, 44, 0.18);
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
 }
 
 .snooze-btn .mdi {

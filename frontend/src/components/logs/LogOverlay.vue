@@ -198,10 +198,10 @@ async function handleRevert(entry) {
       rgba(189, 233, 221, 0) 52%
     );
   color: var(--color-text);
-  box-shadow: 0 -4px 24px rgba(31, 45, 44, 0.15);
+  box-shadow: 0 -4px 24px color-mix(in srgb, var(--color-text) 15%, transparent);
   border-top-left-radius: var(--md-sys-radius-large);
   border-top-right-radius: var(--md-sys-radius-large);
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--color-border-glass);
   border-bottom: none;
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: var(--md-sys-zindex-overlay);
@@ -212,7 +212,7 @@ async function handleRevert(entry) {
 
 .log-overlay.expanded {
   max-height: 70vh;
-  box-shadow: 0 -8px 32px rgba(31, 45, 44, 0.25);
+  box-shadow: 0 -8px 32px color-mix(in srgb, var(--color-text) 25%, transparent);
 }
 
 .handle,
@@ -255,7 +255,7 @@ async function handleRevert(entry) {
 .handle-bar {
   width: 40px;
   height: 4px;
-  background: rgba(31, 45, 44, 0.2);
+  background: color-mix(in srgb, var(--color-text) 20%, transparent);
   border-radius: 2px;
   margin-bottom: 6px;
 }
@@ -330,7 +330,7 @@ async function handleRevert(entry) {
   height: 32px;
   min-width: 32px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-border-glass);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: 1rem;

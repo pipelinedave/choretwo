@@ -169,7 +169,7 @@ function clearFilters() {
   color: var(--color-text);
   cursor: pointer;
   white-space: nowrap;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--color-border-glass-subtle);
   box-shadow: var(--shadow-sm);
   transition:
     transform var(--transition-fast),
@@ -202,7 +202,7 @@ function clearFilters() {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  background: rgba(31, 45, 44, 0.15);
+  background: color-mix(in srgb, var(--color-text) 15%, transparent);
   border-radius: 10px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -210,6 +210,6 @@ function clearFilters() {
 
 .pill.active .pill-count,
 .chip.active .chip-count {
-  background: rgba(31, 45, 44, 0.25);
+  background: color-mix(in srgb, var(--color-text) 25%, transparent);
 }
 </style>

@@ -268,7 +268,7 @@ function showToast(type, message) {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--color-overlay-scrim);
   z-index: var(--md-sys-zindex-modal);
   display: flex;
   align-items: center;

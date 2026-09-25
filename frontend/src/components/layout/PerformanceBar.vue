@@ -61,10 +61,10 @@ const textColor = computed(() => {
 .bar-background {
   flex-grow: 1;
   height: 12px;
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: color-mix(in srgb, var(--color-text) 8%, transparent);
   border-radius: 6px;
   overflow: hidden;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 2px rgb(var(--md-sys-color-shadow-rgb) / 0.1);
 }
 
 .bar-fill {

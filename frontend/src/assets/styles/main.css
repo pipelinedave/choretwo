@@ -75,7 +75,7 @@ h3 {
   box-shadow: var(--shadow-sm);
   transition: transform var(--transition-normal), box-shadow var(--transition-normal);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--color-border-glass-subtle);
 }
 
 .card:hover {
@@ -114,17 +114,17 @@ button:active, .btn:active {
 
 .btn-primary, .btn-filled, button.primary {
   background-color: var(--color-primary);
-  color: #fdfbf7;
+  color: var(--color-on-accent);
 }
 
 .btn-primary:hover, .btn-filled:hover, button.primary:hover {
   background-color: var(--color-primary-hover);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 .btn-danger, button.danger {
   background-color: var(--color-danger);
-  color: #fffdf8;
+  color: var(--color-on-accent);
 }
 
 .btn-danger:hover, button.danger:hover {
@@ -180,7 +180,7 @@ input, textarea, select {
 input:focus, textarea:focus, select:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(47, 111, 111, 0.2);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 /* Transitions */
@@ -209,7 +209,7 @@ input:focus, textarea:focus, select:focus {
 .spinner, .loading-spinner {
   width: 22px;
   height: 22px;
-  border: 3px solid rgba(47, 111, 111, 0.2);
+  border: 3px solid var(--color-focus-ring);
   border-radius: 50%;
   border-top-color: var(--color-primary);
   animation: spin 0.9s linear infinite;
