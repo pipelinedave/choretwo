@@ -281,6 +281,31 @@ input:focus, textarea:focus, select:focus {
   box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
+/* === Fokus-Ring (Befund 5) =============================================
+   Vorher gab es in der gesamten App NULL `:focus-visible`-Regeln: die
+   pure Tastaturnutzung war unsichtbar. Fuer die Tastaturbedienung des
+   Aufholen-Features in STAGE 2 ist das ein Blocker, kein Nice-to-have.
+
+   Steht bewusst HINTER der `input:focus`-Regel oben: `input:focus` und
+   `input:focus-visible` haben beide Spezifitaet (0,1,1), entscheidet
+   also die Quellreihenfolge — der Ring gewinnt.
+
+   Die Komponenten, die ein eigenes `outline: none` hatten (ChatWidget,
+   AIView, CopilotBar, Login), tragen das jetzt nicht mehr: Vue-Scoped-
+   CSS hat mit (0,2,0) sonst hoehere Spezifitaet als diese Liste und
+   haette den Ring wieder geloescht. Der weiche Halo am Input bleibt
+   unveraendert, nur der Ring ist neu. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-outline);
+  outline-offset: var(--focus-ring-offset);
+}
+
 /* Transitions */
 .fade-enter-active,
 .fade-leave-active {
@@ -303,11 +328,13 @@ input:focus, textarea:focus, select:focus {
   transform: translateY(15px);
 }
 
-/* Spinner */
+/* Spinner. Die Spur stand vorher auf `--color-focus-ring` und war damit
+   an die Fokus-Achse gekoppelt — sie ist aber eine dezente
+   Primaer-Flaeche, keine Fokusfarbe. Eigenes Token, eigene Deckkraft. */
 .spinner, .loading-spinner {
   width: 22px;
   height: 22px;
-  border: 3px solid var(--color-focus-ring);
+  border: 3px solid var(--color-primary-subtle);
   border-radius: 50%;
   border-top-color: var(--color-primary);
   animation: spin 0.9s linear infinite;

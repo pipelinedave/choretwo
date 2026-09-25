@@ -165,7 +165,6 @@ async function handleSubmit() {
 }
 
 .copilot-input-wrapper input:focus {
-  outline: none;
   box-shadow: none;
 }
 

@@ -513,7 +513,6 @@ async function scrollToBottom() {
 }
 
 .chat-input:focus {
-  outline: none;
   border-color: var(--md-sys-color-primary);
   box-shadow: 0 0 0 2px var(--md-sys-color-primary-container);
 }

@@ -93,7 +93,10 @@
   --color-overlay-scrim: rgb(var(--md-sys-color-ink-rgb) / 0.45);
   --color-primary-subtle: rgb(var(--md-sys-color-primary-rgb) / 0.12);
   --color-danger-subtle: rgb(231 99 99 / 0.15);
-  --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.2);
+  /* Halo am fokussierten Input. Bewusst von der Ringfarbe getrennt:
+     als 2px-Ring war der bisherige Wert rgb(47 111 111 / 0.2)
+     praktisch unsichtbar. */
+  --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.3);
 
   /* === Elevation / Shadows ==============================================
      Aufgebaut auf dem Shadow-RGB-Triplet, damit die Tiefenachse Light/Dark
@@ -161,6 +164,17 @@
   /* Sechs quadratische Icon-Knöpfe auf 40px (AppHeader .btn-icon,
      CatchUpCard, SnoozeSheet, ArchivedChoresModal, LogOverlay). */
   --icon-button-size: 40px;
+
+  /* === Fokus-Achse (Befund 5) ===========================================
+     Dreiteilig, damit Ringfarbe und Geometrie getrennt justierbar sind.
+     `--color-focus-outline` zeigt bewusst auf `--color-primary` und
+     erbt das Thema damit automatisch — der Dark-Mode-Contrast liegt
+     bei 6.4:1, der Light-Mode bei 5.1:1 (WCAG 2.2 verlangt 3:1 fuer
+     die Fokus-Appearance). `--md-sys-color-outline` ist als Ringfarbe
+     unbrauchbar: rgb(31 45 44 / 0.2) im Light Mode. */
+  --color-focus-outline: var(--color-primary);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 
   /* === MD-Sys-Farbrollen =================================================
      Die Alias-Zeilen darunter verweisen auf die `--color-*`-Rolle.
@@ -263,7 +277,7 @@
   --color-overlay-scrim: rgb(0 0 0 / 0.55);
   --color-primary-subtle: rgb(var(--md-sys-color-primary-rgb) / 0.18);
   --color-danger-subtle: rgb(231 99 99 / 0.22);
-  --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.35);
+  --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.45);
 
   /* Dark-Mode-Varianten der ergaenzten MD-Sys-Rollen: die Light-Mode-Werte
      waeren auf dunklen Surfaces entweder unsichtbar (Container) oder zu

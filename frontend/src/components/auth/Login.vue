@@ -178,7 +178,6 @@ async function handleGoogle() {
   background: var(--color-surface-light, #fff);
   color: var(--color-text);
   text-align: center;
-  outline: none;
 }
 
 .login-input:focus {
