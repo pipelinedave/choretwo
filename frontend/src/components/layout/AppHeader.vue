@@ -307,13 +307,13 @@ async function installPwa() {
   background-image:
     radial-gradient(
       120% 160% at 10% 10%,
-      rgba(253, 232, 213, 0.9) 0%,
-      rgba(253, 232, 213, 0) 45%
+      rgb(var(--md-sys-color-accent-warm-rgb) / 0.9) 0%,
+      rgb(var(--md-sys-color-accent-warm-rgb) / 0) 45%
     ),
     radial-gradient(
       90% 120% at 90% 20%,
-      rgba(189, 233, 221, 0.9) 0%,
-      rgba(189, 233, 221, 0) 52%
+      rgb(var(--md-sys-color-accent-cool-rgb) / 0.9) 0%,
+      rgb(var(--md-sys-color-accent-cool-rgb) / 0) 52%
     );
   border-radius: var(--md-sys-radius-medium);
   box-shadow: var(--shadow-lg);

@@ -189,13 +189,13 @@ async function handleRevert(entry) {
   background-image:
     radial-gradient(
       120% 160% at 10% 90%,
-      rgba(253, 232, 213, 0.5) 0%,
-      rgba(253, 232, 213, 0) 45%
+      rgb(var(--md-sys-color-accent-warm-rgb) / 0.5) 0%,
+      rgb(var(--md-sys-color-accent-warm-rgb) / 0) 45%
     ),
     radial-gradient(
       90% 120% at 90% 80%,
-      rgba(189, 233, 221, 0.5) 0%,
-      rgba(189, 233, 221, 0) 52%
+      rgb(var(--md-sys-color-accent-cool-rgb) / 0.5) 0%,
+      rgb(var(--md-sys-color-accent-cool-rgb) / 0) 52%
     );
   color: var(--color-text);
   box-shadow: 0 -4px 24px color-mix(in srgb, var(--color-text) 15%, transparent);
