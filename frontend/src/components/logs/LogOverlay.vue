@@ -181,8 +181,8 @@ async function handleRevert(entry) {
 .log-overlay {
   position: fixed;
   bottom: 0;
-  left: var(--space-md);
-  right: var(--space-md);
+  left: var(--md-sys-spacing-md);
+  right: var(--md-sys-spacing-md);
   max-width: 900px;
   margin: 0 auto;
   background: var(--color-background);
@@ -199,8 +199,8 @@ async function handleRevert(entry) {
     );
   color: var(--color-text);
   box-shadow: 0 -4px 24px rgba(31, 45, 44, 0.15);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+  border-top-left-radius: var(--md-sys-radius-large);
+  border-top-right-radius: var(--md-sys-radius-large);
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-bottom: none;
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);

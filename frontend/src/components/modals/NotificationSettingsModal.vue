@@ -201,7 +201,7 @@ async function sendTestNotification() {
       rgba(189, 233, 221, 0) 52%
     );
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow-lg);
@@ -261,7 +261,7 @@ async function sendTestNotification() {
 .time-input {
   flex: 1;
   padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--md-sys-radius-small);
   border: 1px solid var(--color-surface-lighter);
 }
 

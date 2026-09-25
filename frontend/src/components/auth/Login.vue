@@ -116,23 +116,23 @@ async function handleGoogle() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-lg);
+  padding: var(--md-sys-spacing-lg);
 }
 
 .login-card {
   width: 100%;
   max-width: 420px;
-  padding: var(--space-xl);
+  padding: var(--md-sys-spacing-xl);
   text-align: center;
   background: var(--color-surface);
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   box-shadow: var(--shadow-lg);
   border: 1px solid rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
 }
 
 .login-header {
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--md-sys-spacing-xl);
 }
 
 .brand-icon {
@@ -146,7 +146,7 @@ async function handleGoogle() {
   font-weight: 800;
   color: var(--color-primary);
   letter-spacing: -0.5px;
-  margin-top: var(--space-xs);
+  margin-top: var(--md-sys-spacing-sm);
   margin-bottom: var(--space-xxs);
 }
 
@@ -158,22 +158,22 @@ async function handleGoogle() {
 .login-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--md-sys-spacing-md);
 }
 
 .btn-login {
   width: 100%;
-  padding: 0.85rem var(--space-md);
+  padding: 0.85rem var(--md-sys-spacing-md);
   font-size: 1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
 }
 
 .login-input {
   width: 100%;
-  padding: 0.85rem var(--space-md);
+  padding: 0.85rem var(--md-sys-spacing-md);
   font-size: 1rem;
   font-family: inherit;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   border: 1px solid var(--color-surface-variant, rgba(0, 0, 0, 0.15));
   background: var(--color-surface-light, #fff);
   color: var(--color-text);
@@ -197,7 +197,7 @@ async function handleGoogle() {
 .login-sent .mdi {
   font-size: 1.4rem;
   display: block;
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--md-sys-spacing-sm);
   color: var(--color-primary);
 }
 
@@ -205,13 +205,13 @@ async function handleGoogle() {
   padding: 0.5rem 1rem;
   background-color: rgba(231, 99, 99, 0.15);
   color: var(--color-danger);
-  border-radius: var(--radius-sm);
+  border-radius: var(--md-sys-radius-small);
   font-size: 0.85rem;
 }
 
 .login-note {
   font-size: 0.8rem;
   color: var(--color-text-muted);
-  margin-top: var(--space-md);
+  margin-top: var(--md-sys-spacing-md);
 }
 </style>

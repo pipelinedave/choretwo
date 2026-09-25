@@ -214,7 +214,7 @@ function onArchive() {
       rgba(189, 233, 221, 0) 52%
     );
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow-lg);
@@ -268,7 +268,7 @@ function onArchive() {
 .form-group input[type="number"] {
   width: 100%;
   padding: 0.65rem 0.85rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--md-sys-radius-small);
   border: 1px solid var(--color-surface-lighter);
   background: var(--color-surface);
   color: var(--color-text);

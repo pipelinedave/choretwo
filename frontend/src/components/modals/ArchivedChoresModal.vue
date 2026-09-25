@@ -119,7 +119,7 @@ async function handleUpdate(choreData) {
       rgba(189, 233, 221, 0.6) 0%,
       rgba(189, 233, 221, 0) 52%
     );
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -164,7 +164,7 @@ async function handleUpdate(choreData) {
 .unarchive-button {
   width: 40px;
   height: 40px;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   padding: 0;
   flex-shrink: 0;
 }

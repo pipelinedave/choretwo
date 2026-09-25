@@ -38,22 +38,30 @@
   --color-text-dim: #7c8584;
   --color-link: #2f6f6f;
 
-  /* Spacing Scale */
-  --space-xxs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-
-  /* MD Sys Spacing aliases for component compatibility */
+  /* === Spacing — kanonisch ==============================================
+     Quelle der Wahrheit ist das M3-4dp-Raster unter `--md-sys-spacing-*`
+     (146 Referenzen in der App). `--space-*` sind reine LESE-Aliase fuer
+     den kuerzeren Namen. Weil der Alias per `var()` auf denselben Wert
+     zeigt, sind beide Skalen konstruktionsbedingt identisch — stille
+     Differenzen sind damit strukturell ausgeschlossen. */
   --md-sys-spacing-xs: 4px;
   --md-sys-spacing-sm: 8px;
   --md-sys-spacing-md: 16px;
   --md-sys-spacing-lg: 24px;
   --md-sys-spacing-xl: 32px;
   --md-sys-spacing-2xl: 48px;
+
+  /* Legacy-Aliase: nur noch Lese-Namen, bitte neue Stellen mit
+     `--md-sys-spacing-*` schreiben. */
+  --space-xs: var(--md-sys-spacing-xs);
+  --space-sm: var(--md-sys-spacing-sm);
+  --space-md: var(--md-sys-spacing-md);
+  --space-lg: var(--md-sys-spacing-lg);
+  --space-xl: var(--md-sys-spacing-xl);
+  --space-2xl: var(--md-sys-spacing-2xl);
+  /* `--space-xxs` hat keine M3-Entsprechung (Zwischenstufe 4px) und
+     bleibt daher eigenstaendig definiert. */
+  --space-xxs: 0.25rem;
 
   /* Elevation / Shadows */
   --shadow-sm: 0 4px 14px rgba(31, 45, 44, 0.07);
@@ -77,16 +85,21 @@
   --md-sys-transition-normal: var(--transition-normal);
   --md-sys-transition-slow: var(--transition-slow);
 
-  /* Border Radius */
-  --radius-sm: 10px;
-  --radius-md: 18px;
-  --radius-lg: 26px;
-  --radius-full: 9999px;
+  /* === Border Radius — kanonisch =========================================
+     Gleiche Konstruktion wie Spacing: `--md-sys-radius-*` ist kanonisch,
+     `--radius-*` liest nur noch darauf. `--md-sys-radius-extra-large`
+     wurde ergaenzt — es war in 4 Komponenten referenziert, aber nirgends
+     definiert, d. h. `border-radius` fiel auf 0 (scharfe Ecken). */
+  --md-sys-radius-small: 10px;
+  --md-sys-radius-medium: 18px;
+  --md-sys-radius-large: 26px;
+  --md-sys-radius-extra-large: 34px;
+  --md-sys-radius-full: 9999px;
 
-  --md-sys-radius-small: var(--radius-sm);
-  --md-sys-radius-medium: var(--radius-md);
-  --md-sys-radius-large: var(--radius-lg);
-  --md-sys-radius-full: var(--radius-full);
+  --radius-sm: var(--md-sys-radius-small);
+  --radius-md: var(--md-sys-radius-medium);
+  --radius-lg: var(--md-sys-radius-large);
+  --radius-full: var(--md-sys-radius-full);
 
   /* MD Sys color aliases */
   --md-sys-color-primary: var(--color-primary);

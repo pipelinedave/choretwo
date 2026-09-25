@@ -133,7 +133,7 @@ async function handleSubmit() {
 
 <style scoped>
 .copilot-bar {
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--md-sys-spacing-md);
   width: 100%;
 }
 
@@ -143,7 +143,7 @@ async function handleSubmit() {
   gap: 10px;
   background: var(--color-surface);
   border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   padding: 6px 12px;
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(14px);
@@ -193,7 +193,7 @@ async function handleSubmit() {
   margin-top: 8px;
   padding: 8px 14px;
   background: rgba(47, 111, 111, 0.12);
-  border-radius: var(--radius-sm);
+  border-radius: var(--md-sys-radius-small);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -220,7 +220,7 @@ async function handleSubmit() {
   background: var(--color-primary);
   color: white;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;

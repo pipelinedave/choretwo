@@ -410,7 +410,7 @@ function animateReturn() {
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   z-index: 1;
   display: flex;
   justify-content: space-between;
@@ -435,7 +435,7 @@ function animateReturn() {
 .catchup-card {
   position: relative;
   z-index: 2;
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   padding: 18px 20px 14px;
   box-shadow: var(--shadow-md);
   user-select: none;
@@ -494,7 +494,7 @@ function animateReturn() {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 2px 10px;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   background: rgba(255, 255, 255, 0.5);
   color: var(--color-text);
   backdrop-filter: blur(6px);
@@ -581,7 +581,7 @@ function animateReturn() {
   margin: 10px auto 0;
   padding: 6px 16px;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   background: rgba(31, 45, 44, 0.1);
   color: var(--color-text);
   font-size: 0.82rem;

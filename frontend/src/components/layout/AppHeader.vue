@@ -216,7 +216,7 @@ async function installPwa() {
   position: sticky;
   top: 0;
   z-index: 100;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--md-sys-spacing-md);
   backdrop-filter: blur(16px);
 }
 
@@ -315,7 +315,7 @@ async function installPwa() {
       rgba(189, 233, 221, 0.9) 0%,
       rgba(189, 233, 221, 0) 52%
     );
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   box-shadow: var(--shadow-lg);
   border: 1px solid rgba(255, 255, 255, 0.7);
   padding: 8px 0;

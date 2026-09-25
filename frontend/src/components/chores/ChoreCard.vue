@@ -483,8 +483,8 @@ function handleArchive() {
 <style scoped>
 .chore-card-wrapper {
   position: relative;
-  margin-bottom: var(--space-xs);
-  border-radius: var(--radius-md);
+  margin-bottom: var(--md-sys-spacing-sm);
+  border-radius: var(--md-sys-radius-medium);
   overflow: hidden;
   touch-action: pan-y;
 }
@@ -496,7 +496,7 @@ function handleArchive() {
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   z-index: 1;
   display: flex;
   justify-content: space-between;
@@ -522,7 +522,7 @@ function handleArchive() {
 .chore-card {
   position: relative;
   z-index: 2;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   padding: 12px 18px;
   box-shadow: var(--shadow-sm);
   user-select: none;
@@ -589,7 +589,7 @@ function handleArchive() {
   content: "✓ Done today";
   position: absolute;
   top: 50%;
-  right: var(--space-md);
+  right: var(--md-sys-spacing-md);
   transform: translateY(-50%);
   font-weight: 700;
   font-size: 0.85rem;

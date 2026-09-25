@@ -112,7 +112,7 @@ function clearFilters() {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--md-sys-spacing-md);
   position: relative;
   width: 100%;
 }
@@ -124,7 +124,7 @@ function clearFilters() {
   width: 38px;
   height: 38px;
   min-width: 38px;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-surface-lighter);

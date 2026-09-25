@@ -194,7 +194,7 @@ async function handleFileSelected(event) {
       rgba(189, 233, 221, 0) 52%
     );
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   width: 100%;
   max-width: 480px;
   box-shadow: var(--shadow-lg);
@@ -225,7 +225,7 @@ async function handleFileSelected(event) {
 .import-btn {
   padding: 0.85rem 1.25rem;
   font-size: 1rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,7 +234,7 @@ async function handleFileSelected(event) {
 
 .status-msg {
   padding: 0.75rem 1rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--md-sys-radius-small);
   font-size: 0.9rem;
   font-weight: 500;
 }

@@ -134,7 +134,7 @@ function savePreferences() {
       rgba(189, 233, 221, 0) 52%
     );
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   width: 100%;
   max-width: 440px;
   box-shadow: var(--shadow-lg);

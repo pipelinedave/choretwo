@@ -99,7 +99,7 @@ function onCustomDate(e) {
   max-width: 480px;
   background: var(--color-surface);
   backdrop-filter: blur(20px);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--md-sys-radius-large) var(--md-sys-radius-large) 0 0;
   padding: 12px 20px calc(20px + env(safe-area-inset-bottom, 0));
   box-shadow: var(--shadow-lg);
 }
@@ -107,7 +107,7 @@ function onCustomDate(e) {
 .snooze-handle {
   width: 40px;
   height: 4px;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   background: var(--color-text-dim);
   opacity: 0.4;
   margin: 0 auto 12px;
@@ -142,7 +142,7 @@ function onCustomDate(e) {
   width: 100%;
   padding: 14px 16px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   background: var(--color-surface-variant);
   color: var(--color-text);
   font-size: 1rem;
@@ -179,7 +179,7 @@ function onCustomDate(e) {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   background: transparent;
   color: var(--color-text-muted);
   font-size: 0.95rem;

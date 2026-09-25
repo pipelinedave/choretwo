@@ -91,7 +91,7 @@ defineEmits(["close"]);
       rgba(189, 233, 221, 0) 52%
     );
   color: var(--color-text);
-  border-radius: var(--radius-lg);
+  border-radius: var(--md-sys-radius-large);
   width: 100%;
   max-width: 440px;
   box-shadow: var(--shadow-lg);
@@ -142,7 +142,7 @@ defineEmits(["close"]);
   gap: 8px;
   background: var(--color-surface);
   padding: 12px 16px;
-  border-radius: var(--radius-md);
+  border-radius: var(--md-sys-radius-medium);
   border: 1px solid var(--color-surface-lighter);
 }
 

@@ -410,7 +410,7 @@ async function applySnooze(offsetDays, customDate) {
   font-weight: 600;
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--md-sys-radius-small);
   transition: background-color var(--transition-fast);
   font-family: inherit;
 }
@@ -448,7 +448,7 @@ async function applySnooze(offsetDays, customDate) {
   border: 1px solid rgba(31, 45, 44, 0.15);
   background: var(--color-surface);
   color: var(--color-text-muted);
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
@@ -468,7 +468,7 @@ async function applySnooze(offsetDays, customDate) {
 .progress-bar {
   height: 6px;
   background: rgba(31, 45, 44, 0.08);
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   overflow: hidden;
   margin-bottom: 20px;
 }
@@ -480,7 +480,7 @@ async function applySnooze(offsetDays, customDate) {
     var(--color-primary),
     var(--color-success)
   );
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   transition: width 0.4s var(--motion-soft);
 }
 
@@ -497,14 +497,14 @@ async function applySnooze(offsetDays, customDate) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 var(--space-md);
+  padding: 0 var(--md-sys-spacing-md);
 }
 
 /* Fortschritts-Banner "Karte X von Y" */
 .stack-counter {
   margin-bottom: 14px;
   padding: 6px 18px;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   background: var(--color-primary);
   color: #ffffff;
   font-size: 0.9rem;
@@ -538,7 +538,7 @@ async function applySnooze(offsetDays, customDate) {
   background: var(--color-text);
   color: #ffffff;
   padding: 10px 16px;
-  border-radius: var(--radius-full);
+  border-radius: var(--md-sys-radius-full);
   box-shadow: var(--shadow-lg);
   z-index: 2100; /* über dem Success-Overlay (1400), damit UNDO immer klickbar bleibt */
   max-width: calc(100vw - 32px);
