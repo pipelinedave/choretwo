@@ -1,13 +1,20 @@
 <template>
   <div class="catchup-card-wrapper" :class="{ 'active-card': isActive }">
-    <!-- Swipe Background Layer (Gmail Style) -->
-    <div class="swipe-background" :style="backgroundStyle">
-      <div class="action-icon icon-left" :style="leftIconStyle">
-        <span class="mdi mdi-check"></span>
-      </div>
-      <div class="action-icon icon-right" :style="rightIconStyle">
-        <span class="mdi mdi-sleep"></span>
-      </div>
+    <!--
+      Richtungs-Hinweis unter der Karte (Befund A5). Vorher standen hier zwei
+      nackte Icons: links (gelb) nur ein `mdi-sleep`, ohne ein Wort. Der
+      Hinweis sagt jetzt, was passiert — Icon PLUS Klartext — und er sitzt in
+      dem Bereich, den die Karte bei der Geste freigibt (links beim
+      Rechts-Swipe, unten beim Up-Swipe).
+    -->
+    <div
+      class="swipe-hint"
+      :class="[axisClass, kindClass]"
+      :style="hintStyle"
+      aria-hidden="true"
+    >
+      <span class="mdi swipe-hint-icon" :class="hint?.icon"></span>
+      <span v-if="hint" class="swipe-hint-label">{{ hint.label }}</span>
     </div>
 
     <!-- Sliding Surface Card -->
@@ -72,12 +79,44 @@ const emit = defineEmits(["toggle", "snooze"]);
 
 // Swipe Configuration
 const SWIPE_THRESHOLD = 80;
+const UP_SWIPE_THRESHOLD = 70;
 const MAX_RETURN_DISTANCE = 160;
 const RETURN_ANIMATION_MS = 480;
 
+// Stapel-Geometrie als Konstanten: drei magische Zahlen an drei Stellen
+// (Transform, Schatten, C3-Tiefenstaffelung) sind an drei Orten aenderbar
+// und an keinem nachvollziehbar.
+const STACK_OFFSET_PX = 12;
+const STACK_ROTATION_DEG = 1.2;
+const STACK_SCALE_STEP = 0.025;
+
+// Die zwei Aktionen und ihre Hinweise. Befund A5: links-Swipe war gelb mit
+// einem `mdi-sleep` und ohne Text. Ein Icon allein sagt nicht, OB man die
+// Chore erledigt oder aufschiebt — das steht jetzt als Wort daneben, und
+// dieselben Begriffe tragen die Knoepfe der Aktionsleiste, damit Geste,
+// Tastatur und Knopf nicht drei Vokabulare fuehren.
+const DONE_HINT = {
+  kind: "done",
+  icon: "mdi-check-bold",
+  label: "Erledigen",
+  threshold: SWIPE_THRESHOLD,
+};
+const SNOOZE_HINT = {
+  kind: "snooze",
+  icon: "mdi-clock-outline",
+  label: "Aufschieben",
+  threshold: UP_SWIPE_THRESHOLD,
+};
+
 const isSwiping = ref(false);
 const isReturning = ref(false);
-const swipeOffset = ref(0);
+// X- und Y-Offset getrennt, damit eine Geste genau eine Achse bewegt. Vorher
+// gab es nur `swipeOffset` fuer X — und der Up-Swipe aktualisierte es
+// grundsaetzlich nie (`if (isSwipeLocked)`), die Karte blieb bei 0 stehen und
+// der Hinweis blieb stumm (Befund A3).
+const swipeX = ref(0);
+const swipeY = ref(0);
+const gestureAxis = ref(null); // "x" | "y" | null
 
 const intervalHint = computed(() => {
   const days = props.chore.interval || props.chore.interval_days;
@@ -87,49 +126,52 @@ const intervalHint = computed(() => {
     : `wiederkehrend alle ${days} Tage`;
 });
 
-const swipeThresholdPct = computed(() =>
-  Math.min(1, Math.abs(swipeOffset.value) / SWIPE_THRESHOLD),
+// --- Aktions-Hinweis ----------------------------------------------------
+const activeHint = computed(() => {
+  if (gestureAxis.value === "y") {
+    // Nach unten ist Scrollen, keine Aktion.
+    return swipeY.value < 0 ? SNOOZE_HINT : null;
+  }
+  if (swipeX.value === 0) return null;
+  return swipeX.value > 0 ? DONE_HINT : SNOOZE_HINT;
+});
+
+const hintProgress = computed(() => {
+  const hint = activeHint.value;
+  if (!hint) return 0;
+  const distance = gestureAxis.value === "y" ? swipeY.value : swipeX.value;
+  return Math.min(1, Math.abs(distance) / hint.threshold);
+});
+
+const axisClass = computed(() =>
+  gestureAxis.value === "y" ? "axis-up" : "axis-horizontal",
+);
+const kindClass = computed(() =>
+  activeHint.value ? `kind-${activeHint.value.kind}` : "kind-none",
 );
 
-// --- Icon opacity per swipe direction ---
-const leftIconStyle = computed(() => {
-  if (swipeOffset.value <= 0) return { opacity: 0, transform: "scale(0.8)" };
-  const scale = 0.8 + swipeThresholdPct.value * 0.4;
+const hintStyle = computed(() => {
+  const progress = hintProgress.value;
+  if (!activeHint.value) return { opacity: 0 };
+  // Skaliert mit, aber gedeckelt: bei 1.0 soll der Hinweis voll da sein,
+  // nicht staerker skaliert als die Geste es rechtfertigt.
+  const scale = 0.85 + progress * 0.15;
   return {
-    opacity: Math.min(1, swipeThresholdPct.value * 1.5),
+    opacity: Math.min(1, progress * 1.6),
     transform: `scale(${scale})`,
-  };
-});
-
-const rightIconStyle = computed(() => {
-  if (swipeOffset.value >= 0) return { opacity: 0, transform: "scale(0.8)" };
-  const scale = 0.8 + swipeThresholdPct.value * 0.4;
-  return {
-    opacity: Math.min(1, swipeThresholdPct.value * 1.5),
-    transform: `scale(${scale})`,
-  };
-});
-
-// --- Background color ---
-const backgroundStyle = computed(() => {
-  if (swipeOffset.value === 0) return {};
-  return {
-    backgroundColor:
-      swipeOffset.value > 0
-        ? "var(--color-primary, #2f6f6f)"
-        : "var(--color-warning, #f6c572)",
   };
 });
 
 // --- Position/stack styling + swipe offset ---
 const cardStyle = computed(() => {
-  const stackOffset = props.position * 12;
-  const rotation = props.position * 1.2;
-  const scale = 1 - props.position * 0.025;
-  // Swipe-X nur auf der aktiven Card (oberste) anwenden
-  const swipeX = props.isActive ? swipeOffset.value : 0;
+  const stackOffset = props.position * STACK_OFFSET_PX;
+  const rotation = props.position * STACK_ROTATION_DEG;
+  const scale = 1 - props.position * STACK_SCALE_STEP;
+  // Swipe-Offset nur auf der aktiven Card (oberste) anwenden
+  const x = props.isActive ? swipeX.value : 0;
+  const y = props.isActive ? swipeY.value : 0;
   return {
-    transform: `translate(${swipeX}px, ${stackOffset}px) rotate(${rotation}deg) scale(${Math.max(0.92, scale)})`,
+    transform: `translate(${x}px, ${y + stackOffset}px) rotate(${rotation}deg) scale(${Math.max(0.92, scale)})`,
     zIndex: props.total - props.position,
   };
 });
@@ -215,7 +257,7 @@ let isScrollLocked = false;
 let isSwipeLocked = false;
 let isUpSwipeLocked = false;
 
-const UP_SWIPE_THRESHOLD = 70;
+const clamp = (value, limit) => Math.max(-limit, Math.min(limit, value));
 
 // Interaktive Elemente nehmen an der Swipe-Geste NICHT teil: Eine Geste
 // duerfte ihren Klicks nicht abwuergen. Mit Pointer Events ist das nur noch
@@ -253,29 +295,31 @@ function moveGesture(clientX, clientY) {
       // Wichtig: NACH OBEN wird NICHT sofort als Scroll gelockt, sonst wird
       // jeder echte (inkrementelle) Up-Swipe schon beim ersten < 70px-Move
       // als Scroll interpretiert und Snooze wuerde nie feuern. Der Kandidat
-      // bleibt offen, bis die Schwelle ueberschritten ist.
+      // bleibt offen, bis die Schwelle ueberschritten ist — und ab dem
+      // Punkt bewegt sich die Karte auch sichtbar (Befund A3).
       if (dy < 0) {
         if (absDy > UP_SWIPE_THRESHOLD) {
           isUpSwipeLocked = true;
           isSwiping.value = true;
+          gestureAxis.value = "y";
         }
-        // unter Schwelle: Kandidat offen lassen, kein gleicher Scroll-Lock
       } else {
         isScrollLocked = true;
         isGestureActive = false;
       }
-      return;
     } else {
       isSwipeLocked = true;
       isSwiping.value = true;
+      gestureAxis.value = "x";
     }
   }
 
+  const limit = MAX_RETURN_DISTANCE * 1.2;
   if (isSwipeLocked) {
-    swipeOffset.value = Math.max(
-      -MAX_RETURN_DISTANCE * 1.2,
-      Math.min(MAX_RETURN_DISTANCE * 1.2, dx),
-    );
+    swipeX.value = clamp(dx, limit);
+  }
+  if (isUpSwipeLocked) {
+    swipeY.value = clamp(dy, limit);
   }
 }
 
@@ -322,9 +366,13 @@ function endGesture() {
   isSwiping.value = false;
 
   if (isUpSwipeLocked) {
-    triggerSnooze();
-  } else if (isSwipeLocked && Math.abs(swipeOffset.value) > SWIPE_THRESHOLD) {
-    if (swipeOffset.value < 0) {
+    if (Math.abs(swipeY.value) > UP_SWIPE_THRESHOLD) {
+      triggerSnooze();
+    } else {
+      animateReturn();
+    }
+  } else if (isSwipeLocked && Math.abs(swipeX.value) > SWIPE_THRESHOLD) {
+    if (swipeX.value < 0) {
       // Links = aufschieben (Snooze-Sheet), KEINE Navigation aus der View
       triggerSnooze();
     } else {
@@ -340,18 +388,24 @@ function endGesture() {
 }
 
 function triggerSnooze() {
-  swipeOffset.value = 0;
+  resetGesture();
   emit("snooze", props.chore);
 }
 
 function triggerDone() {
-  swipeOffset.value = 0;
+  resetGesture();
   emit("toggle", props.chore.id);
+}
+
+function resetGesture() {
+  swipeX.value = 0;
+  swipeY.value = 0;
+  gestureAxis.value = null;
 }
 
 function animateReturn() {
   isReturning.value = true;
-  swipeOffset.value = 0;
+  resetGesture();
   setTimeout(() => {
     isReturning.value = false;
   }, RETURN_ANIMATION_MS);
@@ -367,32 +421,55 @@ function animateReturn() {
   transition: transform var(--transition-normal) var(--motion-soft);
 }
 
-.swipe-background {
+/* Aktions-Hinweis. Fuellt dieselbe Flaeche wie die Karte und liegt unter ihr,
+   damit die Karte ihn beim Wegwischen freigibt. */
+.swipe-hint {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: var(--md-sys-radius-large);
+  inset: 0;
   z-index: 1;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0 1.8rem;
+  gap: 10px;
+  padding: 0 var(--md-sys-spacing-lg);
   box-sizing: border-box;
+  border-radius: var(--md-sys-radius-large);
+  font-weight: 700;
+  transition: opacity var(--transition-fast);
 }
 
-.action-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  color: #ffffff;
-  font-size: 1.6rem;
-  transition:
-    transform var(--transition-fast),
-    opacity var(--transition-fast);
+/* Horizontal: die Karte waechst nach rechts, der Hinweis sitzt links.
+   Vertikal: die Karte waechst nach oben, der Hinweis sitzt unten. */
+.swipe-hint.axis-horizontal {
+  justify-content: flex-start;
+}
+
+.swipe-hint.axis-up {
+  align-items: flex-end;
+  padding-bottom: var(--md-sys-spacing-lg);
+}
+
+.swipe-hint-icon {
+  font-size: 1.8rem;
+}
+
+.swipe-hint-label {
+  font-size: 1.05rem;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+/* Erledigen: gruen. Aufschieben: gelb (die Farbe, die der Snooze-Pfad schon
+   immer hatte). Beide Flaechen sind hell, deshalb kommt die Schrift aus dem
+   Inverse-Paar: es gibt keine on-success/on-warning-Rolle, und eine helle
+   Schrift auf #48bb78 laege bei 2.4:1. */
+.swipe-hint.kind-done {
+  background-color: var(--color-success);
+  color: var(--md-sys-color-inverse-on-surface);
+}
+
+.swipe-hint.kind-snooze {
+  background-color: var(--color-warning);
+  color: var(--md-sys-color-inverse-on-surface);
 }
 
 .catchup-card {

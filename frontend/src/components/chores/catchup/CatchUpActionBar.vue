@@ -8,6 +8,10 @@
 
     Die Tastenkürzel stehen als sichtbare Hinweise auf den Knöpfen, weil die
     Tastatursteuerung sonst eine reine Doku-Angelegenheit wäre (Befund A2).
+
+    Die Icons sind dieselben wie die des Swipe-Hinweises in CatchUpCard
+    (mdi-check-bold / mdi-clock-outline): Geste, Tastatur und Knöpfe dürfen
+    nicht drei Bildsprachen führen (Befund A5).
   -->
   <div class="catchup-actions" role="group" aria-label="Aktionen für die aktuelle Karte">
     <button
@@ -17,7 +21,7 @@
       aria-keyshortcuts="2"
       @click="emit('snooze', chore)"
     >
-      <span class="mdi mdi-sleep"></span>
+      <span class="mdi mdi-clock-outline"></span>
       <span class="catchup-action-label">Später</span>
       <kbd class="catchup-action-key">2</kbd>
     </button>
