@@ -535,7 +535,11 @@ function handleArchive() {
   transition: box-shadow var(--transition-normal);
   color: var(--color-text);
   border: 1px solid var(--color-border-glass-subtle);
-  backdrop-filter: blur(14px);
+  /* Befund C4, gleiche Ursache wie in CatchUpCard: der `backdrop-filter`
+     stand auf einer opaken Dringlichkeitsflaeche (--color-overdue u.ae.)
+     und war damit unsichtbar. Entfernt statt eingefaerbt — die Kartenliste
+     rendert viele davon gleichzeitig, und ein wirkungsloser Blur pro Karte
+     ist reiner Paint-Overhead. */
 }
 
 .chore-card:active {

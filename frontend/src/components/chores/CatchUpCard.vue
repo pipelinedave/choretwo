@@ -540,8 +540,13 @@ function animateReturn() {
     box-shadow var(--transition-normal),
     transform var(--swipe-return-duration) var(--motion-rubber);
   border: 1px solid var(--color-border-glass);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* Befund C4: hier stand `backdrop-filter: blur(18px)` auf einer OPOKEN
+     Flaeche. Die Dringlichkeitsfarben (--color-overdue u.ae.) sind deckende
+     Pastell-Werte, es gab also nichts, was der Filter haette weichzeichnen
+     koennen — der Blur war unsichtbar und kostete bei jeder Karte und jedem
+     Frame Paint-Zeit. Bei 50+ Chores im Stapel summiert sich das (vgl. den
+     Perf-Befund in 82f3085). Der Frosted-Glass-Eindruck traegt weiterhin die
+     Haarlinie --color-border-glass, nicht der Filter. */
   overflow: hidden;
 }
 
