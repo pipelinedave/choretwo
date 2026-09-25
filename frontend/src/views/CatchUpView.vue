@@ -1,5 +1,10 @@
 <template>
-  <div class="catchup-view">
+  <!-- tabindex="-1": nicht in der Tab-Folge, aber programmatisch
+       fokussierbar. Das ist der Fokus-Ziel nach dem Schliessen eines
+       Overlays, wenn kein Stapel (und damit keine Karte) mehr da ist —
+       sonst hinge der Fokus auf dem Ausloeser-Knopf und die Deck-Tasten
+       waeren tot (siehe focusDeck/hasDeckFocus). -->
+  <div class="catchup-view" ref="viewRef" tabindex="-1">
     <!-- Header -->
     <div class="catchup-header">
       <button class="back-btn" @click="$router.push('/')" aria-label="Zurück">
@@ -13,6 +18,26 @@
           {{ completedInSession }} von {{ progress.total }} Chores abgearbeitet
         </p>
       </div>
+
+      <!-- Verlauf der Runde (Befund B5). Der Knopf bleibt sichtbar, auch wenn
+           der Stapel leer ist: genau dann ist Rueckwaerts am wertvollsten. -->
+      <button
+        class="history-btn"
+        :disabled="!history.length"
+        aria-keyshortcuts="u"
+        :aria-label="
+          history.length
+            ? `Verlauf der Runde, ${history.length} Aktionen rueckgaengig`
+            : 'Verlauf der Runde, nichts rueckgaengig'
+        "
+        @click="openHistory"
+      >
+        <span class="mdi mdi-undo-variant"></span>
+        <span class="history-btn-label">Verlauf</span>
+        <span v-if="history.length" class="history-btn-count">{{
+          history.length
+        }}</span>
+      </button>
     </div>
 
     <!-- Filter Chips -->
@@ -136,6 +161,15 @@
       @close="helpOpen = false"
     />
 
+    <!-- Undo-Historie der Runde -->
+    <CatchUpHistoryPanel
+      v-if="historyOpen"
+      :entries="history"
+      :busy-id="historyBusyId"
+      @close="closeTopOverlay()"
+      @undo="undoHistoryEntry"
+    />
+
     <!-- Action Toast (Done / Undo / Snooze) -->
     <transition name="toast-enter">
       <div
@@ -185,6 +219,7 @@ import EmptyState from "@/components/chores/EmptyState.vue";
 import CatchUpCard from "@/components/chores/CatchUpCard.vue";
 import CatchUpActionBar from "@/components/chores/catchup/CatchUpActionBar.vue";
 import CatchUpEmptyState from "@/components/chores/catchup/CatchUpEmptyState.vue";
+import CatchUpHistoryPanel from "@/components/chores/catchup/CatchUpHistoryPanel.vue";
 import CatchUpShortcuts from "@/components/chores/catchup/CatchUpShortcuts.vue";
 import SnoozeSheet from "@/components/chores/SnoozeSheet.vue";
 
@@ -202,6 +237,7 @@ const sessionStack = ref([]);
 const sessionTotal = ref(0);
 const containerRef = ref(null);
 const stackAreaRef = ref(null);
+const viewRef = ref(null);
 
 // IDs der in dieser Runde aufgeschobenen Chores. Runde-Zustand, weil eine
 // verschobene Chore offen bleibt und ohne diese Merkung nach dem naechsten
@@ -263,9 +299,62 @@ const helpOpen = ref(false);
 const shortcutHelp = [
   { keys: ["Eingabe", "␣", "1"], text: "Aktuelle Chore erledigen" },
   { keys: ["2"], text: "Aktuelle Chore aufschieben" },
+  { keys: ["u"], text: "Letzte Aktion zurücknehmen" },
   { keys: ["Esc"], text: "Offenes Fenster schließen" },
   { keys: ["?"], text: "Diese Übersicht" },
 ];
+
+// Undo-Historie der Runde (Befund B5). Vorher gab es nur den Toast der
+// LETZTEN Aktion (4s) — bei zehn schnellen Swipes war der Toast weg, die
+// Runde nicht, und rueckwaerts ging nichts mehr. Die Historie ist auf 20
+// Eintraege gedeckelt: das ist eine Bedienhilfe fuer die laufende Runde,
+// kein Audit-Log (das macht die Logs-Seite).
+const HISTORY_LIMIT = 20;
+const history = ref([]);
+const historyOpen = ref(false);
+const historyBusyId = ref(null);
+let historySeq = 0;
+
+function pushHistory(entry) {
+  historySeq += 1;
+  history.value = [{ ...entry, id: historySeq }, ...history.value].slice(
+    0,
+    HISTORY_LIMIT,
+  );
+}
+
+function dropHistory(id) {
+  history.value = history.value.filter((entry) => entry.id !== id);
+}
+
+/** Nimmt die juengste Aktion der Runde zurueck (Taste `u`, Toast-Knopf). */
+function undoLastAction() {
+  const entry = history.value[0];
+  if (!entry) return;
+  return undoHistoryEntry(entry.id);
+}
+
+/** Verlauf oeffnen — fuehrt den Fokus aus dem Knopf ins Deck, damit die
+ *  Deck-Tasten direkt danach greifen. */
+function openHistory() {
+  if (!history.value.length) return;
+  historyOpen.value = true;
+  focusDeck();
+}
+
+async function undoHistoryEntry(id) {
+  const entry = history.value.find((item) => item.id === id);
+  if (!entry || historyBusyId.value !== null) return;
+  historyBusyId.value = id;
+  try {
+    const ok = await entry.undo();
+    // Nur bei Erfolg aus der Historie nehmen: ein fehlgeschlagener Undo
+    // bleibt als Angebot stehen, statt spurlos zu verschwinden.
+    if (ok) dropHistory(id);
+  } finally {
+    historyBusyId.value = null;
+  }
+}
 
 // Toast
 const toast = ref({ visible: false, message: "", action: null, handler: null });
@@ -331,25 +420,47 @@ function isTextEntry(el) {
 function hasDeckFocus() {
   const el = document.activeElement;
   if (!el || el === document.body) return true;
-  return !!(el.closest && el.closest(DECK_FOCUS));
+  if (el.closest && el.closest(DECK_FOCUS)) return true;
+  // Der View-Root selbst: der Zustand nach dem Schliessen eines Overlays,
+  // wenn das Deck leer ist und es keine Karte zum Fokussieren gibt.
+  return el === viewRef.value;
+}
+
+/**
+ * Setzt den Fokus zurueck auf das Deck.
+ *
+ * Nach dem Schliessen eines Overlays bleibt der Fokus sonst auf dem Knopf, der
+ * ihn geoeffnet hat. Damit faellt er aus `hasDeckFocus()` heraus, und die
+ * Deck-Tasten (u, 1, 2) sind tot, bis der Nutzer wieder irgendwo ins Deck
+ * klickt. Rueckgabe des Fokus auf den Ausloeser ist zugleich die
+ * erwartete Dialog-Bedienung (WCAG 2.1.2) — der Weg durch den Dialog fuehrt
+ * zum Ausgangspunkt zurueck.
+ *
+ * Reihenfolge: aktive Karte, dann der Stapel-Container, dann der View-Root.
+ * Die letzten beiden sind die Faelle "Deck leer" (Summary/Empty-State) und
+ * "noch nichts gerendert".
+ */
+function focusDeck() {
+  const target =
+    containerRef.value?.querySelector(".catchup-card") ||
+    containerRef.value ||
+    viewRef.value;
+  target?.focus?.({ preventScroll: true });
 }
 
 /** Overlay obenauf? Dann hat es eigene Bedienung (inkl. Escape). */
 function isOverlayOpen() {
-  return snoozeOpen.value || helpOpen.value;
+  return snoozeOpen.value || helpOpen.value || historyOpen.value;
 }
 
 /** Schliesst das oberste Overlay, sonst nichts. */
 function closeTopOverlay() {
-  if (snoozeOpen.value) {
-    snoozeOpen.value = false;
-    return true;
-  }
-  if (helpOpen.value) {
-    helpOpen.value = false;
-    return true;
-  }
-  return false;
+  const wasOpen = snoozeOpen.value || helpOpen.value || historyOpen.value;
+  snoozeOpen.value = false;
+  helpOpen.value = false;
+  historyOpen.value = false;
+  if (wasOpen) focusDeck();
+  return wasOpen;
 }
 
 function onKeydown(e) {
@@ -368,6 +479,17 @@ function onKeydown(e) {
   if (!hasDeckFocus()) return;
   if (pending.value) return;
 
+  // Enter/Leertaste auf einem Knopf gehoeren dem Knopf — der Browser
+  // erzeugt daraus selbst den Click. Ohne diese Ausnahme wuerde die Karte
+  // zweimal reagieren.
+  if (
+    (e.key === "Enter" || e.key === " ") &&
+    e.target.closest &&
+    e.target.closest("button, a")
+  ) {
+    return;
+  }
+
   const top = visibleStack.value[0];
 
   if (e.key === "Enter" || e.key === " " || e.key === "1") {
@@ -380,6 +502,11 @@ function onKeydown(e) {
     if (!top) return;
     e.preventDefault();
     handleSnooze(top);
+    return;
+  }
+  if (e.key === "u" || e.key === "U") {
+    e.preventDefault();
+    undoLastAction();
     return;
   }
   if (e.key === "?") {
@@ -492,6 +619,7 @@ async function callStore(action, errorMessage) {
 
 async function handleToggle(choreId) {
   if (isBusy(choreId)) return;
+  const chore = sessionStack.value.find((c) => c.id === choreId);
   pending.value = { id: choreId, kind: "done" };
   const response = await callStore(
     () => choreStore.markDone(choreId, authStore.user?.email),
@@ -506,7 +634,16 @@ async function handleToggle(choreId) {
     const msg = nextDue
       ? `Erledigt ✓ Nächste Fälligkeit: ${formatNextDue(nextDue)}`
       : `Erledigt ✓`;
-    showToast(msg, "UNDO", () => handleUndo(choreId));
+    showToast(msg, "RÜCKGÄNGIG", () => undoLastAction());
+
+    pushHistory({
+      kind: "done",
+      choreId,
+      choreName: chore?.name || "Chore",
+      label: "erledigt",
+      icon: "mdi-check-bold",
+      undo: () => handleUndo(choreId),
+    });
 
     if (sessionStack.value.length === 0) {
       showSuccess.value = true;
@@ -538,9 +675,38 @@ async function handleUndo(choreId) {
     "Fehler beim Rückgängig machen",
   );
   try {
-    if (!result) return;
+    if (!result) return false;
     rebuildStack();
     showToast("Chore wieder geöffnet", null, null, 2500);
+    return true;
+  } finally {
+    pending.value = null;
+  }
+}
+
+/**
+ * Nimmt ein Aufschieben zurueck: das alte `due_date` zurueckschreiben und die
+ * Chore wieder in den Stapel dieser Runde aufnehmen.
+ *
+ * Das Gegenstueck zu `applySnooze`, das vorher fehlte: aufgeschobene Chores
+ * waren ein Einbahnstrasse — der Toast hatte fuer sie keine Aktion. Mit der
+ * Historie ist beides rueckgaengig.
+ */
+async function handleSnoozeUndo(choreId, prevDue, choreName) {
+  if (isBusy(choreId)) return false;
+  pending.value = { id: choreId, kind: "snooze" };
+  const result = await callStore(
+    () => choreStore.snoozeChore(choreId, prevDue),
+    "Fehler beim Rückgängig machen",
+  );
+  try {
+    if (!result) return false;
+    snoozedIds.value = new Set(
+      [...snoozedIds.value].filter((id) => id !== choreId),
+    );
+    rebuildStack();
+    showToast(`${choreName} zurück im Aufholen-Stapel`, null, null, 2500);
+    return true;
   } finally {
     pending.value = null;
   }
@@ -557,6 +723,11 @@ async function applySnooze(offsetDays, customDate) {
   snoozeOpen.value = false;
   if (!chore || isBusy(chore.id)) return;
   pending.value = { id: chore.id, kind: "snooze" };
+
+  // Das alte Datum merken: es ist der Anker fuer den Undo. Gespeichert wird
+  // der Chore-Zustand VOR dem Aufschieben, nicht der daraus errechnete
+  // Termin — sonst waere der Undo ein zweiter Aufschub.
+  const prevDue = chore.dueDate || chore.due_date || null;
 
   const newDate =
     customDate ||
@@ -579,7 +750,18 @@ async function applySnooze(offsetDays, customDate) {
     // wieder aufgenommen).
     snoozedIds.value = new Set([...snoozedIds.value, chore.id]);
     rebuildStack();
-    showToast(`Aufgeschoben auf ${formatNextDue(newDate)}`, null, null, 2500);
+    showToast(`Aufgeschoben auf ${formatNextDue(newDate)}`, "RÜCKGÄNGIG", () =>
+      undoLastAction(),
+    );
+    pushHistory({
+      kind: "snooze",
+      choreId: chore.id,
+      choreName: chore.name,
+      prevDue,
+      label: "aufgeschoben",
+      icon: "mdi-clock-outline",
+      undo: () => handleSnoozeUndo(chore.id, prevDue, chore.name),
+    });
   } finally {
     pending.value = null;
   }
@@ -646,6 +828,54 @@ async function applySnooze(offsetDays, customDate) {
   margin: 2px 0 0;
   font-size: 0.85rem;
   color: var(--color-text-muted);
+}
+
+/* Verlauf-Knopf (Befund B5) */
+.history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 4px 12px;
+  border: var(--border-hairline) solid var(--color-border-glass);
+  border-radius: var(--md-sys-radius-full);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.history-btn:hover:not(:disabled) {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.history-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.history-btn-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--md-sys-radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-accent);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+@media (max-width: 420px) {
+  .history-btn-label {
+    display: none;
+  }
 }
 
 /* Filter chips */

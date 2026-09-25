@@ -55,6 +55,13 @@ test.describe("CatchUp Session", () => {
     return data;
   }
 
+  async function getChore(request, id) {
+    const res = await request.get(`/api/chores/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.json();
+  }
+
   async function cleanup(request) {
     while (createdIds.length) {
       const id = createdIds.pop();
@@ -184,5 +191,72 @@ test.describe("CatchUp Session", () => {
     await page.locator(".catchup-empty-action").click();
     await page.waitForSelector(".catchup-card", { state: "visible" });
     await expect(page.locator(".subtitle")).toHaveText(/0 von 1/);
+  });
+
+  test("die Historie nimmt auch ein Aufschieben zurueck (Befund B5)", async ({
+    page,
+    request,
+  }) => {
+    const stamp = Date.now();
+    const name = `Sess-Undo ${stamp}`;
+    const chore = await createChore(request, name, -2);
+    const originalDue = dueDateFor(-2);
+
+    await page.goto("/catchup");
+    await page.waitForSelector(".catchup-card", { state: "visible" });
+
+    // Aufschieben ueber das Sheet.
+    await page.locator(".snooze-btn").first().click();
+    await page.locator(".snooze-sheet").waitFor({ state: "visible" });
+    await page
+      .locator(".snooze-option")
+      .filter({ hasText: "+1 Woche" })
+      .click();
+    await page.waitForSelector(".catchup-toast", { state: "visible" });
+
+    let db = await getChore(request, chore.id);
+    expect(db.due_date).toBe(dueDateFor(7));
+
+    // Der Toast traegt jetzt eine Aktion (vorher nur bei "erledigt"), und der
+    // Verlauf haelt die Aktion dauerhaft — der Toast verschwindet nach 2.5s.
+    await page.locator(".toast-action").click();
+    await page.waitForTimeout(400);
+
+    db = await getChore(request, chore.id);
+    expect(db.due_date).toBe(originalDue);
+    await expect(page.locator(".subtitle")).toHaveText(/0 von 1/);
+  });
+
+  test("Taste u nimmt die letzte Aktion zurueck, der Verlauf listet alle", async ({
+    page,
+    request,
+  }) => {
+    const stamp = Date.now();
+    await createChore(request, `Sess-U1 ${stamp}`, -3);
+    await createChore(request, `Sess-U2 ${stamp}`, -1);
+
+    await page.goto("/catchup");
+    await page.waitForSelector(".catchup-card", { state: "visible" });
+
+    // Zwei Aktionen, mehr als das Undo-Fenster des Toasts abdeckt.
+    for (let i = 0; i < 2; i++) {
+      await page.locator(".done-btn").first().click();
+      await page.waitForSelector(".catchup-toast", { state: "visible" });
+      await page.waitForTimeout(200);
+    }
+    await expect(page.locator(".subtitle")).toHaveText(/2 von 2/);
+
+    // Der Verlauf zaehlt beide Aktionen.
+    await page.locator(".history-btn").click();
+    await page.locator(".history-panel").waitFor({ state: "visible" });
+    await expect(page.locator(".history-row")).toHaveCount(2);
+
+    // Escape schliesst, Taste u nimmt die letzte Aktion zurueck — beides
+    // ueber den Tastatur-Handler der View.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".history-panel")).toBeHidden();
+    await page.keyboard.press("u");
+    await page.waitForSelector(".catchup-card", { state: "visible" });
+    await expect(page.locator(".subtitle")).toHaveText(/1 von 2/);
   });
 });
