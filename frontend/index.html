@@ -8,6 +8,25 @@
     <meta name="description" content="Choretwo - Modern chore management for households">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link rel="manifest" href="/manifest.json">
+
+    <!-- Webfonts: `media="print" onload` laedt nicht-blockierend, damit die
+         UI offline sofort in der Fallback-Kette erscheint. Begruendung und
+         Fallback-Kette in assets/styles/variables.css. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap"
+      media="print"
+      onload="this.media='all'"
+    >
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap"
+      >
+    </noscript>
+
     <title>Choretwo</title>
   </head>
   <body>

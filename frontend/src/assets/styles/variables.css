@@ -1,4 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+/* === Webfonts ==========================================================
+   Hier stand einmal ein `@import url('https://fonts.googleapis.com/...')`.
+   Zwei Probleme, beide in Befund 9 belegt:
+
+     1. Ein `@import` in einem gebuendelten CSS kann erst gefunden werden,
+        wenn das Haupt-CSS heruntergeladen und geparst ist. Die
+        Font-Anfrage startet also erst danach — sie kann den Download
+        der uebrigen Ressourcen nicht vorwegnehmen. Mit `<link>` plus
+        `preconnect` in index.html laufen die TCP/TLS-Handshakes zu
+        fonts.googleapis.com und fonts.gstatic.com dagegen schon, waehrend
+        der HTML-Parser noch den Rest des Heads liest.
+
+     2. `background-attachment`-Analogon beim Rendern: der `@import`
+        blockiert den First Paint. `media="print" onload="this.media='all'"`
+        in index.html macht das Stylesheet nicht-blockierend; der Browser
+        laedt es mit niedriger Prioritaet und schaltet es im onload aktiv.
+
+   Warum das hier Pflicht ist und nicht Kosmetik: Offline-First ist ein
+   Kern-Feature der PWA. Ein blockierendes Stylesheet von einem nicht
+   erreichbaren Host haelt den First Paint bis zum DNS-/TCP-Timeout
+   fest — bei deaktiviertem Netz ist die App dann schlicht unsichtbar.
+   Mit dem nicht-blockierenden Laden erscheint die UI sofort.
+
+   Die Fallback-Kette haelt das offline lesbar (Befund 9, hart):
+     - main.css body:   'Space Grotesk', 'Manrope', system-ui, -apple-system, sans-serif
+     - main.css button: 'Space Grotesk', 'Manrope', sans-serif
+     - h1-h4 + 4 Komponenten: 'Space Grotesk', sans-serif
+   Jede Deklaration endet auf dem generischen `sans-serif`, und
+   system-ui bzw. -apple-system sind auf jedem Geraet vorhanden. Es
+   gibt keine font-family-Deklaration ohne Fallback, also kann die App
+   ohne Netz nie leer oder unlesbar werden. `display=swap` steckt zudem
+   in der URL: Auch wenn die Schrift spaet eintrifft, ist der Text
+   durchgehend sichtbar. */
 
 :root {
   /* Status Colors (Material You inspired pastels) */
