@@ -124,9 +124,21 @@ const RETURN_ANIMATION_MS = 480;
 // Stapel-Geometrie als Konstanten: drei magische Zahlen an drei Stellen
 // (Transform, Schatten, C3-Tiefenstaffelung) sind an drei Orten aenderbar
 // und an keinem nachvollziehbar.
-const STACK_OFFSET_PX = 12;
-const STACK_ROTATION_DEG = 1.2;
-const STACK_SCALE_STEP = 0.025;
+//
+// Befund C3: mit 12px Offset, 0.025 Skalierungsschritt und 1.2 Grad war der
+// Stapel bei 40 Chores nicht als Stapel lesbar — es sah aus wie EINE Karte.
+// Im Browser gemessen: der sichtbare Peek-Streifen betrug 15.7px, davon
+// waren 4px allein der Kippwinkel an der Ecke. Die Werte unten verdoppeln
+// den Streifen und geben der hinteren Karte zusaetzlich eine Deckung (siehe
+// `.catchup-card-wrapper:not(.active-card) .catchup-card::after`), weil ein
+// verkleinertes Rechteck allein nicht als "dahinter" gelesen wird.
+//
+// Die RENDERMENGE bleibt unberuehrt: `visibleStack` in CatchUpView schneidet
+// weiter auf zwei Karten (Perf-Fix 82f3085, bei 50+ Chores der eigentliche
+// Killer). Geaendert wird ausschliesslich die Tiefenwirkung.
+const STACK_OFFSET_PX = 24;
+const STACK_ROTATION_DEG = 2.2;
+const STACK_SCALE_STEP = 0.06;
 
 // Die zwei Aktionen und ihre Hinweise. Befund A5: links-Swipe war gelb mit
 // einem `mdi-sleep` und ohne Text. Ein Icon allein sagt nicht, OB man die
@@ -539,6 +551,23 @@ function animateReturn() {
 
 .catchup-card.swiping {
   transition: none;
+}
+
+/* Tiefenstaffelung (Befund C3): die hintere Karte bekommt einen Schleier,
+   damit sie als "dahinter" gelesen wird und nicht nur als kleinere
+   Kopie. Ohne das war sie trotz des grösseren Versatzes ein blasser
+   Randstreifen.
+   Der Schleier ist eine abgeschwaechte Form von `--color-overlay-scrim`:
+   der Scrim ist im Dark Mode ein Schwarz und im Light Mode die Tinte —
+   die Richtung "dunkler" stimmt damit in BEIDEN Themes, was ein
+   konstanter Weiss-Schleier nicht leisten wuerde. */
+.catchup-card-wrapper:not(.active-card) .catchup-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-overlay-scrim) 40%, transparent);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 /* Busy (Befund B3): die Aktion laeuft. Der Inhalt tritt zurueck und der
