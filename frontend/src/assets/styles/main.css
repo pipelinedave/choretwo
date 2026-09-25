@@ -6,25 +6,64 @@
 }
 
 body {
-  background: radial-gradient(120% 160% at 10% 10%, #fde8d5 0%, rgba(253, 232, 213, 0) 45%),
-              radial-gradient(90% 120% at 90% 20%, #bde9dd 0%, rgba(189, 233, 221, 0) 52%),
-              radial-gradient(140% 200% at 40% 100%, #c7d9d2 0%, rgba(199, 217, 210, 0) 55%),
-              linear-gradient(145deg, #e9f4ef 0%, #f6ece1 100%);
+  background-color: var(--color-background);
   color: var(--color-text);
   font-family: 'Space Grotesk', 'Manrope', system-ui, -apple-system, sans-serif;
   line-height: 1.6;
   margin: 0;
   padding: 0;
-  background-attachment: fixed;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
 
-[data-theme="dark"] body {
-  background: radial-gradient(120% 160% at 10% 10%, #291e16 0%, rgba(41, 30, 22, 0) 45%),
-              radial-gradient(90% 120% at 90% 20%, #152c28 0%, rgba(21, 44, 40, 0) 52%),
-              radial-gradient(140% 200% at 40% 100%, #182623 0%, rgba(24, 38, 35, 0) 55%),
-              linear-gradient(145deg, #121b1a 0%, #1c1815 100%);
+/* === Pastell-Verlauf auf eigenem Layer (Befund 8) ======================
+   Vorher standen vier gestapelte radial-gradients plus ein
+   linear-gradient direkt auf `body`, verankert ueber die
+   background-attachment-Eigenschaft im Wert `fixed`.
+   Warum das teuer war:
+
+   1. Paint-Flaeche. Bei fixiertem Hintergrund gehoert der
+      Hintergrund zum scrollenden Element, die Paint-Flaeche ist damit
+      das DOKUMENT — bei einer App mit mehreren Viewports Hoehe also ein
+      Mehrfaches des Viewports. Ein `position: fixed`-Pseudo-Layer hat
+      per Definition genau eine Viewport-Hoehe.
+   2. Kein Compositing. Der Background des scrollenden Elements kann beim
+      Scrollen nicht als fertige Textur durch den Compositor geschoben
+      werden, weil er sich relativ zum Viewport ausrichtet. Browser
+      rasterisieren die vier Verlaeufe darum pro Scroll-Schritt neu —
+      auf einem 低端-Panel (2340x1080 bei DPR 3 = ~7.6 Mpx) sind das
+      Millionen Pixel Gradient-Fuellung pro Frame. Ein
+      `position: fixed`-Layer wird dagegen zu einer Compositor-Ebene
+      befördert: einmal rastern, danach beim Scrollen nur noch
+      re-compositen. Neu rastern muss er nur bei Resize,
+      Orientierungswechsel oder Theme-Wechsel.
+   3. Dark Mode brauchte ein zweites Set. Mit Tokens faellt der komplette
+      `[data-theme="dark"] body`-Block ersatzlos weg; der Verlauf folgt
+      dem Theme ueber `--md-sys-color-accent-*-rgb` und
+      `--md-sys-color-bg-*-rgb`.
+
+   Optisch identisch: die Prozentangaben beziehen sich bei beiden
+   Loesungen auf die Viewport-Groesse, der Verlauf bleibt beim Scrollen
+   stehen. `background-color` am body bleibt als Canvas-Farbe erhalten,
+   damit hinter dem Layer nichts durchscheint. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 160% at 10% 10%,
+      rgb(var(--md-sys-color-accent-warm-rgb)) 0%,
+      rgb(var(--md-sys-color-accent-warm-rgb) / 0) 45%),
+    radial-gradient(90% 120% at 90% 20%,
+      rgb(var(--md-sys-color-accent-cool-rgb)) 0%,
+      rgb(var(--md-sys-color-accent-cool-rgb) / 0) 52%),
+    radial-gradient(140% 200% at 40% 100%,
+      rgb(var(--md-sys-color-accent-sage-rgb)) 0%,
+      rgb(var(--md-sys-color-accent-sage-rgb) / 0) 55%),
+    linear-gradient(145deg,
+      rgb(var(--md-sys-color-bg-top-rgb)) 0%,
+      rgb(var(--md-sys-color-bg-bottom-rgb)) 100%);
 }
 
 #app {

@@ -79,6 +79,20 @@
   --md-sys-color-accent-warm-rgb: 253 232 213;
   --md-sys-color-accent-cool-rgb: 189 233 221;
 
+  /* === Pastell-Verlauf (Befund 8) =======================================
+     Farbtriplets des Hintergrund-Verlaufs. `--accent-warm` und
+     `--accent-cool` waren schon da (7af3698) und exakt die beiden
+     Warm-/Kuelt-Farben des Body-Verlaufs — sie werden hier zum ersten
+     Mal tatsaechlich benutzt, statt in neun Dateien als rgba()-Literal
+     zu stehen. `sage` und die beiden Verlaufskanten sind neu.
+
+     Als Triplets statt als Hex, weil alle Verbraucher daraus
+     `rgb(<triplet> / <alpha>)` bauen: Body und Komponenten nutzen
+     denselben Farbton mit 0.0, 0.5, 0.6 und 0.9 Deckkraft. */
+  --md-sys-color-accent-sage-rgb: 199 217 210;
+  --md-sys-color-bg-top-rgb: 233 244 239;
+  --md-sys-color-bg-bottom-rgb: 246 236 225;
+
   /* === Semantische Border-/State-Achse (Befund 3) ======================
      Die Karten der App sind Frosted Glass ueber einem Pastell-Verlauf.
      Ihre Haarlinie ist im Light Mode weiss (Highlight) und im Dark Mode
@@ -271,6 +285,16 @@
   --md-sys-color-ink-rgb: 255 255 255; /* Tint-Basis folgt jetzt dem Text */
   --md-sys-color-primary-rgb: 77 170 160;
   --md-sys-color-shadow-rgb: 0 0 0;
+
+  /* Dark-Mode-Varianten des Pastell-Verlaufs. Vorher standen die
+     rgba()-Literale in einem kompletten zweiten `[data-theme="dark"]
+     body`-Block in main.css — 4 Farbwerte, die nur an dieser einen
+     Stelle gepflegt werden konnten. */
+  --md-sys-color-accent-warm-rgb: 41 30 22;
+  --md-sys-color-accent-cool-rgb: 21 44 40;
+  --md-sys-color-accent-sage-rgb: 24 38 35;
+  --md-sys-color-bg-top-rgb: 18 27 26;
+  --md-sys-color-bg-bottom-rgb: 28 24 21;
   --color-border-glass: rgb(var(--md-sys-color-white-rgb) / 0.18);
   --color-border-glass-subtle: rgb(var(--md-sys-color-white-rgb) / 0.14);
   --color-surface-overlay-soft: rgb(var(--md-sys-color-white-rgb) / 0.1);
