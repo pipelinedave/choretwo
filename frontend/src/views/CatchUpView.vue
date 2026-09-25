@@ -75,6 +75,15 @@
           @snooze="handleSnooze"
         />
       </div>
+
+      <!-- Aktionen als sichtbare Leiste unter der Karte (Befund A1): die
+           Geste bleibt der schnellste Weg, ist aber nicht mehr der einzige. -->
+      <CatchUpActionBar
+        :chore="visibleStack[0] || null"
+        :pending="pendingAction"
+        @done="handleToggle(visibleStack[0].id)"
+        @snooze="handleSnooze(visibleStack[0])"
+      />
     </div>
 
     <!-- Snooze Action Sheet -->
@@ -127,6 +136,7 @@ import { buildCatchUpStack, getBucketLabel } from "@/utils/catchUpStack";
 import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 import EmptyState from "@/components/chores/EmptyState.vue";
 import CatchUpCard from "@/components/chores/CatchUpCard.vue";
+import CatchUpActionBar from "@/components/chores/catchup/CatchUpActionBar.vue";
 import SnoozeSheet from "@/components/chores/SnoozeSheet.vue";
 
 const router = useRouter();
@@ -165,9 +175,16 @@ const currentCardNumber = computed(() =>
 // Filter: "all" | "urgent" (nur Überfällig + Heute)
 const displayFilter = ref("all");
 
-// Busy-Guard gegen doppelte Aktionen während laufender Requests
-const busyIds = ref(new Set());
-const isBusy = (id) => busyIds.value.has(id);
+// Pending-Aktion: der Busy-Guard war vorher ein `Set` ohne jedes Template-
+// Binding (Befund B3) — geschuetzt wurde, sichtbar war nichts. Jetzt EIN
+// Zustand statt einer Menge: das Deck zeigt immer nur eine Karte, es kann
+// also hoechstens eine Aktion gleichzeitig in Arbeit sein. Dieselbe Quelle
+// speist den Guard (`isBusy`), den Spinner und den Disabled-State.
+const pending = ref(null); // { id, kind: "done" | "snooze" }
+const isBusy = (id) => pending.value?.id === id;
+const pendingAction = computed(() =>
+  isBusy(visibleStack.value[0]?.id) ? pending.value?.kind || "" : "",
+);
 
 // Snooze
 const snoozeOpen = ref(false);
@@ -289,7 +306,7 @@ function triggerAction() {
 
 async function handleToggle(choreId) {
   if (isBusy(choreId)) return;
-  busyIds.value.add(choreId);
+  pending.value = { id: choreId, kind: "done" };
   try {
     const response = await choreStore.markDone(choreId, authStore.user?.email);
     rebuildStack();
@@ -314,13 +331,13 @@ async function handleToggle(choreId) {
     console.error("Failed to mark chore done in catchup:", err);
     showToast("Fehler beim Erledigen", null, null, 3000);
   } finally {
-    busyIds.value.delete(choreId);
+    pending.value = null;
   }
 }
 
 async function handleUndo(choreId) {
   if (isBusy(choreId)) return;
-  busyIds.value.add(choreId);
+  pending.value = { id: choreId, kind: "done" };
   // Sofort (vor dem await) den Erfolgs-Overlay + Redirect-Timer stoppen:
   // sonst räumt der ablaufende Timer die View weg, während undoDone noch läuft
   // (Race bei der letzten Chore). Die zurückgeholte Chore muss wieder sichtbar sein.
@@ -337,12 +354,12 @@ async function handleUndo(choreId) {
     console.error("Failed to undo chore in catchup:", err);
     showToast("Fehler beim Rückgängig machen", null, null, 3000);
   } finally {
-    busyIds.value.delete(choreId);
+    pending.value = null;
   }
 }
 
 function handleSnooze(chore) {
-  if (isBusy(chore.id)) return;
+  if (!chore || isBusy(chore.id)) return;
   snoozeChore.value = chore;
   snoozeOpen.value = true;
 }
@@ -351,7 +368,7 @@ async function applySnooze(offsetDays, customDate) {
   const chore = snoozeChore.value;
   snoozeOpen.value = false;
   if (!chore || isBusy(chore.id)) return;
-  busyIds.value.add(chore.id);
+  pending.value = { id: chore.id, kind: "snooze" };
 
   const newDate =
     customDate ||
@@ -374,7 +391,7 @@ async function applySnooze(offsetDays, customDate) {
     console.error("Failed to snooze chore in catchup:", err);
     showToast("Fehler beim Aufschieben", null, null, 3000);
   } finally {
-    busyIds.value.delete(chore.id);
+    pending.value = null;
   }
 }
 </script>
@@ -384,7 +401,13 @@ async function applySnooze(offsetDays, customDate) {
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  padding-bottom: 20px;
+  /* Platz fuer die fixe Bottom-Nav (AppBottomNav: 80px + Safe-Area). Die
+     Aktionsleiste ist das Einzige, was der User zwingend anfasst — sie darf
+     nie hinter der Navigation liegen. Dieselbe Konstante steht in
+     AppBottomNav.vue; ein gemeinsames Token steht als Folgearbeit aus. */
+  padding-bottom: calc(
+    80px + env(safe-area-inset-bottom, 0px) + var(--md-sys-spacing-lg)
+  );
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 80px);

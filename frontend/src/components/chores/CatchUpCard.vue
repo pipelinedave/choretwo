@@ -52,17 +52,6 @@
         <span class="mdi mdi-repeat"></span>
         {{ intervalHint }}
       </p>
-
-      <!-- Snooze Button (Aktive Card unten) -->
-      <button
-        v-if="isActive"
-        class="snooze-btn"
-        @click.stop.prevent="emit('snooze', chore)"
-        aria-label="Chore aufschieben"
-      >
-        <span class="mdi mdi-sleep"></span>
-        <span>Später</span>
-      </button>
     </div>
   </div>
 </template>
@@ -528,32 +517,5 @@ function animateReturn() {
 
 .recurrence-hint .mdi {
   font-size: 0.9rem;
-}
-
-/* Snooze button (bottom, active card only) */
-.snooze-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 10px auto 0;
-  padding: 6px 16px;
-  border: none;
-  border-radius: var(--md-sys-radius-full);
-  background: color-mix(in srgb, var(--color-text) 10%, transparent);
-  color: var(--color-text);
-  font-size: 0.82rem;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background-color var(--transition-fast);
-}
-
-.snooze-btn:hover {
-  background: color-mix(in srgb, var(--color-text) 18%, transparent);
-}
-
-.snooze-btn .mdi {
-  font-size: 1rem;
 }
 </style>
