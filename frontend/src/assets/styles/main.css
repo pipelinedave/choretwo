@@ -346,3 +346,92 @@ summary:focus-visible,
     transform: rotate(360deg);
   }
 }
+
+/* === prefers-reduced-motion (Befund 6) =================================
+   Vorher gab es genau EINE Reduced-Motion-Regel in der gesamten App
+   (CatchUpView:647, .success-check). Bewegung gab es dagegen reichlich:
+   die fade-/list-Uebergaenge hier, popIn auf dem AddChore-Modal,
+   dialog-in im Bestaetigungsdialog, die vier bounce-Typing-Indikatoren
+   und sechs Spinner — plus die Karten-Swipe-Geste, deren
+   Ruecklauf ueber `--swipe-return-duration: 480ms` laeuft.
+
+   Die Grundregel daempftglobal, die Ausnahmen sind bewusst gesetzt:
+
+     - Opazitaets-Uebergaenge (fade, list) BLEIBEN. Sie beantworten
+       "was ist gerade neu?", nicht "wohin bewegt sich etwas?".
+     - Sprungbewegung (translateY, scale) entfaellt ersatzlos.
+     - Endlos-Indikatoren (Spinner, Typing-Dots) BEHALTEN ihre
+       Animation. Sie zeigen Arbeitszustand an, nicht Dekoration —
+       ein eingefrorener Spinner waere unlesbar und wuerde als
+       Haenger erscheinen statt als Fortschritt. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Orientierung behalten, Bewegung nicht. */
+  .fade-enter-active,
+  .fade-leave-active,
+  .list-enter-active,
+  .list-leave-active {
+    transition-duration: var(--transition-fast) !important;
+  }
+
+  .list-enter-from,
+  .list-leave-to {
+    transform: none;
+  }
+
+  /* Hover-/Active-Sprünge des Button-Primitives. */
+  button:hover,
+  .btn:hover,
+  button:active,
+  .btn:active,
+  .btn-icon:hover {
+    transform: none !important;
+  }
+
+  /* Ausnahme: Arbeitszustand. Ohne diese Regel wären Spinner und
+     Typing-Punkte auf ihrem Start-Keyframe eingefroren. */
+  .spinner,
+  .loading-spinner,
+  .spinner-ring,
+  .spinner-sm,
+  .dot {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* === prefers-contrast: more (Befund 7) =================================
+   Die App ist Frosted Glass ueber einem Pastell-Verlauf. Ihre
+   Trennkante ist ein 1px-Weiss mit niedriger Deckkraft — genau die Art
+   von Kante, die bei erhoehtem Kontrastwunsch als Erste verschwindet.
+   Nachgeschaerft wird ueber die Border-Achse aus Befund 3, nicht ueber
+   neue Farbwerte.
+
+   `--md-sys-color-outline` / `-variant` stehen auf
+   `--md-sys-color-ink-rgb`, das dem Text folgt und im Dark Mode
+   automatisch auf Weiss umschaltet — da genuegt ein Block. Die weissen
+   Border brauchen zwei: Light-Mode-Weiss mit 0.95 Deckkraft waere im
+   Dark Mode genau die grelle Linie, die Befund 3 beseitigt hat. */
+@media (prefers-contrast: more) {
+  :root {
+    --md-sys-color-outline: rgb(var(--md-sys-color-ink-rgb) / 0.8);
+    --md-sys-color-outline-variant: rgb(var(--md-sys-color-ink-rgb) / 0.65);
+    --color-border-glass: rgb(var(--md-sys-color-white-rgb) / 0.95);
+    --color-border-glass-subtle: rgb(var(--md-sys-color-white-rgb) / 0.8);
+    --color-surface-overlay-soft: rgb(var(--md-sys-color-white-rgb) / 0.5);
+  }
+
+  [data-theme="dark"] {
+    --color-border-glass: rgb(var(--md-sys-color-white-rgb) / 0.7);
+    --color-border-glass-subtle: rgb(var(--md-sys-color-white-rgb) / 0.55);
+    --color-surface-overlay-soft: rgb(var(--md-sys-color-white-rgb) / 0.28);
+  }
+}
