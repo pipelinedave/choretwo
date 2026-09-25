@@ -133,6 +133,7 @@
           :position="index"
           :total="stackLength"
           :is-active="index === 0"
+          :busy="isBusy(chore.id)"
           @toggle="handleToggle"
           @snooze="handleSnooze"
         />
@@ -143,6 +144,7 @@
       <CatchUpActionBar
         :chore="visibleStack[0] || null"
         :pending="pendingAction"
+        :disabled="pending !== null"
         @done="handleToggle(visibleStack[0].id)"
         @snooze="handleSnooze(visibleStack[0])"
       />

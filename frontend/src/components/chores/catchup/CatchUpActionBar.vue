@@ -135,6 +135,15 @@ const emit = defineEmits(["done", "snooze"]);
   background: var(--color-primary-hover);
 }
 
+/* Pending: der Spinner ersetzt das Icon, das Label tritt zurueck, damit der
+   Zustand an EINER Stelle steht und nicht an zwei konkurrierenden. Vorher
+   war `.is-pending` im Template gesetzt, aber im CSS nirgends verwendet —
+   ein totes Klassen-Binding. */
+.done-btn.is-pending .catchup-action-label,
+.done-btn.is-pending .catchup-action-key {
+  opacity: 0.75;
+}
+
 .catchup-action:disabled {
   opacity: 0.55;
   cursor: not-allowed;

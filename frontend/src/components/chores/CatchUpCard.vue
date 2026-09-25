@@ -20,7 +20,7 @@
     <!-- Sliding Surface Card -->
     <div
       class="catchup-card"
-      :class="[choreClass, { swiping: isSwiping, returning: isReturning }]"
+      :class="[choreClass, { swiping: isSwiping, returning: isReturning, busy }]"
       :style="cardStyle"
       :id="`catchup-card-${chore.id}`"
       ref="cardRef"
@@ -31,6 +31,7 @@
       role="listitem"
       tabindex="0"
       :aria-label="ariaLabel"
+      :aria-busy="busy"
     >
       <!-- Priority Badge -->
       <div class="priority-badge">{{ bucketLabel }}</div>
@@ -73,6 +74,16 @@ const props = defineProps({
   position: { type: Number, default: 0 },
   total: { type: Number, default: 1 },
   isActive: { type: Boolean, default: true },
+  /**
+   * Fuer diese Karte laeuft gerade eine Aktion (Befund B3).
+   *
+   * Der Guard in der View (isBusy) verhindert das doppelte Erledigen schon
+   * seit vorher — der zweite Klick wurde aber stillschweigend geschluckt. Mit
+   * diesem Flag wird daraus ein sichtbarer Zustand: `aria-busy` fuer den
+   * Screenreader, `.busy` fuer das Styling, und die Aktionsleiste sperrt
+   * ihre Knoepfe.
+   */
+  busy: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["toggle", "snooze"]);
@@ -528,6 +539,20 @@ function animateReturn() {
 
 .catchup-card.swiping {
   transition: none;
+}
+
+/* Busy (Befund B3): die Aktion laeuft. Der Inhalt tritt zurueck und der
+   Cursor sagt "warte" — zusammen mit `aria-busy` und dem Spinner in der
+   Aktionsleiste. Kein pointer-events:none, damit der Wisch nicht mit einem
+   Fehler abgewiesen wird: der Guard in der View faengt ihn ab. */
+.catchup-card.busy {
+  cursor: progress;
+}
+.catchup-card.busy .catchup-content,
+.catchup-card.busy .priority-badge,
+.catchup-card.busy .recurrence-hint {
+  opacity: 0.55;
+  transition: opacity var(--transition-fast);
 }
 
 /* Urgency color themes (reuse existing) */
