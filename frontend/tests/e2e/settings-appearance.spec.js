@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { goToSettings } from "./helpers/nav.js";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
 function prepareSettings({
@@ -43,11 +44,17 @@ test.describe("Settings — Appearance Theme", () => {
 
   test("selecting a different theme should show save bar", async ({ page }) => {
     await page.evaluate(() => localStorage.setItem("settings-theme", "light"));
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     // Wait for page to fully render
-    await expect(page.locator("text=Appearance")).toBeVisible();
+    // Präziser Selektor: Playwrights `text=` matcht case-insensitiv und
+    // als Teilstring, traf im Modal mehrere Elemente (strict-mode violation).
+    // Der Sektionstitel ist eindeutig adressierbar.
+    await expect(
+      page.locator(".modal-content .section-title").filter({ hasText: "Appearance" }),
+    ).toBeVisible();
     await expect(
       page.locator(".theme-option:has-text('Light')"),
     ).toHaveAttribute("aria-pressed", "true");
@@ -77,8 +84,9 @@ test.describe("Settings — Appearance Theme", () => {
     page,
   }) => {
     await page.evaluate(() => localStorage.setItem("settings-theme", "dark"));
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     // "Dark" should be active
     const darkBtn = page.locator(".theme-option:has-text('Dark')");
@@ -104,8 +112,9 @@ test.describe("Settings — Appearance Theme", () => {
 
   test("saving theme should persist via localStorage", async ({ page }) => {
     await page.evaluate(() => localStorage.setItem("settings-theme", "dark"));
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     // Select "System" theme
     const systemBtn = page.locator(".theme-option:has-text('System')");

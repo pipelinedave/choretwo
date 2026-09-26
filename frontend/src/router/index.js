@@ -27,10 +27,15 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    // Die Route /settings ist absichtlich entfernt. Sie war seit 5671fd
+    // (Entfernen der Bottom-Nav) von keiner Stelle der UI mehr erreichbar —
+    // die Bottom-Nav war ihr einziger Zugang — und damit toter Code. Der
+    // Inhalt lebt jetzt im Settings-Modal (Home -> ☰ -> Settings), das die
+    // Sektionen Notification/Appearance/Data/AI vollstaendig enthaelt.
+    // Bewusst KEIN Redirect auf eine andere Route: das Modal ist kein
+    // Adressierbares, ein Redirect wuerde ins Leere zeigen.
     path: "/settings",
-    name: "Settings",
-    component: () => import("@/views/SettingsView.vue"),
-    meta: { requiresAuth: true },
+    redirect: "/",
   },
   {
     path: "/ai",

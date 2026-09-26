@@ -12,49 +12,25 @@
       </div>
 
       <div class="modal-body">
-        <div class="settings-section">
-          <label class="section-title">Theme</label>
-          <div class="theme-options">
-            <button
-              class="btn btn-sm"
-              :class="theme === 'light' ? 'btn-primary' : 'btn-tonal'"
-              @click="setTheme('light')"
-            >
-              <span class="mdi mdi-white-balance-sunny"></span> Light
-            </button>
-            <button
-              class="btn btn-sm"
-              :class="theme === 'dark' ? 'btn-primary' : 'btn-tonal'"
-              @click="setTheme('dark')"
-            >
-              <span class="mdi mdi-weather-night"></span> Dark
-            </button>
-            <button
-              class="btn btn-sm"
-              :class="theme === 'auto' ? 'btn-primary' : 'btn-tonal'"
-              @click="setTheme('auto')"
-            >
-              <span class="mdi mdi-theme-light-dark"></span> System
-            </button>
-          </div>
-        </div>
+        <!--
+          Ab hier ist dies die EINZIGE Settings-Oberflaeche der App.
 
-        <div class="settings-section">
-          <label class="section-title">AI Copilot</label>
-          <div class="custom-checkbox-wrapper">
-            <input
-              type="checkbox"
-              id="ai-enabled"
-              v-model="aiEnabled"
-              @change="savePreferences"
-            />
-            <label for="ai-enabled">
-              <span class="checkbox-text"
-                >Enable Natural Language Copilot Bar</span
-              >
-            </label>
-          </div>
-        </div>
+          Vorher gab es zwei: die Route /settings (Notification, Appearance,
+          Data, AI) und dieses Modal (nur Theme + eine AI-Checkbox). Die Route
+          war seit 5671fd nicht mehr erreichbar — die Bottom-Nav war ihr
+          einziger Zugang — und damit toter Code. Der User hat entschieden:
+          Route entfaellt, das Modal uebernimmt.
+
+          Die doppelt vorhandene Einstellung "AI aktiviert" ist dabei auf eine
+          reduziert: die alte Modal-Checkbox schrieb nach localStorage
+          (`choretwo_ai_enabled`) und war eine zweite, schlechtere
+          Implementierung derselben Sache. Jetzt gilt allein AiSettingsSection
+          (Draft/Discard/Save gegen den Store).
+        -->
+        <NotificationSettings />
+        <AppearanceSettings />
+        <DataSettings />
+        <AiSettingsSection ref="aiSection" />
       </div>
 
       <div class="modal-footer">
@@ -65,43 +41,44 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+/**
+ * Settings-Modal — ab jetzt die einzige Einstellungs-Oberflaeche.
+ *
+ * Saettigung ueber `useSettingsStore` (`GET /api/settings`), damit die
+ * Sektionen aus dem Backend kommen statt aus localStorage. Der Theme-Teil
+ * bleibt bewusst lokal: `choretwo_theme` ist die Quelle, die auch App.vue
+ * beim Start liest, und AppearanceSettings schreibt ebenfalls dorthin.
+ */
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import { useSettingsStore } from "@/stores/settings";
+import NotificationSettings from "@/components/settings/NotificationSettings.vue";
+import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
+import DataSettings from "@/components/settings/DataSettings.vue";
+import AiSettingsSection from "@/components/settings/AiSettingsSection.vue";
 
 const emit = defineEmits(["close"]);
+const s = useSettingsStore();
+const aiSection = ref(null);
 
-const theme = ref("light");
-const aiEnabled = ref(true);
-
-onMounted(() => {
-  const savedTheme = localStorage.getItem("choretwo_theme") || "light";
-  theme.value = savedTheme;
-  applyTheme(savedTheme);
-
-  const savedAi = localStorage.getItem("choretwo_ai_enabled");
-  aiEnabled.value = savedAi !== null ? JSON.parse(savedAi) : true;
+onMounted(async () => {
+  try {
+    await s.fetchSettings();
+    s.applyTheme();
+    // Der AI-Entwurf braucht die geholten Werte, sonst zeigt er die Defaults
+    // und "Discard" setzt auf etwas zurueck, das nie gespeichert war.
+    aiSection.value?.loadFromStore();
+  } catch (err) {
+    console.error("Failed to load settings:", err);
+  }
 });
 
-function setTheme(val) {
-  theme.value = val;
-  localStorage.setItem("choretwo_theme", val);
-  applyTheme(val);
-}
-
-function applyTheme(val) {
-  if (
-    val === "dark" ||
-    (val === "auto" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches)
-  ) {
-    document.documentElement.setAttribute("data-theme", "dark");
-  } else {
-    document.documentElement.removeAttribute("data-theme");
-  }
-}
-
-function savePreferences() {
-  localStorage.setItem("choretwo_ai_enabled", JSON.stringify(aiEnabled.value));
-}
+// Scroll im Modal: mit allen Sektionen ist es regelmaessig hoeher als der
+// Viewport, und ohne das scrollt die Seite dahinter beim Scrollen mit.
+const prevOverflow = document.body.style.overflow;
+document.body.style.overflow = "hidden";
+onBeforeUnmount(() => {
+  document.body.style.overflow = prevOverflow;
+});
 </script>
 
 <style scoped>
@@ -136,7 +113,12 @@ function savePreferences() {
   color: var(--color-text);
   border-radius: var(--md-sys-radius-large);
   width: 100%;
-  max-width: 440px;
+  /* Breiter als die 440px von vorher: mit Notification, Appearance, Data und
+     AI ist der Inhalt zweispaltig zu breit fuer schmale Spalten. */
+  max-width: 560px;
+  /* Hoehe begrenzen, damit Kopf und Fuss sichtbar bleiben. `dvh` statt `vh`,
+     weil auf Mobil die Adressleiste die vh-Zahl verflaescht. */
+  max-height: min(88dvh, 900px);
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--color-border-glass);
   display: flex;
@@ -159,6 +141,13 @@ function savePreferences() {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  /* Der Body ist der scrollende Teil: Kopf ("App Settings") und Fuss ("Done")
+     bleiben stehen. Ohne das ragt der Inhalt aus dem Modal heraus und der
+     Done-Knopf ist auf kleinen Bildschirmen nicht erreichbar. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Platz fuer den eigenen Scrollbalken, damit er nicht auf den Text legt. */
+  scrollbar-gutter: stable;
 }
 
 .settings-section {

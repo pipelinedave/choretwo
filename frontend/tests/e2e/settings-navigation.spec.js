@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { goToSettings } from "./helpers/nav.js";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
 
@@ -14,9 +15,10 @@ test.describe("Settings Page Navigation & Rendering", () => {
   test("should navigate to settings and render all sections", async ({
     page,
   }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
-    await expect(page).toHaveURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: das Modal haengt an HomeView. Statt der
+    // URL pruefen wir, dass es offen ist (goToSettings wartet darauf).
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     await expect(page.locator("h2:has-text('Notifications')")).toBeVisible();
     await expect(page.locator("h2:has-text('Appearance')")).toBeVisible();
@@ -27,19 +29,32 @@ test.describe("Settings Page Navigation & Rendering", () => {
   test("should have notification toggles rendered correctly", async ({
     page,
   }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    await expect(page.locator(".modal-content")).toBeVisible();
 
-    // All toggle checkboxes should exist in DOM
+    // Getrennt geprueft statt als Pauschalzahl. Vorher stand hier
+    // `toHaveCount(4)` fuer "main notification + overdue + soon + AI" — eine
+    // Zahl, die nur stimmte, solange beide AI-Umsetzungen (Route + Modal-
+    // Checkbox) existierten. Jetzt gibt es genau eine AI-Sektion, und sie
+    // traegt `.settings-section` ohne `.card`. Eine Pauschalzahl wuerde bei
+    // jeder Sektionsaenderung stillschweigend falsch.
     const notifications = page.locator(
       ".settings-section.card >> .toggle input[type='checkbox']",
     );
-    await expect(notifications).toHaveCount(4); // main notification + overdue + soon + AI
+    await expect(notifications).toHaveCount(3); // aktiv, ueberfaellig, bald faellig
+
+    // Der AI-Toggle ist eine eigene Sektion mit eigener Optik. Ueber den
+    // Sektions-Text gefiltert statt per XPath-Ahnentraegerei — das bleibt
+    // stabil, wenn sich die Sektions-Struktur aendert.
+    const aiSection = page
+      .locator(".modal-content .settings-section")
+      .filter({ hasText: "AI Copilot" });
+    await expect(aiSection.locator("input[type='checkbox']")).toHaveCount(1);
   });
 
   test("should have all 3 theme options visible", async ({ page }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     const themeButtons = page.locator(".theme-option");
     await expect(themeButtons).toHaveCount(3);
@@ -49,8 +64,8 @@ test.describe("Settings Page Navigation & Rendering", () => {
   });
 
   test("should have export and import buttons visible", async ({ page }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     await expect(page.locator("text=EXPORT DATA")).toBeVisible();
     await expect(page.locator("text=IMPORT DATA")).toBeVisible();

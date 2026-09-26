@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { goToSettings } from "./helpers/nav.js";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
 
@@ -14,8 +15,9 @@ test.describe("Settings — Notification Draft & Save", () => {
   test("toggling enable notifications should show save bar", async ({
     page,
   }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     const settingItem = page
       .locator(".setting-item")
@@ -28,8 +30,9 @@ test.describe("Settings — Notification Draft & Save", () => {
   });
 
   test("toggling overdue alerts should show save bar", async ({ page }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     const settingItem = page
       .locator(".setting-item")
@@ -42,8 +45,9 @@ test.describe("Settings — Notification Draft & Save", () => {
   });
 
   test("toggling upcoming alerts should show save bar", async ({ page }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     const settingItem = page
       .locator(".setting-item")
@@ -56,8 +60,9 @@ test.describe("Settings — Notification Draft & Save", () => {
   });
 
   test("adding a notification time should show save bar", async ({ page }) => {
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     await expect(page.locator("text=Morning reminder")).toBeVisible();
 
@@ -87,8 +92,9 @@ test.describe("Settings — Notification Draft & Save", () => {
       },
     });
 
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
 
     const overdueItem = page
       .locator(".setting-item")

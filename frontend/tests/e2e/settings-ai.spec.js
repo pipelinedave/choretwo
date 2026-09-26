@@ -16,6 +16,7 @@
  * (PATCH gibt es nicht: der Monolith bietet nur GET und PUT /api/settings.)
  */
 import { test, expect } from "@playwright/test";
+import { goToSettings } from "./helpers/nav.js";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
 
 // Eigene Test-Adresse pro Spec: die Settings-Zeilen sind pro User persistiert,
@@ -52,9 +53,13 @@ test.describe("Settings — AI Settings", () => {
   }) => {
     await givenAiState(page, request, { learningEnabled: false });
 
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
-    await page.reload();
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
+    // KEIN reload: das Modal haengt per v-if an HomeView, ein Reload
+    // schliesst es wieder. Bei der Route /settings war das noetig (die
+    // Daten kommen beim Mount), beim Modal laedt `SettingsModal` selbst
+    // ueber `s.fetchSettings()` in onMounted.
 
     // Wait for AI section to render
     await expect(page.locator("text=AI Copilot")).toBeVisible();
@@ -80,9 +85,13 @@ test.describe("Settings — AI Settings", () => {
       types: ["recurrence", "timing", "assignment"],
     });
 
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
-    await page.reload();
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
+    // KEIN reload: das Modal haengt per v-if an HomeView, ein Reload
+    // schliesst es wieder. Bei der Route /settings war das noetig (die
+    // Daten kommen beim Mount), beim Modal laedt `SettingsModal` selbst
+    // ueber `s.fetchSettings()` in onMounted.
 
     // Wait for AI section
     await expect(page.locator("text=AI Copilot")).toBeVisible();
@@ -105,9 +114,13 @@ test.describe("Settings — AI Settings", () => {
   }) => {
     await givenAiState(page, request, { learningEnabled: true });
 
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
-    await page.reload();
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
+    // KEIN reload: das Modal haengt per v-if an HomeView, ein Reload
+    // schliesst es wieder. Bei der Route /settings war das noetig (die
+    // Daten kommen beim Mount), beim Modal laedt `SettingsModal` selbst
+    // ueber `s.fetchSettings()` in onMounted.
 
     await expect(page.locator("text=AI Copilot")).toBeVisible();
 
@@ -135,9 +148,13 @@ test.describe("Settings — AI Settings", () => {
   }) => {
     await givenAiState(page, request, { learningEnabled: false });
 
-    await page.click('a[href="/settings"]');
-    await page.waitForURL("/settings");
-    await page.reload();
+    await goToSettings(page);
+    // Kein Routenwechsel: Settings sind ein Modal an HomeView.
+    await expect(page.locator(".modal-content")).toBeVisible();
+    // KEIN reload: das Modal haengt per v-if an HomeView, ein Reload
+    // schliesst es wieder. Bei der Route /settings war das noetig (die
+    // Daten kommen beim Mount), beim Modal laedt `SettingsModal` selbst
+    // ueber `s.fetchSettings()` in onMounted.
 
     await expect(page.locator("text=AI Copilot")).toBeVisible();
 
