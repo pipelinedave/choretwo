@@ -8,6 +8,17 @@
       </div>
 
       <div class="header-actions" v-if="authStore.isAuthenticated">
+        <!-- Global Sync Indicator -->
+        <transition name="fade">
+          <div
+            v-if="isGlobalSyncing"
+            class="global-sync-badge"
+            title="Daten werden im Hintergrund synchronisiert…"
+          >
+            <ChoreSpinner inline variant="bubbles" size="sm" />
+          </div>
+        </transition>
+
         <!-- Add Chore Button (+) -->
         <button
           class="btn-icon add-btn"
@@ -127,8 +138,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { useChoreStore } from "@/stores/chore";
+import { useLogStore } from "@/stores/log";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 
 defineProps({
   title: { type: String, default: "CHORETWO" },
@@ -147,6 +161,10 @@ const emit = defineEmits([
 ]);
 
 const authStore = useAuthStore();
+const choreStore = useChoreStore();
+const logStore = useLogStore();
+
+const isGlobalSyncing = computed(() => !!(choreStore.loading || logStore.loading));
 const showMenu = ref(false);
 const menuRef = ref(null);
 const canInstallPwa = ref(false);
@@ -385,5 +403,13 @@ async function installPwa() {
 .scale-leave-to {
   transform: scale(0.92) translateY(-8px);
   opacity: 0;
+}
+
+.global-sync-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  line-height: 1;
 }
 </style>

@@ -15,7 +15,7 @@
       <span class="mdi mdi-plus" style="font-size: 24px"></span>
     </button>
 
-    <LoadingSpinner v-if="choreStore.loading" />
+    <LoadingSpinner v-if="choreStore.loading" context="chores" />
 
     <EmptyState
       v-else-if="choreStore.filteredChores.length === 0"

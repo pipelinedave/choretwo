@@ -46,7 +46,8 @@
         </div>
 
         <div class="catchup-right">
-          <span class="due-date-text">{{ friendlyDueDate }}</span>
+          <ChoreSpinner v-if="busy" inline variant="sponge" size="sm" />
+          <span v-else class="due-date-text">{{ friendlyDueDate }}</span>
           <span
             v-if="chore.interval || chore.interval_days"
             class="chore-interval"
@@ -68,6 +69,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { getBucketLabel } from "@/utils/catchUpStack";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 
 const props = defineProps({
   chore: { type: Object, required: true },

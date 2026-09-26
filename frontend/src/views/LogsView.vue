@@ -1,6 +1,6 @@
 <template>
   <div class="logs-view">
-    <LoadingSpinner v-if="logStore.loading" />
+    <LoadingSpinner v-if="logStore.loading" context="logs" message="Aktivitätsverlauf wird geladen…" />
 
     <EmptyState
       v-else-if="logs.length === 0"

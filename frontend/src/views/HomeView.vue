@@ -40,6 +40,7 @@
     <!-- Loading Indicator -->
     <LoadingSpinner
       v-if="choreStore.loading && choreStore.chores.length === 0"
+      context="chores"
     />
 
     <!-- Empty State -->

@@ -2,7 +2,8 @@
   <div class="callback-container">
     <LoadingSpinner
       v-if="authStore.loading"
-      message="Completing authentication..."
+      context="auth"
+      message="Anmeldung wird abgeschlossen…"
     />
     <div v-else-if="error" class="error-container">
       <p class="error-message">{{ error }}</p>

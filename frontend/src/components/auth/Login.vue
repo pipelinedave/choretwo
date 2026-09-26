@@ -10,7 +10,7 @@
       </div>
 
       <div class="login-content">
-        <LoadingSpinner v-if="authStore.loading" message="Authenticating..." />
+        <LoadingSpinner v-if="authStore.loading" context="auth" message="Authentifizierung läuft…" />
 
         <!-- Supabase mode: passwordless magic link (+ optional Google OAuth) -->
         <div v-else-if="authStore.isSupabaseMode" class="login-actions">
@@ -31,10 +31,13 @@
             <button
               @click="handleMagicLink"
               class="btn btn-primary btn-login"
-              :disabled="!email"
+              :disabled="!email || magicLinkSending"
             >
-              <span class="mdi mdi-email-outline"></span>
-              Send login link
+              <ChoreSpinner v-if="magicLinkSending" inline variant="bubbles" />
+              <template v-else>
+                <span class="mdi mdi-email-outline"></span>
+                Send login link
+              </template>
             </button>
             <button
               v-if="googleEnabled"
@@ -80,12 +83,14 @@ import { ref } from "vue";
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 
 const route = useRoute();
 const authStore = useAuthStore();
 
 const email = ref("");
 const magicLinkSent = ref(false);
+const magicLinkSending = ref(false);
 // Google OAuth is opt-in via env (VITE_SUPABASE_GOOGLE_ENABLED=true) and
 // only rendered in Supabase mode.
 const googleEnabled =
@@ -98,10 +103,15 @@ function handleLogin() {
 }
 
 async function handleMagicLink() {
-  if (!email.value) return;
-  const redirect = route.query.redirect || "/";
-  const sent = await authStore.login(email.value, redirect);
-  if (sent) magicLinkSent.value = true;
+  if (!email.value || magicLinkSending.value) return;
+  magicLinkSending.value = true;
+  try {
+    const redirect = route.query.redirect || "/";
+    const sent = await authStore.login(email.value, redirect);
+    if (sent) magicLinkSent.value = true;
+  } finally {
+    magicLinkSending.value = false;
+  }
 }
 
 async function handleGoogle() {

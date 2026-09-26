@@ -60,9 +60,11 @@
               class="confirm-btn"
               :disabled="msg.confirming"
             >
-              <span v-if="msg.confirming" class="dot"></span>
-              <span v-else class="mdi mdi-check"></span>
-              {{ msg.confirmLabel }}
+              <ChoreSpinner v-if="msg.confirming" inline variant="rocket_task" />
+              <template v-else>
+                <span class="mdi mdi-check"></span>
+                {{ msg.confirmLabel }}
+              </template>
             </button>
           </div>
         </div>
@@ -72,9 +74,7 @@
             <span class="mdi mdi-robot-happy"></span>
           </div>
           <div class="message-content loading">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
+            <ChoreSpinner inline variant="ai_robot" label="Copilot denkt nach…" />
           </div>
         </div>
       </div>
@@ -93,7 +93,8 @@
           :disabled="!inputMessage.trim() || loading"
           class="chat-send btn-icon"
         >
-          <span class="mdi mdi-send"></span>
+          <ChoreSpinner v-if="loading" inline variant="bubbles" size="sm" />
+          <span v-else class="mdi mdi-send"></span>
         </button>
       </div>
     </div>
@@ -103,6 +104,7 @@
 <script setup>
 import { ref, nextTick } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 import {
   assistantText,
   sendToCopilot,

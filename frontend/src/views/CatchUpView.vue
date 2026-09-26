@@ -69,7 +69,7 @@
     </div>
 
     <!-- Loading -->
-    <LoadingSpinner v-if="loading" class="loader-center" />
+    <LoadingSpinner v-if="loading" context="catchup" class="loader-center" />
 
     <!-- Empty States. Der Grund unterscheidet, WAS der Nutzer sieht: eine
          abgearbeitete Runde, ein Filter, der alles ausblendet, oder von

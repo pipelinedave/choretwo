@@ -34,11 +34,11 @@
       aria-keyshortcuts="1"
       @click="emit('done', chore)"
     >
-      <span
+      <ChoreSpinner
         v-if="pending === 'done'"
-        class="catchup-action-spinner spinner"
-        aria-hidden="true"
-      ></span>
+        inline
+        variant="rocket_task"
+      />
       <span v-else class="mdi mdi-check-bold"></span>
       <span class="catchup-action-label">Erledigen</span>
       <kbd class="catchup-action-key">1</kbd>
@@ -47,6 +47,8 @@
 </template>
 
 <script setup>
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
+
 /**
  * Sichtbare Aktionen fuer die oberste Karte des Aufholen-Decks.
  *

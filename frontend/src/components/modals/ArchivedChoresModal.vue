@@ -12,8 +12,13 @@
       </div>
 
       <div class="modal-body" ref="modalBody">
+        <LoadingSpinner
+          v-if="choreStore.loading"
+          context="chores"
+          message="Archivierte Chores werden geladen…"
+        />
         <EmptyState
-          v-if="choreStore.archivedChores.length === 0"
+          v-else-if="choreStore.archivedChores.length === 0"
           type="archived"
           title="No archived chores"
           message="Archived chores will appear here once you archive them from your active chores list."
@@ -62,6 +67,7 @@ import { onMounted } from "vue";
 import { useChoreStore } from "@/stores/chore";
 import ChoreCard from "@/components/chores/ChoreCard.vue";
 import EmptyState from "@/components/chores/EmptyState.vue";
+import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 
 defineEmits(["close"]);
 const choreStore = useChoreStore();

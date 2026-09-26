@@ -120,8 +120,10 @@
                 <button
                   type="submit"
                   class="btn btn-primary btn-sm save-button"
+                  :disabled="saving"
                 >
-                  Save
+                  <ChoreSpinner v-if="saving" inline variant="plant" size="sm" />
+                  <span v-else>Save</span>
                 </button>
               </div>
             </div>
@@ -164,6 +166,7 @@
 import { ref, computed, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { isDoneToday as isChoreDoneToday } from "@/utils/choreBuckets";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 
 const props = defineProps({
   chore: { type: Object, required: true },
@@ -181,6 +184,7 @@ const emit = defineEmits([
 const authStore = useAuthStore();
 const cardRef = ref(null);
 const editMode = ref(false);
+const saving = ref(false);
 
 const getChoreDueDate = () => {
   const d = props.chore.dueDate || props.chore.due_date;

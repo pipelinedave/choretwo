@@ -81,12 +81,16 @@
           type="submit"
           form="add-chore-form"
           class="btn btn-primary submit-btn"
+          :disabled="submitting"
         >
-          <span
-            class="mdi"
-            :class="editing ? 'mdi-content-save' : 'mdi-plus'"
-          ></span>
-          {{ editing ? "Save Changes" : "Add Chore" }}
+          <ChoreSpinner v-if="submitting" inline variant="plant" />
+          <template v-else>
+            <span
+              class="mdi"
+              :class="editing ? 'mdi-content-save' : 'mdi-plus'"
+            ></span>
+            {{ editing ? "Save Changes" : "Add Chore" }}
+          </template>
         </button>
       </div>
     </div>
@@ -96,6 +100,9 @@
 <script setup>
 import { ref, watch, computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
+
+const submitting = ref(false);
 
 const props = defineProps({
   chore: {

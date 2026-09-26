@@ -15,7 +15,7 @@
         :disabled="loading || !query.trim()"
         aria-label="Send AI prompt"
       >
-        <span v-if="loading" class="spinner-sm"></span>
+        <ChoreSpinner v-if="loading" inline variant="ai_robot" />
         <span v-else class="mdi mdi-send"></span>
       </button>
     </div>
@@ -33,7 +33,7 @@
           @click="confirmAction"
           :disabled="confirming"
         >
-          <span v-if="confirming" class="spinner-sm"></span>
+          <ChoreSpinner v-if="confirming" inline variant="rocket_task" />
           <span v-else>{{ pendingProposal.label }}</span>
         </button>
         <button class="feedback-close" @click="dismissFeedback">✕</button>
@@ -45,6 +45,7 @@
 <script setup>
 import { ref } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 import {
   assistantText,
   sendToCopilot,

@@ -15,10 +15,13 @@
         <button
           class="btn btn-primary export-btn"
           @click="exportData"
-          :disabled="exporting"
+          :disabled="exporting || importing"
         >
-          <span class="mdi mdi-download"></span>
-          {{ exporting ? "Exporting..." : "Export Backup (JSON)" }}
+          <ChoreSpinner v-if="exporting" inline variant="trash" label="Exportiere…" />
+          <template v-else>
+            <span class="mdi mdi-download"></span>
+            Export Backup (JSON)
+          </template>
         </button>
 
         <input
@@ -32,10 +35,13 @@
         <button
           class="btn btn-warning import-btn"
           @click="triggerImport"
-          :disabled="importing"
+          :disabled="importing || exporting"
         >
-          <span class="mdi mdi-upload"></span>
-          {{ importing ? "Importing..." : "Import Backup (JSON)" }}
+          <ChoreSpinner v-if="importing" inline variant="plant" label="Importiere…" />
+          <template v-else>
+            <span class="mdi mdi-upload"></span>
+            Import Backup (JSON)
+          </template>
         </button>
 
         <div
@@ -59,6 +65,7 @@ import { ref } from "vue";
 import { useChoreStore } from "@/stores/chore";
 import { useLogStore } from "@/stores/log";
 import { choreApi } from "@/api";
+import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 
 const emit = defineEmits(["close"]);
 const choreStore = useChoreStore();
