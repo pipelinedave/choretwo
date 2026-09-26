@@ -18,7 +18,7 @@ def get_chores(
         .filter(
             Chore.archived == False,
             (Chore.is_private == False)
-            | (Chore.is_private == True and Chore.owner_email == user_email),
+            | ((Chore.is_private == True) & (Chore.owner_email == user_email)),
         )
         .order_by(Chore.due_date.asc())
         .offset(offset)
@@ -34,7 +34,7 @@ def get_archived_chores(db: Session, user_email: str) -> List[Chore]:
         .filter(
             Chore.archived == True,
             (Chore.is_private == False)
-            | (Chore.is_private == True and Chore.owner_email == user_email),
+            | ((Chore.is_private == True) & (Chore.owner_email == user_email)),
         )
         .order_by(Chore.updated_at.desc())
     )
@@ -79,7 +79,7 @@ def get_chore(db: Session, chore_id: int, user_email: str) -> Optional[Chore]:
         .filter(
             Chore.id == chore_id,
             (Chore.is_private == False)
-            | (Chore.is_private == True and Chore.owner_email == user_email),
+            | ((Chore.is_private == True) & (Chore.owner_email == user_email)),
         )
         .first()
     )
@@ -194,7 +194,7 @@ def delete_chore(db: Session, chore_id: int, user_email: str) -> Optional[Chore]
         .filter(
             Chore.id == chore_id,
             (Chore.is_private == False)
-            | (Chore.is_private == True and Chore.owner_email == user_email),
+            | ((Chore.is_private == True) & (Chore.owner_email == user_email)),
         )
         .first()
     )
@@ -216,7 +216,7 @@ def get_chore_stats(db: Session, user_email: str) -> dict:
         .filter(
             Chore.archived == False,
             (Chore.is_private == False)
-            | (Chore.is_private == True and Chore.owner_email == user_email),
+            | ((Chore.is_private == True) & (Chore.owner_email == user_email)),
         )
         .all()
     )
