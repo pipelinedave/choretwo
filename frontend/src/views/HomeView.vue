@@ -208,7 +208,7 @@ async function handleArchiveChore(choreId) {
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  padding-bottom: 90px;
+  padding-bottom: var(--md-sys-spacing-xl);
 }
 
 .chores-list {

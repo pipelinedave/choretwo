@@ -890,16 +890,12 @@ async function applySnooze(offsetDays, customDate) {
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
-  /* Platz fuer die fixe Bottom-Nav (AppBottomNav: 80px + Safe-Area). Die
-     Aktionsleiste ist das Einzige, was der User zwingend anfasst — sie darf
-     nie hinter der Navigation liegen. Dieselbe Konstante steht in
-     AppBottomNav.vue; ein gemeinsames Token steht als Folgearbeit aus. */
   padding-bottom: calc(
-    80px + env(safe-area-inset-bottom, 0px) + var(--md-sys-spacing-lg)
+    env(safe-area-inset-bottom, 0px) + var(--md-sys-spacing-lg)
   );
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 80px);
+  min-height: 100vh;
 }
 
 /* Header */

@@ -7,30 +7,11 @@
         </transition>
       </router-view>
     </main>
-
-    <!--
-      Die Bottom-Nav ist App-Shell, nicht View-Inhalt: sie liegt ueber allen
-      Routen. Sie war beim Header-Refactor aus der Seite gefallen — HomeView
-      reserviert bis heute `padding-bottom: 90px`, exakt ihre Hoehe plus
-      Safe-Area, und die E2E-Suite navigierte ueber ihre `a[href]`, die dadurch
-      nie aufloesbar waren.
-      Auf /login und /auth-callback gehoert sie nicht hin.
-    -->
-    <AppBottomNav v-if="showNav" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, computed } from "vue";
-import { useRoute } from "vue-router";
-import AppBottomNav from "@/components/layout/AppBottomNav.vue";
-
-const route = useRoute();
-
-// Auth-Routen tragen keine Navigation.
-const showNav = computed(
-  () => route.path !== "/login" && route.path !== "/auth-callback",
-);
+import { onMounted } from "vue";
 
 onMounted(() => {
   const savedTheme = localStorage.getItem("choretwo_theme") || "light";
