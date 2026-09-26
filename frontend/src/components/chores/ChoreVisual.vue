@@ -10,23 +10,50 @@
   <span
     v-if="visual"
     class="chore-visual"
-    :class="[`is-${visual.category}`, { 'has-modifier': !!visual.modifier }]"
+    :class="[
+      `is-${visual.category}`,
+      {
+        'has-modifier': !!visual.modifier,
+        // Steuert, WHICH ELEMENT die Maske traegt. Siehe `.chore-visual`.
+        'src-image': visual.source === 'image',
+      },
+    ]"
     :style="rootStyle"
     aria-hidden="true"
   >
+    <!--
+      KI-Bild. `mix-blend-mode: multiply` laesst die weissen Bildflaechen in
+      die Kartenfarbe verschwinden, sodass nur die Form uebrig bleibt — das
+      Bild verhaelt sich damit wie der Vektor mit `fill: var(--color-text)`
+      darunter. Ohne den Blend-Modus waere jedes Bild ein weisser Kasten auf
+      der pastellfarbenen Karte.
+
+      Der Dark Mode braucht dafuer KEINE eigene Regel — die Begruendung und
+      die Messung, die der naheliegenden Annahme widersprechen, stehen bei
+      `.chore-visual-img` im Style-Block.
+    -->
+    <img
+      v-if="visual.source === 'image' && visual.imageUrl"
+      class="chore-visual-img"
+      :src="visual.imageUrl"
+      :style="{ opacity: motifOpacity }"
+      alt=""
+      decoding="async"
+      loading="lazy"
+    />
+
+    <!-- Vektor-Rueckschritt: nur noch, wenn fuer die Kategorie kein Bild
+         existiert. Die Deckkraft steht am Pfad und NICHT ueber eine
+         CSS-Variable — design-tokens.spec.js prueft, dass jede per var()
+         referenzierte Konstante in :root definiert ist. -->
     <svg
+      v-else
       class="chore-visual-svg"
       :viewBox="`0 0 ${viewSize} ${viewSize}`"
       :style="svgStyle"
       focusable="false"
       preserveAspectRatio="xMaxYMid slice"
     >
-      <!-- Basisform, leicht transparentiert damit sie nie mit dem Text
-           konkurriert. Die Deckkraft haengt an der Dringlichkeitsstufe und
-           steht direkt am Pfad — bewusst NICHT ueber eine CSS-Variable:
-           design-tokens.spec.js prueft, dass jede per var() referenzierte
-           Konstante in :root definiert ist, und eine Inline-Komponenten-
-           Konstante hat dort nichts verloren. -->
       <path
         class="chore-visual-base"
         :d="basePath"
@@ -77,9 +104,7 @@ const viewSize = computed(() => VIEW_SIZE);
 const basePath = computed(() => MDI_PATHS[visual.value.base] || "");
 
 const accentPaths = computed(() =>
-  (visual.value.accents || [])
-    .map((s) => MDI_PATHS[s])
-    .filter(Boolean),
+  (visual.value.accents || []).map((s) => MDI_PATHS[s]).filter(Boolean),
 );
 
 /**
@@ -156,6 +181,21 @@ function accentStyle(i) {
  * fokussierbar, `pointer-events: none`, damit die Swipe-Gesten der Card
  * unberuehrt bleiben.
  */
+/*
+ * Warum der Vektor hier eine Maske traegt und das KI-Bild nicht.
+ *
+ * Der Verlauf blendet das Motiv nach links aus, damit es nicht wie ein
+ * Fremdkoerper an der Titelspalte klebt. Beim Vektor ist das noetig, weil
+ * dort die FORM beschnitten wird — das faellt sofort auf. Beim Bild nicht:
+ * die Illustrationen haben weissen Rand um das Motiv, ein Schnitt durch
+ * diesen Rand ist unsichtbar.
+ *
+ * Wichtiger noch: eine `mask-image` hebt `mix-blend-mode: multiply` auf.
+ * Sowohl am Vorfahren als auch am selben Element — dann mischt das Bild nur
+ * noch gegen transparent, und auf der Karte bleibt ein helles Quadrat. Die
+ * Klasse `src-image` haelt deshalb die Maske beim Vektor und nimmt sie dem
+ * Bild. Die Messwerte stehen bei `.chore-visual-img`.
+ */
 .chore-visual {
   /* Flex-Kind, nicht absolut: es sitzt im Fluss zwischen Titel und
      Faelligkeit und kann so nichts ueberdecken. */
@@ -166,9 +206,22 @@ function accentStyle(i) {
   justify-content: center;
   margin: 0 -2px;
   pointer-events: none;
+}
+
+/* Weicher Verlauf nach links: das Motiv verliert Richtung Titel an Kante,
+   damit es sich nicht wie ein Fremdkoerper aufklebt. */
+/*
+ * Weicher Verlauf nach links: das Motiv verliert Richtung Titel an Kante,
+ * damit es sich nicht wie ein Fremdkoerper aufklebt.
+ *
+ * Als Custom Property waere das bequemer, aber design-tokens.spec.js
+ * verlangt, dass jede per var() referenzierte Konstante in :root definiert
+ * ist, und ein komponentenlokaler Farbverlauf hat in der globalen
+ * Farb-Achse nichts zu suchen. Der Verlauf steht deshalb hier ausgeschrieben
+ * — er wird nur an dieser einen Stelle gebraucht.
+ */
+.chore-visual:not(.src-image) {
   opacity: 0.9;
-  /* Weicher Verlauf nach links: das Motiv verliert Richtung Titel an
-     Kante, damit es sich nicht wie ein Fremdkoerper aufklebt. */
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
@@ -185,6 +238,40 @@ function accentStyle(i) {
 
 .chore-visual-svg {
   overflow: visible;
+}
+
+/*
+ * KI-Bild.
+ *
+ * `object-fit: cover` statt `contain`: die Bilder sind quadratisch und das
+ * Element auch, beide liefern dasselbe. `contain` wuerde bei
+ * `loading="lazy"` mit noch unbekannter intrinsischer Groesse den
+ * Motivationen zusaetzlich Platz reservieren.
+ */
+.chore-visual-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /*
+   * `multiply` OHNE Maske — beides ist Bedingung, nicht Kosmetik.
+   *
+   * Eine `mask-image` auf DEMSELBEN Element hebt den Blend genauso auf wie
+   * ein maskierter Vorfahr: das Bild mischt wieder nur gegen transparent.
+   * Gemessen (Δ Blau zwischen Kartengrund und weissem Bildrand, 0 = unsichtbar):
+   *
+   *   mit Maske am Bild            Δ 21   (Gegenprobe: blend normal → Δ 21)
+   *   ohne Maske, mit multiply     Δ  8   (Gegenprobe: blend normal → Δ 21)
+   *
+   * Die verbleibenden 8 sind FLUX' weicher Schlagschatten unter dem Motiv,
+   * der jetzt korrekt in die Karte multipliziert wird. Er ist als Schatten
+   * gewollt, nicht als Kasten.
+   *
+   * Den links ausblendenden Verlauf braucht das Bild nicht: die
+   * Illustrationen haben weissen Rand um das Motiv, ein Schnitt durch
+   * diesen Rand ist unsichtbar. Der Vektor braucht die Maske weiterhin —
+   * dort wird die FORM beschnitten, und das faellt auf.
+   */
+  mix-blend-mode: multiply;
 }
 
 /* Die MDI-Pfade sind 24x24-Pfade; in einer 48er-ViewBox entspricht das
@@ -225,6 +312,24 @@ function accentStyle(i) {
 [data-theme="dark"] .chore-visual-svg {
   filter: opacity(0.8);
 }
+
+/*
+ * Dark Mode fuer das KI-Bild: es braucht KEINE Sonderregel.
+ *
+ * Das war die naheliegende Vermutung und sie war falsch. `multiply` ergibt
+ * auf schwarzem Grund nichts, die Karten sind aber nicht schwarz, sondern
+ * mittel-dunkel (#82403b bis #305c5c). Weiss mal mittel-dunkel ergibt
+ * mittel-dunkel — der weisse Bildgrund verschwindet also auch hier, und
+ * das Motiv bleibt sichtbar. `invert(1)` + `screen` ist die naheliegende
+ * "Reparatur", erzeugt aber messbar WENIGER Signal:
+ *
+ *   multiply         Δ-Luminanz 0,138–0,156   1,79–2,03:1
+ *   invert + screen  Δ-Luminanz 0,059–0,076   1,43–1,62:1
+ *
+ * (gemessen im echten Browser ueber alle fuenf Dringlichkeitsstufen, Region
+ * der Motivflaeche). Also: gleiche Regel in beiden Modi, kein Mode-Zweig.
+ * Das ist nicht nur kuerzer, es ist auch das bessere Ergebnis.
+ */
 
 /* Reduzierte Bewegung: das Motiv bewegt sich ohnehin nicht, aber die
    Komponente wird nach dem globalen Muster hier ausdruecklich als

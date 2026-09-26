@@ -52,11 +52,11 @@ export async function goToSettings(page) {
   // Das Modal ist kein Routenwechsel — es wird per v-if eingeblendet. Also
   // nicht auf waitForURL warten, sondern auf das Sektions-Element.
   await expect(page.locator(".modal-content").first()).toBeVisible({
-    timeout: 10_000,
+    timeout: 10000,
   });
   await expect(
     page.locator(".modal-content .section-title").first(),
-  ).toBeVisible({ timeout: 10_000 });
+  ).toBeVisible({ timeout: 10000 });
 }
 
 /** Navigiert direkt per URL — die Route leitet auf "/" um (toter Pfad). */

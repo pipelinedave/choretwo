@@ -6,3 +6,9 @@ node_modules/
 # die Datei damit unlesbar machen, ohne einen echten Fehler zu beheben.
 # Regenerieren:  node scripts/extract-mdi-paths.mjs
 src/assets/icons/mdi-paths.generated.js
+
+# Generiert aus FLUX.1-schnell via scripts/generate-chore-images.mjs.
+# Enthaelt 210 Bild-URLs, eine pro Zeile; Prettier wuerde die Arrays auf je
+# eine Zeile zusammenfalten und damit 30 Warnungen ohne echten Fehler erzeugen.
+# Regenerieren:  CLOUDFLARE_ACCOUNT_ID=… CLOUDFLARE_API_TOKEN=… npm run chore-images
+src/assets/icons/chore-images.generated.js

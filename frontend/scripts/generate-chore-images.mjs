@@ -247,7 +247,15 @@ async function main() {
   }
 
   if (plan.length === 0) {
-    process.stdout.write("Nichts zu tun — alle Bilder vorhanden.\n");
+    // Das Manifest wird TROTZDEM geschrieben. Der fruehere fruehe Return
+    // liess es stehen, wenn sich der Generator geaendert hatte — ein
+    // Syntaxfehler im Manifest blieb so unsichtbar, bis der Build
+    // komplett brach. "Keine neuen Bilder" heisst nicht "nichts zu tun".
+    process.stdout.write("Nichts zu erzeugen — alle Bilder vorhanden.\n");
+    await writeManifest(args.variants);
+    process.stdout.write(
+      `Manifest aktualisiert: ${path.relative(process.cwd(), MANIFEST)}\n\n`,
+    );
     return;
   }
 
@@ -323,9 +331,13 @@ async function writeManifest(variants) {
       if (await exists(file))
         list.push(`/chore-images/${keyOf(category, v)}.webp`);
     }
+    // Keys MUESSEN quotiert sein: `waesche-aufhaengen` ist kein gueltiger
+    // JS-Bezeichner. Unquotiert erzeugt das einen Syntaxfehler im gesamten
+    // Bundle — der erste Lauf lieferte genau das, nachdem `bad` als
+    // gueltiger Name still durchgegangen war.
     if (list.length)
       entries.push(
-        `  ${category}: [\n${list.map((u) => `    "${u}",`).join("\n")}\n  ],`,
+        `  "${category}": [\n${list.map((u) => `    "${u}",`).join("\n")}\n  ],`,
       );
   }
 

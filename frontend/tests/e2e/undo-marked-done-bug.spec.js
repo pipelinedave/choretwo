@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
-
+import { localDate, localDateOffset } from "./helpers/dates.js";
 
 // Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
 // dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
 const USER = specEmail("undo-marked-done-bug");
 test.describe("Undo marked_done Bug (Issue #42)", () => {
-  test.beforeEach(async ({ context, page }) => {
+  test.beforeEach(async ({ page }) => {
     await e2eLogin(page, { email: USER, name: "undo-marked-done-bug" });
   });
 
@@ -16,10 +16,8 @@ test.describe("Undo marked_done Bug (Issue #42)", () => {
   }) => {
     const testId = Date.now();
     const choreName = `Undo Bug Test Chore ${testId}`;
-    const today = new Date().toISOString().split("T")[0];
-    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const today = localDate();
+    const nextWeek = localDateOffset(7);
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
 

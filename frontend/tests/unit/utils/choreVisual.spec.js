@@ -67,7 +67,9 @@ describe("classifyChore", () => {
   });
 
   it("normalisiert Diakritika, damit 'grosse' und 'große' gleich sind", () => {
-    expect(classifyChore("Große Wäsche").category).toBe(classifyChore("Grosse Wäsche").category);
+    expect(classifyChore("Große Wäsche").category).toBe(
+      classifyChore("Grosse Wäsche").category,
+    );
   });
 
   it("bevorzugt bei Gleichstand die frueheste Kategorie (deterministisch)", () => {
@@ -114,7 +116,10 @@ describe("buildComposition / resolveChoreVisual", () => {
   it("liefert fuer JEDES Sample einen gueltigen Basispfad", () => {
     for (const name of SAMPLES) {
       const c = buildComposition(name);
-      expect(MDI_PATHS[c.base], `Basispfad fehlt fuer "${name}": ${c.base}`).toBeTruthy();
+      expect(
+        MDI_PATHS[c.base],
+        `Basispfad fehlt fuer "${name}": ${c.base}`,
+      ).toBeTruthy();
     }
   });
 
@@ -122,7 +127,10 @@ describe("buildComposition / resolveChoreVisual", () => {
     for (const name of SAMPLES) {
       const c = buildComposition(name);
       for (const a of c.accents) {
-        expect(MDI_PATHS[a], `Akzentpfad fehlt fuer "${name}": ${a}`).toBeTruthy();
+        expect(
+          MDI_PATHS[a],
+          `Akzentpfad fehlt fuer "${name}": ${a}`,
+        ).toBeTruthy();
       }
     }
   });
@@ -143,7 +151,9 @@ describe("buildComposition / resolveChoreVisual", () => {
 
   it("gibt unterscheidlichen Chores unterschiedliche Kompositionen", () => {
     // Das ist die Anforderung 'pro Chore ein eigenes Bild'.
-    const seen = new Set(SAMPLES.map((n) => JSON.stringify(resolveChoreVisual(n))));
+    const seen = new Set(
+      SAMPLES.map((n) => JSON.stringify(resolveChoreVisual(n))),
+    );
     // Mindestens die Haelfte muss sich unterscheiden — gleiche Kategorie
     // mit gleichem Namen-Fingerprint ist erlaubt, identische Komposition
     // fuer verschiedene Chores waere ein Fehler.
@@ -158,8 +168,13 @@ describe("buildComposition / resolveChoreVisual", () => {
     expect(byObj.seed).toBe(byName.seed);
   });
 
-  it("markiert die Quelle als 'vector' — die Austauschstelle fuer spaetere KI-Bilder", () => {
-    expect(resolveChoreVisual("Bad putzen").source).toBe("vector");
+  it("liefert jetzt ein KI-Bild statt eines Vektors", () => {
+    // Dieser Test stand vorher auf 'vector' und war damit die Zusage
+    // "die Austauschstelle fuer spaetere KI-Bilder". Die Zusage ist
+    // eingeloest, der Test ist entsprechend weitergezogen.
+    const v = resolveChoreVisual("Bad putzen");
+    expect(v.source).toBe("image");
+    expect(v.imageUrl).toMatch(/^\/chore-images\/bad-\d+\.webp$/);
   });
 
   it("nutzt fuer jede Kategorie eine eigene Basisform, ausser bewusste Mehrfachzuordnung", () => {
@@ -203,9 +218,7 @@ describe("Bild-Prompts (scripts/chore-image-prompts.mjs)", () => {
 
   it("liefert pro Variante einen anderen Prompt", () => {
     // Sonst waeren es 7 Kopien desselben Bildes — der Pool waere wirkungslos.
-    const prompts = new Set(
-      FRAMINGS.map((_, i) => buildPrompt("waesche", i)),
-    );
+    const prompts = new Set(FRAMINGS.map((_, i) => buildPrompt("waesche", i)));
     expect(prompts.size).toBe(FRAMINGS.length);
   });
 

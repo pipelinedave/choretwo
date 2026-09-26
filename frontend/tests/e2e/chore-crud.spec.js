@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
+import { localDateOffset } from "./helpers/dates.js";
 
 
 // Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
@@ -59,9 +60,7 @@ test.describe("Chore CRUD + Undo Flow", () => {
   test("should mark chore as done via API", async ({ page, request }) => {
     const testId = Date.now();
     const choreName = `Test Chore to Complete ${testId}`;
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(7);
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
     const createResponse = await request.post("/api/chores/", {
@@ -100,9 +99,7 @@ test.describe("Chore CRUD + Undo Flow", () => {
   test("should archive a chore via API", async ({ page, request }) => {
     const testId = Date.now();
     const choreName = `Test Chore to Archive ${testId}`;
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(7);
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
     const createResponse = await request.post("/api/chores/", {
@@ -142,9 +139,7 @@ test.describe("Chore CRUD + Undo Flow", () => {
   test("should undo chore creation via API", async ({ page, request }) => {
     const testId = Date.now();
     const choreName = `Chore to Undo Create ${testId}`;
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(7);
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
 
@@ -192,9 +187,7 @@ test.describe("Chore CRUD + Undo Flow", () => {
   test("should show logs after chore actions", async ({ page, request }) => {
     const testId = Date.now();
     const choreName = `Log Test Chore ${testId}`;
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(7);
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
 

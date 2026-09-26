@@ -1,5 +1,6 @@
 import { test, expect, request } from "@playwright/test";
 import { makeToken, specEmail } from "./helpers/auth.js";
+import { localDate } from "./helpers/dates.js";
 
 // Diese Spec ist eine reine API-Spec (kein Browser). Sie lief urspruenglich
 // gegen den Microservice-Stack mit drei Ports (8001 auth, 8002 chore, 8003 log).
@@ -50,7 +51,7 @@ test.describe("Undo marked_done Bug Fix", () => {
   });
 
   test("undo marked_done resets due_date, last_done, done_by", async () => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDate();
     const email = USER;
 
     // 1. Create chore

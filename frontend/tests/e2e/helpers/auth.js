@@ -77,7 +77,7 @@ export function specEmail(specName) {
  */
 export async function expectRedirectToLogin(page, expectUrl = "/login") {
   await page.goto("/");
-  await page.waitForURL(`**${expectUrl}`, { timeout: 10_000 });
+  await page.waitForURL(`**${expectUrl}`, { timeout: 10000 });
   await expectLoginPageVisible(page);
 }
 
@@ -115,7 +115,7 @@ export async function login(page, opts = {}) {
 
   await page.goto(url);
   await page.waitForFunction(() => !!window.localStorage.getItem("token"), null, {
-    timeout: 10_000,
+    timeout: 10000,
   });
   return token;
 }

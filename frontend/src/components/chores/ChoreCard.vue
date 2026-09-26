@@ -123,7 +123,12 @@
                   class="btn btn-primary btn-sm save-button"
                   :disabled="saving"
                 >
-                  <ChoreSpinner v-if="saving" inline variant="plant" size="sm" />
+                  <ChoreSpinner
+                    v-if="saving"
+                    inline
+                    variant="plant"
+                    size="sm"
+                  />
                   <span v-else>Save</span>
                 </button>
               </div>
@@ -142,11 +147,26 @@
               :disabled="isDoneToday || isCompleting"
               @click.stop="triggerDone"
               :aria-label="isDoneToday ? 'Erledigt' : 'Als erledigt markieren'"
-              :title="isDoneToday ? 'Heute bereits erledigt' : 'Als erledigt markieren'"
+              :title="
+                isDoneToday
+                  ? 'Heute bereits erledigt'
+                  : 'Als erledigt markieren'
+              "
             >
-              <ChoreSpinner v-if="isCompleting" inline variant="rocket_task" size="sm" />
-              <span v-else-if="isDoneToday" class="mdi mdi-check-circle done-icon"></span>
-              <span v-else class="mdi mdi-checkbox-blank-circle-outline check-circle-icon"></span>
+              <ChoreSpinner
+                v-if="isCompleting"
+                inline
+                variant="rocket_task"
+                size="sm"
+              />
+              <span
+                v-else-if="isDoneToday"
+                class="mdi mdi-check-circle done-icon"
+              ></span>
+              <span
+                v-else
+                class="mdi mdi-checkbox-blank-circle-outline check-circle-icon"
+              ></span>
             </button>
 
             <span
@@ -174,19 +194,22 @@
             Die Dringlichkeitsfarbe auf `.chore-card` bleibt unveraendert:
             Farbe = wie dringend, Motiv = was.
           -->
-          <ChoreVisual
-            :chore="chore"
-            :urgency="urgencyClass"
-            :size="56"
-          />
+          <ChoreVisual :chore="chore" :urgency="urgencyClass" :size="56" />
 
           <div class="chore-right">
             <transition name="fade" mode="out-in">
               <div v-if="isCompleting" class="completing-badge">
-                <ChoreSpinner inline variant="handshake" label="Deal besiegelt! 🤝" />
+                <ChoreSpinner
+                  inline
+                  variant="handshake"
+                  label="Deal besiegelt! 🤝"
+                />
               </div>
               <div v-else class="due-info">
-                <span class="chore-due" :class="{ 'chore-overdue': isOverdueDate }">
+                <span
+                  class="chore-due"
+                  :class="{ 'chore-overdue': isOverdueDate }"
+                >
                   {{ friendlyDueDate }}
                 </span>
                 <span
@@ -689,7 +712,9 @@ function handleArchive() {
   color: var(--color-text-muted, #757575);
   font-size: 1.35rem;
   line-height: 1;
-  transition: transform var(--transition-fast), color var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    color var(--transition-fast);
   border-radius: 50%;
   width: 28px;
   height: 28px;
@@ -730,12 +755,33 @@ function handleArchive() {
   align-items: center;
   width: 100%;
   gap: 12px;
-  /* Das Motiv (ChoreVisual) ist position:absolute und liegt hinter dem
-     Text. `relative` + `z-index: 1` hebt `.chore-content` darueber, damit
-     Titel und Faelligkeit garantiert lesbar bleiben — unabhaengig davon, wie
-     dunkel das Motiv gerade steht. */
+  /*
+   * KEIN `z-index` hier — und das ist der zweite Teil einer Korrektur, die
+   * erst auffiel, als die KI-Bilder mit `mix-blend-mode: multiply`
+   * eingezogen sind.
+   *
+   * `position: relative` + `z-index: 1` erzeugt einen Stacking-Kontext,
+   * und der isoliert das Blenden. Das Motiv liegt im Inneren von
+   * `.chore-content`, also mischte es nur noch gegen transparente und
+   * `multiply` laeuft ins Leere: auf jeder Karte blieb ein helles Quadrat,
+   * in dem das Bild sass. Gemessen als Δ Blau zwischen Kartengrund und
+   * weissem Bildrand (0 = unsichtbar):
+   *
+   *   z-index: 1,  blend: multiply   Δ 19   helles Quadrat
+   *   z-index: 1,  blend: normal     Δ 19   identisch → der Blend wirkte nicht
+   *   z-index: auto, blend: multiply Δ  8   Quadrat weg
+   *
+   * Die Stufe bleibt aber noetig, diesmal an den TEXT-SPALTEN statt am
+   * Container: `.swipe-background` hat `z-index: 1` und muss unter Titel
+   * und Faelligkeit bleiben. Ohne jede Stufe rueckte die Wisch-Farbe beim
+   * Swipe ueber den Text. `.chore-left` und `.chore-right` tragen sie jetzt.
+   *
+   * Nebenbei: der alte Kommentar hier sprach von einem position:absolute
+   * Motiv, das den Text ueberlagerte. Das ist seit der Umstellung auf ein
+   * Flex-Kind nicht mehr wahr — der Kommentar beschrieb einen Zustand, der
+   * seit Wochen nicht existierte.
+   */
   position: relative;
-  z-index: 1;
 }
 
 .chore-left {
@@ -761,9 +807,17 @@ function handleArchive() {
  * legte sich das Motiv sichtbar ueber die Faelligkeitsangabe ("Overdue by
  * 6d") — das war im Screenshot-Vergleich sofort sichtbar.
  */
+/* Traegt die Stufe ueber `.swipe-background`, damit Titel und Faelligkeit
+   beim Swipe bedeckt bleiben. Sie sitzt hier statt am Container, weil ein
+   Stacking-Kontext auf `.chore-content` das `mix-blend-mode` des Motivs
+   isolieren wuerde — siehe dort. */
 .chore-left,
 .chore-right {
-  text-shadow: 0 0 6px var(--chore-bg), 0 0 2px var(--chore-bg);
+  position: relative;
+  z-index: 1;
+  text-shadow:
+    0 0 6px var(--chore-bg),
+    0 0 2px var(--chore-bg);
 }
 
 /* `--chore-bg` spiegelt die Dringlichkeitsfarbe. Es ist bewusst pro Stufe

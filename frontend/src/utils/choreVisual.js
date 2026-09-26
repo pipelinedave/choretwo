@@ -32,23 +32,43 @@
  *    elemente). "Wäsche waschen" und "Wäsche aufhängen" teilen sich die
  *    Kategorie, sehen aber unterschiedlich aus.
  *
- * 4. Austauschbarkeit der Bildquelle.
- *    Spaeter kommen echte KI-Bilder (OpenRouter, gemini-2.5-flash-image,
- *    ~0,3 ct/Bild) statt der Vektoren. Der Einstiegspunkt dafuer ist
- *    `resolveChoreVisual()` — die Karten kennen nur dessen Rueckgabe, nie
- *    die MDI-Pfade. `source: 'vector'` im Rueckgabeobjekt sagt, woher das
- *    Bild kam; ein 'image'-Provider wuerde dieselbe Struktur liefern.
- *    ACHTUNG: Da die Zuordnung aus dem Namen kommt, muss ein spaeterer
- *    Bild-Generator identisch kategorisieren, sonst bekommen ahnliche
- *    Chores verschiedene Bilder. Die Kategorie-Liste unten ist deshalb die
- *    verbindliche Referenz.
+ * 4. Austauschbarkeit der Bildquelle — ERLEDIGT.
+ *    Es gab zuerst nur Vektoren. Die Karten kannten nie die MDI-Pfade,
+ *    sondern nur den Rueckgabewert von `resolveChoreVisual()` — genau
+ *    darum wurde dieser eine Einstiegspunkt gewaehlt. Jetzt liefert die
+ *    Funktion bei vorhandenem KI-Bild `source: 'image'` plus eine URL,
+ *    sonst `source: 'vector'` plus die Pfade. ChoreVisual.vue rendert
+ *    beides; der Vektorpfad bleibt als Rueckschritt erhalten, falls fuer
+ *    eine Kategorie kein Bild existiert.
  *
- * FORMGEOMETRIE
+ *    Die Bilder kommen aus einem POOL je Kategorie (siehe
+ *    scripts/chore-image-prompts.mjs). Der Pool loest ein Problem, das
+ *    sonst unloesbar waere: Chore-Namen sind unbegrenzt, "ein Bild pro
+ *    Name" laesst sich also nicht vorproduzieren. Die Variante waehlt der
+ *    Namens-Hash — gleicher Name immer dasselbe Bild, verschiedene Namen
+ *    mit hoher Wahrscheinlichkeit verschiedene.
+ *
+ *    Die Zuordnung bleibt aus dem Namen abgeleitet; ein Wechsel des
+ *    Bildanbieters aendert daran nichts. Die Kategorie-Liste unten bleibt
+ *    die verbindliche Referenz — der Abgleich mit dem Generator ist in
+ *    tests/unit/utils/choreVisual.spec.js als Test festgeschraubt.
+ *
+ *    Erzeugt mit FLUX.1-schnell ueber Cloudflare Workers AI, 210 Bilder,
+ *    924 KB gesamt. Warum ueberhaupt Cloudflare: von allen geprueften
+ *    "gratis"-Angeboten ist es das einzige ohne Wasserzeichen und ohne
+ *    Bezahlung (10.000 Neurone/Tag gratis, 43,2 je Bild). Pollinations
+ *    wirbt mit "free unlimited no signup", liefert aber nur ein
+ *    wassermarkiertes Bild; Google hat laut eigener Preistabelle keinen
+ *    gratis API-Tier fuer Bildmodelle.
+ *
+ * FORMGEOMETRIE (gilt nur noch fuer den Vektor-Rueckschritt)
  * MDI-Pfade liegen im 24x24-Raster. Sie sind FUELL-Pfade, keine Outline-
  * Striche — `fill-rule: evenodd` liegt dem nicht zugrunde, Teile mit
  * "Z"-Luecken (z.B. ein Henkel) werden also gefuellt wie gezeichnet. Das ist
  * die Form, die MDI ausliefert, und sie ist konsistent.
  */
+
+import { CHORE_IMAGES } from "@/assets/icons/chore-images.generated.js";
 
 /** Die verbindliche Kategorie-Liste. Reihenfolge = Fallback-Prioritaet. */
 export const CHORE_CATEGORIES = [
@@ -692,16 +712,43 @@ export function buildComposition(name, opts = {}) {
 }
 
 /**
- * OEFFENTLICHE SCHNITTSTELLE.
+ * Waehlt die Bildvariante fuer einen Chore-Namen.
  *
- * Das ist der einzige Einstiegspunkt, den die Karten kennen. Ein spaeterer
- * KI-Bild-Provider (OpenRouter / gemini-2.5-flash-image) implementiert
- * dieselbe Signatur und liefert `source: 'image'` plus eine Bild-URL statt
- * der Pfade — die Karten muessen dafuer nicht angefasst werden.
+ * Deterministisch ueber den Namens-Hash, damit derselbe Name immer
+ * dasselbe Bild zeigt — auch nach einem Reload, und auch fuer zwei
+ * Nutzer, die dieselbe Chore anlegen. Ohne Pool gaebe es diese Auswahl
+ * nicht: Chore-Namen sind unbegrenzt, vorproduzieren laesst sich nur ein
+ * Pool je Kategorie.
+ *
+ * Der Hash BEZWECHT hier nichts Zufaelliges, er verteilt nur die Namen auf
+ * die Varianten. Bei sieben Varianten kollidieren zwei aehnliche Chores
+ * derselben Kategorie mit Wahrscheinlichkeit 1/7 — der Preis des
+ * Pool-Ansatzes, und akzeptiert, weil "ein Bild pro Chore" sonst gar
+ * nicht vorproduzierbar waere.
+ *
+ * @param {string} name
+ * @param {string} category
+ * @returns {string|null} Bild-URL oder null, wenn kein Pool existiert
+ */
+export function resolveChoreImage(name, category) {
+  const pool = CHORE_IMAGES[category];
+  if (!pool || !pool.length) return null;
+  return pool[hashString(name) % pool.length];
+}
+
+/**
+ * OEFFENTLICKE SCHNITTSTELLE.
+ *
+ * Das ist der einzige Einstiegspunkt, den die Karten kennen. Bei
+ * vorhandenem KI-Bild liefert die Funktion `source: 'image'` plus
+ * `imageUrl`, sonst `source: 'vector'` plus die Pfaddaten.
+ * ChoreVisual.vue entscheidet danach, was es rendert — die Karten selbst
+ * wissen nichts ueber die Bildquelle.
  *
  * @param {string|object} chore - Name oder Chore-Objekt
  * @returns {{
- *   source: 'vector', category: string, modifier: string|null,
+ *   source: 'image'|'vector', category: string, modifier: string|null,
+ *   imageUrl: string|null,
  *   base: string, accents: string[], offsets: object[], seed: number,
  *   label: string
  * }}
@@ -709,8 +756,10 @@ export function buildComposition(name, opts = {}) {
 export function resolveChoreVisual(chore) {
   const name = typeof chore === "string" ? chore : chore?.name || "";
   const comp = buildComposition(name);
+  const imageUrl = resolveChoreImage(name, comp.category);
   return {
-    source: "vector",
+    source: imageUrl ? "image" : "vector",
+    imageUrl,
     ...comp,
     label: name,
   };
@@ -750,5 +799,26 @@ export const CATEGORY_LABELS = {
   sonstiges: "Hausarbeit",
 };
 
-/** MDI-Pfade, damit ChoreVisual.vue die Icon-Daten bekommt. */
+/** MDI-Pfade, damit ChoreVisual.vue die Icon-Daten bekommt (nur noch der
+ *  Vektor-Rueckschritt braucht sie). */
 export { MDI_PATHS } from "@/assets/icons/mdi-paths.generated.js";
+
+/**
+ * Die KI-Bilder: je Kategorie ein Pool aus Varianten.
+ *
+ * Das ist ein GENERIERTES Manifest, kein Handbestand. Erzeugt von
+ * `npm run chore-images` (scripts/generate-chore-images.mjs) aus
+ * scripts/chore-image-prompts.mjs. Die Bilder liegen in `public/`, werden
+ * also NICHT in das JS-Bundle gepackt, sondern zur Laufzeit von
+ * `/chore-images/…` geladen — 210 Bilder, 924 KB, davon sieht eine Sitzung
+ * nur die, die sie wirklich anzeigt.
+ *
+ * Der Abgleich dieser Kategorien gegen CHORE_CATEGORIES ist in
+ * tests/unit/utils/choreVisual.spec.js als Test festgeschraubt: eine neue
+ * Kategorie ohne Bild faellt dort sofort auf, statt still ein leeres
+ * Motiv zu zeigen.
+ */
+export {
+  CHORE_IMAGES,
+  CHORE_IMAGE_VARIANTS,
+} from "@/assets/icons/chore-images.generated.js";

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
-
+import { localDateOffset } from "./helpers/dates.js";
 
 // Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
 // dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
@@ -14,9 +14,7 @@ test.describe("Undo marked_done fix", () => {
     await e2eLogin(page, { email: USER, name: "undo-marked-done" });
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(7);
 
     // Create a fresh chore for testing
     const createResp = await request.post("/api/chores/", {
@@ -103,9 +101,7 @@ test.describe("Undo marked_done fix", () => {
     await e2eLogin(page, { email: USER, name: "undo-marked-done" });
 
     const token = await page.evaluate(() => localStorage.getItem("token"));
-    const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(7);
 
     // Create chore
     const createResp = await request.post("/api/chores/", {

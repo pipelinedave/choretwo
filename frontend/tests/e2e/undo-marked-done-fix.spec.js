@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
-
+import { localDate, localDateOffset } from "./helpers/dates.js";
 
 // Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
 // dieser Spec mit denen anderer Specs in der geteilten Test-DB mischen.
@@ -14,10 +14,8 @@ test.describe("Undo marked_done Bug Fix Verification", () => {
     page,
   }) => {
     const token = await page.evaluate(() => localStorage.getItem("token"));
-    const today = new Date().toISOString().split("T")[0];
-    const next7 = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const today = localDate();
+    const next7 = localDateOffset(7);
 
     // 1. Create chore with due_date = today
     const result = await page.evaluate(

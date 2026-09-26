@@ -15,6 +15,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { login as e2eLogin, specEmail } from "./helpers/auth.js";
+import { localDateOffset } from "./helpers/dates.js";
 
 
 // Eigene Test-Adresse pro Spec — verhindert, dass sich die Chores
@@ -29,9 +30,7 @@ test.describe("Swipe Gesture Interactions — Mouse & Touch", () => {
     await e2eLogin(page, { email: USER, name: "swipe-interactions" });
 
     token = await page.evaluate(() => localStorage.getItem("token"));
-    const dueDate = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const dueDate = localDateOffset(1);
     choreName = `Swipe Test ${Date.now()}`;
 
     const response = await request.post("/api/chores/", {
