@@ -243,6 +243,38 @@ async function installPwa() {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
+  /*
+   * `flex-wrap` ist hier KEINE Kosmetik, sondern die Reparatur eines
+   * Ueberlaufs, der die ganze Seite breiter machte als den Viewport.
+   *
+   * BEFUND: bei 320 px Viewport war document.scrollWidth 345 px, also 25 px
+   * zu breit. Nachgewiesen, dass der Header die alleinige Ursache ist:
+   *
+   *   Header + Karten sichtbar   scrollWidth 345   +25 px
+   *   nur Header sichtbar        scrollWidth 345   +25 px
+   *   nur Karten sichtbar        scrollWidth 320   ok
+   *
+   * Ursache: diese Zeile war ein Flex-Container OHNE Umbruch, `.brand`
+   * hatte kein `min-width: 0` und schrumpfte daher nicht. Logo (145 px) plus
+   * vier Aktions-Buttons (184 px) ergaben 329 px min-content — mehr als die
+   * 288 px, die bei 320 px Viewport Platz haben.
+   *
+   * Die Folge war, dass die Seite breiter wurde als das Fenster. Die
+   * ChoreCards sind `width: 100%` und erbten diese Breite, wodurch sie
+   * rechts aus dem Bild liefen — inklusive Faelligkeitsangabe. Der Effekt
+   * wurde am Karten-Layout festgemacht, obwohl er im Header passiert.
+   *
+   * Zwei Massnahmen, die sich ergaenzen: `flex-wrap` als Zusage, dass die
+   * Kopfzeile nie breiter wird als ihr Inhalt (die Buttons rutschen auf
+   * schmalen Geraeten in eine zweite Zeile), und `min-width: 0` auf `.brand`,
+   * damit das Logo notfalls schrumpfen darf, statt die Zeile zu sprengen.
+   */
+  flex-wrap: wrap;
+  row-gap: 0.35rem;
+}
+
+.brand {
+  min-width: 0;
 }
 
 .brand-link {
@@ -256,6 +288,14 @@ async function installPwa() {
   letter-spacing: -0.5px;
   color: var(--color-primary);
   text-transform: uppercase;
+  /*
+   * Nur auf schmalen Geraeten kleiner. Ab 381 px bleibt es bei 1.75rem —
+   * eine `clamp()` ueber vw haette das Logo auf ALLEN Geraeten verkleinert,
+   * um ein Problem zu loesen, das nur unter 380 px auftritt.
+   */
+  @media (max-width: 380px) {
+    font-size: 1.2rem;
+  }
 }
 
 .header-actions {

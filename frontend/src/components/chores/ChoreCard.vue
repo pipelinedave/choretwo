@@ -868,6 +868,50 @@ function handleArchive() {
   word-break: break-word;
 }
 
+/*
+ * Schmale Geraete: der Titel braucht eine eigene Zeile.
+ *
+ * BEFUND: bei 320 px Viewport rendert der Titel EIN ZEICHEN PRO ZEILE und
+ * die Karte wird mehrere hundert Pixel hoch. Ursache ist eine Rechnung, die
+ * bei schmalen Geraeten schlecht aufgeht: von 252 px nutzbarer Breite
+ * (320 minus 2x18 Padding) gehen 56 px an das Motiv und 127 px an
+ * `.chore-right` — und `.chore-right` hat `flex-shrink: 0`, gibt also
+ * nichts ab. Bleiben 45 px fuer `.chore-left`. Bei `word-break: break-word`
+ * bricht daraufhin jedes einzelne Zeichen um.
+ *
+ * Der Sichtbericht fuehrte das auf die KI-Bilder zurueck, weil dort der
+ * Effekt zuerst auffiel. Der Header-Überlauf, der die Karten tatsaechlich
+ * abschnitt, ist davon getrennt und in AppHeader.vue behoben.
+ *
+ * Die Loesung ist bewusst ein Umbruch und keine Verkleinerung: die
+ * Faelligkeitsangabe rueckt in eine zweite Zeile unter den Titel und
+ * rechtsbuendig ausgerichtet. Titel und Faelligigkeit bleiben lesbar, und
+ * bei normalen Breiten (ab 381 px) aendert sich gar nichts.
+ */
+@media (max-width: 380px) {
+  .chore-content {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  /* Reihenfolge auf dieser Breite: Titel oben, darunter Faelligkeit und
+     Motiv. Ohne `order` stuende das Motiv allein auf einer Zwischenzeile,
+     weil es vor `.chore-right` im DOM steht. */
+  .chore-left {
+    order: 1;
+    flex: 1 1 100%;
+  }
+  .chore-right {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+  .chore-content :deep(.chore-visual) {
+    order: 3;
+  }
+}
+
 .chore-right {
   position: relative;
   z-index: 1;
