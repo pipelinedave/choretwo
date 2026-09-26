@@ -57,6 +57,7 @@
         v-for="chore in filteredChores"
         :key="chore.id"
         :chore="chore"
+        :completing="completingIds.has(chore.id)"
         @toggle="handleToggle"
         @markAsDone="handleToggle"
         @updateChore="handleUpdateChore"
@@ -133,9 +134,16 @@ const showNotificationsModal = ref(false);
 const showImportExportModal = ref(false);
 const showSettingsModal = ref(false);
 const showAboutModal = ref(false);
+const completingIds = ref(new Set());
 
 const filteredChores = computed(() => {
-  return choreStore.filteredChores;
+  const base = choreStore.filteredChores;
+  if (completingIds.value.size === 0) return base;
+  const baseIds = new Set(base.map((c) => c.id));
+  const stillCompleting = choreStore.chores.filter(
+    (c) => completingIds.value.has(c.id) && !baseIds.has(c.id),
+  );
+  return [...base, ...stillCompleting];
 });
 
 const emptyMessage = computed(() => {
@@ -154,11 +162,16 @@ onMounted(async () => {
 });
 
 async function handleToggle(choreId) {
+  completingIds.value.add(choreId);
   try {
     await choreStore.markDone(choreId, authStore.user?.email);
     await logStore.fetchLogs();
   } catch (err) {
     console.error("Failed to mark chore done:", err);
+  } finally {
+    setTimeout(() => {
+      completingIds.value.delete(choreId);
+    }, 1000);
   }
 }
 

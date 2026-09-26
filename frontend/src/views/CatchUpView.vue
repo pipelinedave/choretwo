@@ -757,6 +757,7 @@ async function handleToggle(choreId) {
   );
   try {
     if (!response) return;
+    await new Promise((r) => setTimeout(r, 650));
     rebuildStack();
 
     // Recurrence-Hinweis, falls vorhanden

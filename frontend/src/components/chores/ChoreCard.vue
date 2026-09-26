@@ -24,6 +24,7 @@
           'done-today': isDoneToday,
           'private-chore': isPrivate,
           'archived-view': isArchivedView,
+          'is-completing': isCompleting,
           swiping: isSwiping,
           returning: isReturning,
         },
@@ -133,6 +134,21 @@
         <!-- Normal Display Mode -->
         <div v-else class="chore-content" @click="handleClick">
           <div class="chore-left">
+            <button
+              v-if="!isArchivedView"
+              type="button"
+              class="chore-check-btn"
+              :class="{ 'is-done': isDoneToday, 'is-completing': isCompleting }"
+              :disabled="isDoneToday || isCompleting"
+              @click.stop="triggerDone"
+              :aria-label="isDoneToday ? 'Erledigt' : 'Als erledigt markieren'"
+              :title="isDoneToday ? 'Heute bereits erledigt' : 'Als erledigt markieren'"
+            >
+              <ChoreSpinner v-if="isCompleting" inline variant="rocket_task" size="sm" />
+              <span v-else-if="isDoneToday" class="mdi mdi-check-circle done-icon"></span>
+              <span v-else class="mdi mdi-checkbox-blank-circle-outline check-circle-icon"></span>
+            </button>
+
             <span
               v-if="isPrivate"
               class="lock-icon"
@@ -146,15 +162,22 @@
           </div>
 
           <div class="chore-right">
-            <span class="chore-due" :class="{ 'chore-overdue': isOverdueDate }">
-              {{ friendlyDueDate }}
-            </span>
-            <span
-              v-if="chore.interval || chore.interval_days"
-              class="chore-interval"
-            >
-              {{ chore.interval || chore.interval_days }}
-            </span>
+            <transition name="fade" mode="out-in">
+              <div v-if="isCompleting" class="completing-badge">
+                <ChoreSpinner inline variant="handshake" label="Deal besiegelt! 🤝" />
+              </div>
+              <div v-else class="due-info">
+                <span class="chore-due" :class="{ 'chore-overdue': isOverdueDate }">
+                  {{ friendlyDueDate }}
+                </span>
+                <span
+                  v-if="chore.interval || chore.interval_days"
+                  class="chore-interval"
+                >
+                  {{ chore.interval || chore.interval_days }}
+                </span>
+              </div>
+            </transition>
           </div>
         </div>
       </transition>
@@ -171,6 +194,7 @@ import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 const props = defineProps({
   chore: { type: Object, required: true },
   isArchivedView: { type: Boolean, default: false },
+  completing: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -185,6 +209,8 @@ const authStore = useAuthStore();
 const cardRef = ref(null);
 const editMode = ref(false);
 const saving = ref(false);
+const localCompleting = ref(false);
+const isCompleting = computed(() => localCompleting.value || props.completing);
 
 const getChoreDueDate = () => {
   const d = props.chore.dueDate || props.chore.due_date;
@@ -411,9 +437,14 @@ function triggerEdit() {
 }
 
 function triggerDone() {
+  if (isDoneToday.value || props.isArchivedView || isCompleting.value) return;
+  localCompleting.value = true;
   markDone();
   swipeOffset.value = 0;
   isReturning.value = false;
+  setTimeout(() => {
+    localCompleting.value = false;
+  }, 1000);
 }
 
 function animateReturn() {
@@ -598,7 +629,7 @@ function handleArchive() {
   opacity: 0.75;
 }
 
-.chore-card.done-today::after {
+.chore-card.done-today:not(.is-completing)::after {
   content: "✓ Done today";
   position: absolute;
   top: 50%;
@@ -606,6 +637,59 @@ function handleArchive() {
   transform: translateY(-50%);
   font-weight: 700;
   font-size: 0.85rem;
+  color: var(--color-primary);
+}
+
+.chore-card.is-completing {
+  border-color: var(--color-primary, #6750a4) !important;
+  box-shadow: 0 0 16px rgba(103, 80, 164, 0.3) !important;
+  background-color: var(--color-due-today, #e8f5e9) !important;
+  transition: all 0.3s ease;
+}
+
+.chore-check-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted, #757575);
+  font-size: 1.35rem;
+  line-height: 1;
+  transition: transform var(--transition-fast), color var(--transition-fast);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.chore-check-btn:hover:not(:disabled) {
+  color: var(--color-primary);
+  transform: scale(1.15);
+}
+
+.chore-check-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.chore-check-btn.is-done {
+  color: var(--color-primary);
+  cursor: default;
+}
+
+.chore-check-btn .done-icon {
+  color: var(--color-primary);
+}
+
+.completing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--color-primary);
 }
 

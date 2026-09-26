@@ -26,9 +26,10 @@
 
     <div v-else class="chore-list">
       <ChoreCard
-        v-for="chore in choreStore.filteredChores"
+        v-for="chore in filteredChores"
         :key="chore.id"
         :chore="chore"
+        :completing="completingIds.has(chore.id)"
         @toggle="handleToggle"
         @updateChore="handleUpdateChore"
         @archive="handleArchive"
@@ -63,6 +64,17 @@ const choreStore = useChoreStore();
 const authStore = useAuthStore();
 
 const showAddForm = ref(false);
+const completingIds = ref(new Set());
+
+const filteredChores = computed(() => {
+  const base = choreStore.filteredChores;
+  if (completingIds.value.size === 0) return base;
+  const baseIds = new Set(base.map((c) => c.id));
+  const stillCompleting = choreStore.chores.filter(
+    (c) => completingIds.value.has(c.id) && !baseIds.has(c.id),
+  );
+  return [...base, ...stillCompleting];
+});
 
 const filterMessage = computed(() => {
   const filter = choreStore.filter;
@@ -79,10 +91,15 @@ onMounted(async () => {
 async function handleToggle(choreId) {
   const chore = choreStore.chores.find((c) => c.id === choreId);
   if (chore && !chore.done) {
+    completingIds.value.add(choreId);
     try {
       await choreStore.markDone(choreId, authStore.user.email);
     } catch (err) {
       console.error("Failed to mark chore as done:", err);
+    } finally {
+      setTimeout(() => {
+        completingIds.value.delete(choreId);
+      }, 1000);
     }
   }
 }
