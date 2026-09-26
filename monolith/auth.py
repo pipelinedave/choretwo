@@ -45,6 +45,15 @@ def _get_jwks_client():
 CRON_SECRET = os.getenv("CRON_SECRET", "")
 CRON_PATH = "/api/notify/run-due"
 
+# Dev-/Mock-Modus. Nur wenn das gesetzt ist, darf der `X-User-Email`-Header
+# als Identitaet gelten. Vorher war der Header unbedingt gueltig — unter
+# Vercel ist der Monolith direkt aus dem Internet erreichbar, damit konnte
+# jeder Anfrage eine beliebige Identitaet vorgeben (Vollstaendiger Bypass der
+# Mandantentrennung, auch fuer Schreiboperationen).
+# Der Header bleibt fuer den lokalen Dev-Betrieb erhalten, damit die
+# Playwright-Suite ohne OIDC-Flow testen kann.
+USE_MOCK_AUTH = os.getenv("USE_MOCK_AUTH", "false").lower() == "true"
+
 # Pfade, die keine Authentifizierung erfordern (egal ob GET/POST/...).
 EXEMPT_PATHS = {
     "/health",
@@ -109,12 +118,29 @@ def validate_token(token: str) -> dict:
     )
 
 
+def _dev_identity(request):
+    """`X-User-Email` als Identitaet — NUR im Dev-/Mock-Modus.
+
+    Ausserhalb davon gibt es keine Header-Identitaet: die Identitaet kommt
+    dann ausschliesslich aus dem verifizierten JWT. Vorher war der Header
+    unbedingt gueltig, was unter Vercel (Monolith direkt aus dem Internet
+    erreichbar) jeden Aufrufer in die Rolle jedes beliebigen Nutzers setzen
+    liess.
+    """
+    if not USE_MOCK_AUTH:
+        return None
+    return request.headers.get("X-User-Email")
+
+
 async def auth_middleware(request, call_next):
     """FastAPI-HTTP-Middleware: validiert JWT echt und setzt user_email.
 
-    Falls kein Bearer-Token vorhanden ist, wird auf den `X-User-Email`-Header
-    zurückgegriffen (Dev/Mock-Modus). Ist ein Bearer-Token vorhanden, muss
-    dessen Signatur gültig sein — andernfalls 401.
+    Ohne Bearer-Token gibt es keine Identitaet — auf den öffentlich lesbaren
+    GET-Pfaden wird dann mit `user_email=None` gearbeitet (die Service-Schicht
+    liefert dort nur geteilte Chores), alles andere antwortet 401.
+    Im Dev-/Mock-Modus (`USE_MOCK_AUTH=true`) akzeptiert die Middleware
+    ersatzweise den `X-User-Email`-Header, damit die lokale E2E-Suite ohne
+    OIDC-Flow testen kann. In Produktion ist dieser Weg zu.
     """
     path = request.url.path
     if path in EXEMPT_PATHS:
@@ -142,7 +168,10 @@ async def auth_middleware(request, call_next):
         token = auth_header[7:]
         try:
             payload = validate_token(token)
-            user_email = payload.get("email") or request.headers.get("X-User-Email")
+            # Der Header-Fallback gilt nur im Dev-/Mock-Modus. Sonst koennte
+            # jeder einen gueltigen Token PLUS eine beliebige Identitaet
+            # mitschicken und damit die Identitaet des Tokens ueberschreiben.
+            user_email = payload.get("email") or _dev_identity(request)
             user_name = payload.get("name")
         except jwt.PyJWTError:
             return JSONResponse(
@@ -150,7 +179,7 @@ async def auth_middleware(request, call_next):
                 content={"error": "Invalid or expired token."},
             )
     else:
-        user_email = request.headers.get("X-User-Email")
+        user_email = _dev_identity(request)
 
     if not user_email:
         # Öffentlich lesbare GET-Endpunkte (Shared-Chores/Export) erlauben
