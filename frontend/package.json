@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "chore-images": "node scripts/generate-chore-images.mjs"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

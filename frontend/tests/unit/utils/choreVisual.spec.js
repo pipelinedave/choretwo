@@ -9,6 +9,13 @@ import {
   CATEGORY_LABELS,
 } from "@/utils/choreVisual";
 import { MDI_PATHS } from "@/assets/icons/mdi-paths.generated.js";
+import {
+  CATEGORIES as IMAGE_CATEGORIES,
+  SUBJECTS,
+  FRAMINGS,
+  buildPrompt,
+  keyOf,
+} from "../../../scripts/chore-image-prompts.mjs";
 
 // Deterministische, lesbare Beispiele aus dem echten Betrieb.
 const SAMPLES = [
@@ -167,5 +174,63 @@ describe("CATEGORY_LABELS", () => {
     for (const c of CHORE_CATEGORIES) {
       expect(CATEGORY_LABELS[c], `Label fehlt fuer ${c}`).toBeTruthy();
     }
+  });
+});
+
+/*
+ * Abgleich mit dem Bild-Generator.
+ *
+ * `scripts/generate-chore-images.mjs` erzeugt die KI-Prompts aus einer
+ * eigenen Kategorie-Liste. Wird hier eine Kategorie ergaenzt und dort
+ * vergessen, entsteht fuer sie KEIN Bild — die Karte zeigte dann still ein
+ * leeres Feld, ohne Fehler in Build oder Tests. Dieser Block ist die
+ * einzige Stelle, die das faengt.
+ */
+describe("Bild-Prompts (scripts/chore-image-prompts.mjs)", () => {
+  it("deckt exakt dieselben Kategorien ab wie die App", () => {
+    expect([...IMAGE_CATEGORIES].sort()).toEqual([...CHORE_CATEGORIES].sort());
+  });
+
+  it("hat fuer jede Kategorie ein Motiv", () => {
+    for (const c of IMAGE_CATEGORIES) {
+      expect(SUBJECTS[c], `Motiv fehlt fuer ${c}`).toBeTruthy();
+    }
+  });
+
+  it("erzeugt je Kategorie so viele Varianten wie Poolgroesse", () => {
+    expect(FRAMINGS.length).toBeGreaterThanOrEqual(7);
+  });
+
+  it("liefert pro Variante einen anderen Prompt", () => {
+    // Sonst waeren es 7 Kopien desselben Bildes — der Pool waere wirkungslos.
+    const prompts = new Set(
+      FRAMINGS.map((_, i) => buildPrompt("waesche", i)),
+    );
+    expect(prompts.size).toBe(FRAMINGS.length);
+  });
+
+  it("fordert in jedem Prompt weissen Hintergrund und Textverbot", () => {
+    // Weisser Grund ist die Voraussetzung fuer mix-blend-mode in der Karte,
+    // "no text" verhindert, dass FLUX Schrift in die Illustration setzt.
+    for (const c of IMAGE_CATEGORIES) {
+      for (let v = 0; v < FRAMINGS.length; v++) {
+        const p = buildPrompt(c, v);
+        expect(p, c).toContain("white background");
+        expect(p, c).toContain("no text");
+      }
+    }
+  });
+
+  it("bleibt mit dem Standardumfang im kostenlosen Tageskontingent", () => {
+    // 4,80 Neurone pro 512x512-Tile + 9,60 pro Schritt, 4 Schritte.
+    const perImage = 4.8 + 9.6 * 4;
+    const total = IMAGE_CATEGORIES.length * 7 * perImage;
+    // Ohne Tausendertrenner: der ESLint-Parser stolpert ueber `10_000`.
+    expect(total).toBeLessThan(10000); // Cloudflare Free-Tier pro Tag
+  });
+
+  it("nutzt einen stabilen Dateischluessel je Variante", () => {
+    expect(keyOf("waesche", 0)).toBe("waesche-0");
+    expect(keyOf("waesche-aufhaengen", 6)).toBe("waesche-aufhaengen-6");
   });
 });
