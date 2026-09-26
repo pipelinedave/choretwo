@@ -144,6 +144,16 @@
      praktisch unsichtbar. */
   --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.3);
 
+  /* Komponenten-Scope-Default fuer den Text-Halo der ChoreCard. Die
+     Komponente ueberschreibt den Wert pro Dringlichkeitsstufe
+     (ChoreCard.vue, `.chore-card.<stufe> { --chore-bg: … }`). Hier steht
+     bewusst nur der Default: damit bleibt die Variable auch dann
+     aufloesbar, wenn keine Stufe greift, und design-tokens.spec.js
+     (jede var()-Referenz muss in :root definiert sein) schlaegt nicht an.
+     Beide Theme-Bloecke muessen sie fuehren, sonst verletzt es die
+     Light/Dark-Vollstaendigkeitspruefung desselben Tests. */
+  --chore-bg: var(--color-due-far-future);
+
   /* === Elevation / Shadows ==============================================
      Aufgebaut auf dem Shadow-RGB-Triplet, damit die Tiefenachse Light/Dark
      nur an einer Stelle umschaltet wird. */
@@ -334,6 +344,12 @@
   --color-primary-subtle: rgb(var(--md-sys-color-primary-rgb) / 0.18);
   --color-danger-subtle: rgb(231 99 99 / 0.22);
   --color-focus-ring: rgb(var(--md-sys-color-primary-rgb) / 0.45);
+
+  /* Siehe Kommentar im :root-Block: Komponenten-Scope-Default, pro
+     Dringlichkeitsstufe in ChoreCard.vue ueberschrieben. Muss in beiden
+     Theme-Bloecken stehen, sonst verletzt es die
+     Light/Dark-Vollstaendigkeitspruefung in design-tokens.spec.js. */
+  --chore-bg: var(--color-due-far-future);
 
   /* Dark-Mode-Varianten der ergaenzten MD-Sys-Rollen: die Light-Mode-Werte
      waeren auf dunklen Surfaces entweder unsichtbar (Container) oder zu

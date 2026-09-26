@@ -1,2 +1,8 @@
 dist/
 node_modules/
+
+# Generiert aus @mdi/font via scripts/extract-mdi-paths.mjs (Apache-2.0).
+# Enthaelt 81 Icon-Pfade als lange Einzeiler; Prettier wuerde sie umbrechen und
+# die Datei damit unlesbar machen, ohne einen echten Fehler zu beheben.
+# Regenerieren:  node scripts/extract-mdi-paths.mjs
+src/assets/icons/mdi-paths.generated.js

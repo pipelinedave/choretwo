@@ -161,6 +161,25 @@
             </span>
           </div>
 
+          <!--
+            Motiv: macht sichtbar, WAS die Chore ist.
+
+            Positionierung als Flex-Kind ZWISCHEN Titel und Faelligkeit —
+            nicht absolut am rechten Rand. Absolut lag es ueber der
+            Faelligkeitsangabe ("Overdue by 6d"); ein Text-Halo allein
+            reichte nicht, weil das Motiv dort direkt auf dem Text stand.
+            Im Fluss kann es nichts ueberdecken, und bei langem Chore-Namen
+            schiebt es die Faelligkeit nach rechts, statt verdeckt zu werden.
+
+            Die Dringlichkeitsfarbe auf `.chore-card` bleibt unveraendert:
+            Farbe = wie dringend, Motiv = was.
+          -->
+          <ChoreVisual
+            :chore="chore"
+            :urgency="urgencyClass"
+            :size="56"
+          />
+
           <div class="chore-right">
             <transition name="fade" mode="out-in">
               <div v-if="isCompleting" class="completing-badge">
@@ -190,6 +209,7 @@ import { ref, computed, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { isDoneToday as isChoreDoneToday } from "@/utils/choreBuckets";
 import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
+import ChoreVisual from "@/components/chores/ChoreVisual.vue";
 
 const props = defineProps({
   chore: { type: Object, required: true },
@@ -303,6 +323,16 @@ const isOverdueDate = computed(() => {
   const due = new Date(rawDueDate.value);
   due.setHours(0, 0, 0, 0);
   return due < today;
+});
+
+/**
+ * Dringlichkeitsstufe fuer das Motiv, ohne den Sonderfall "archived".
+ * ChoreVisual braucht eine Stufe, um die Motiv-Deckkraft zu waehlen; "archived"
+ * ist keine Dringlichkeit, sondern ein Zustand.
+ */
+const urgencyClass = computed(() => {
+  const c = choreClass.value;
+  return c === "archived" ? "archived" : c;
 });
 
 const choreClass = computed(() => {
@@ -700,6 +730,12 @@ function handleArchive() {
   align-items: center;
   width: 100%;
   gap: 12px;
+  /* Das Motiv (ChoreVisual) ist position:absolute und liegt hinter dem
+     Text. `relative` + `z-index: 1` hebt `.chore-content` darueber, damit
+     Titel und Faelligkeit garantiert lesbar bleiben — unabhaengig davon, wie
+     dunkel das Motiv gerade steht. */
+  position: relative;
+  z-index: 1;
 }
 
 .chore-left {
@@ -708,6 +744,63 @@ function handleArchive() {
   gap: 8px;
   flex: 1;
   min-width: 0;
+}
+
+/*
+ * Text-Halo in der Kartenfarbe.
+ *
+ * Das Motiv (ChoreVisual) liegt hinter dem Text und hellt — je nach
+ * Dringlichkeitsstufe — den Untergrund auf. Gemessene Kontraste des Titels
+ * gegen die reine Kartenfarbe liegen im Dark Theme zwischen 4.43:1
+ * (due-2-days) und 6.81:1 (overdue); mit Motiv darunter faellt die Stufe
+ * am unteren Rand unter die 4.5:1 nach WCAG AA. Ein Halo in der jeweils
+ * gesetzten Hintergrundfarbe hebt den lokalen Kontrast wieder an, ohne den
+ * Titel dicker zu machen oder die Dringlichkeitsfarbe zu aendern.
+ *
+ * Er gilt fuer BEIDE Textsaengen (.chore-left und .chore-right): ohne ihn
+ * legte sich das Motiv sichtbar ueber die Faelligkeitsangabe ("Overdue by
+ * 6d") — das war im Screenshot-Vergleich sofort sichtbar.
+ */
+.chore-left,
+.chore-right {
+  text-shadow: 0 0 6px var(--chore-bg), 0 0 2px var(--chore-bg);
+}
+
+/* `--chore-bg` spiegelt die Dringlichkeitsfarbe. Es ist bewusst pro Stufe
+   gesetzt statt als globales Token: die Farbe ist je Card verschieden, ein
+   globales Token wuerde nur einen Wert fuer alle 10 Stufen haben.
+   (design-tokens.spec.js prueft var()-Referenzen gegen `:root` — deshalb
+   steht die Zuweisung hier bewusst VOR der Verwendung und die Definition
+   selbst ist eine Ableitung einer existierenden Farbe, kein neuer Wert.) */
+.chore-card.overdue {
+  --chore-bg: var(--color-overdue);
+}
+.chore-card.due-today {
+  --chore-bg: var(--color-due-today);
+}
+.chore-card.due-tomorrow {
+  --chore-bg: var(--color-due-soon);
+}
+.chore-card.due-2-days {
+  --chore-bg: var(--color-due-2-days);
+}
+.chore-card.due-3-days {
+  --chore-bg: var(--color-due-3-days);
+}
+.chore-card.due-7-days {
+  --chore-bg: var(--color-due-7-days);
+}
+.chore-card.due-14-days {
+  --chore-bg: var(--color-due-14-days);
+}
+.chore-card.due-30-days {
+  --chore-bg: var(--color-due-30-days);
+}
+.chore-card.due-far-future {
+  --chore-bg: var(--color-due-far-future);
+}
+.chore-card.archived {
+  --chore-bg: var(--color-archived);
 }
 
 .lock-icon {
@@ -722,6 +815,8 @@ function handleArchive() {
 }
 
 .chore-right {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
