@@ -948,7 +948,17 @@ async function applySnooze(offsetDays, customDate) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  /*
+   * `flex-shrink: 0` hinderte den Knopf daran, kleiner zu werden als sein
+   * Inhalt. Bei 300 % Schriftgroesse wurde er 144 px breit und schob die
+   * Seite um 154 px ueber den Viewport.
+   *
+   * Das Icon darin ist ein MDI-Glyph und skaliert mit der Schrift; der
+   * Text darf umbrechen, das Icon nicht. Deshalb `min-width: 0` am Knopf
+   * und `flex-shrink: 0` am Icon weiter unten.
+   */
+  flex-shrink: 1;
+  min-width: 0;
   min-height: 36px;
   padding: 4px 12px;
   border: var(--border-hairline) solid var(--color-border-glass);
@@ -975,7 +985,11 @@ async function applySnooze(offsetDays, customDate) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
+  /* Wie beim Tastenkuerzel in CatchUpActionBar: eine feste Untergrenze
+     verhinderte das Schrumpfen. Die Ziffer bleibt bei normaler Schrift
+     20 px breit, kann aber bei extremer Skalierung zusammengehen. */
+  min-width: 0;
+  flex-shrink: 1;
   height: 20px;
   padding: 0 6px;
   border-radius: var(--md-sys-radius-full);

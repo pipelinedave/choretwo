@@ -664,7 +664,20 @@ function animateReturn() {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
+  /*
+   * `flex-shrink: 0` war hier der Grund, warum die CatchUp-Seite bei
+   * grosser Schriftgroesse aus dem Viewport lief: die Box kann nicht
+   * schrumpfen, und ihr Inhalt (Faelligkeitsdatum plus Intervall-Badge)
+   * waechst mit der Schrift. Sie umfasste dann 407 px in einem 380-px-
+   * Container und schob die Seite um 77 px breiter.
+   *
+   * `min-width: 0` erlaubt das Schrumpfen unter die Inhaltsbreite, `gap`
+   * bleibt erhalten. Das Datum bricht dabei um, statt die Seite zu weiten —
+   * das ist bei 200 % Schrift auch inhaltlich richtig, weil ein einzeiliges
+   * Datum dann nicht mehr lesbar waere.
+   */
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .due-date-text {

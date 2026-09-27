@@ -14,6 +14,49 @@ body {
   padding: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+
+  /*
+   * Lange Woerter umbrechen statt die Seite breiter machen.
+   *
+   * BEFUND: bei 150 % Systemschriftgroesse (Android-Display-Einstellung,
+   * in der DevTools-Emulation NICHT nachstellbar — dort ist immer 100 %)
+   * wurde die Login-Seite 42 px breiter als der Viewport und liess sich
+   * seitwaerts wegschieben. Ursache war das <h1> mit dem Text "CHORETWO":
+   * ein einzelnes Wort ohne Trennstelle, 381 px breit in einer 266-px-Box.
+   * Kein Element ragte aus dem Viewport — `getBoundingClientRect()` war bei
+   * allen sauber. Der Ueberlauf steckte im INHALT, auffindbar erst ueber
+   * `scrollWidth > clientWidth`:
+   *
+   *   .login-title  scrollWidth 381  clientWidth 266   +115
+   *   .login-card   scrollWidth 413  clientWidth 330   +83
+   *   html          scrollWidth 454  clientWidth 412   +42
+   *
+   * `word-break: break-word` stand bisher nur in vier Komponenten
+   * (ChoreCard, CatchUpCard, AppHeader, LogItem) — die Login-Seite hatte
+   * nichts. Das ist die falsche Herangehensweise: die Eigenschaft ist
+   * vererbbar, also gehoert sie an eine Stelle statt an vier.
+   *
+   * `anywhere` und nicht `break-word` — der Unterschied ist nicht
+   * kosmetisch, sondern entscheidend:
+   *
+   *   break-word  bricht die Zeile beim RENDEREN, veraendert aber die
+   *               min-content-Groesse NICHT. In einem Container mit
+   *               fester Breite reicht das (so war der Login-Fix). In einem
+   *               Shrink-to-fit-Kontext — ein Flex-Item mit `flex-basis:
+   *               auto` — bleibt die min-content-Groesse die volle
+   *               Wortbreite, und der Container laeuft trotzdem ueber.
+   *               Genau das war der zweite Befund auf /logs: dort overflowte
+   *               `.log-item-text` (scrollWidth 390, clientWidth 290) bereits
+   *               bei 100 % Schriftgroesse, mit korrekt gesetztem
+   *               `min-width: 0`.
+   *
+   *   anywhere    veraendert die min-content-Groesse. Nur damit kann
+   *               Text ein Flex-Item nie sprengen.
+   *
+   * Beide brechen nur, wenn ein Wort sonst nicht auf eine Zeile passt —
+   * normaler Text ist unberuehrt.
+   */
+  overflow-wrap: anywhere;
 }
 
 /* === Pastell-Verlauf auf eigenem Layer (Befund 8) ======================

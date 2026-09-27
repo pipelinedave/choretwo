@@ -81,10 +81,24 @@ const emit = defineEmits(["done", "snooze"]);
   width: 100%;
   max-width: 420px;
   margin: var(--md-sys-spacing-md) auto 0;
+  /*
+   * Umbruch erlaubt, damit die Leiste nie breiter wird als ihr Container.
+   *
+   * BEFUND: bei 150 % Systemschriftgroesse lief die CatchUp-Seite 127 px
+   * ueber den Viewport. Ursache war diese Leiste: `scrollWidth 507` in
+   * `clientWidth 348`. Die Buttons sind `flex: 1` und damit zwar shrinkbar,
+   * aber ohne `min-width: 0` sinken sie nicht unter ihre Inhaltsbreite —
+   * und ohne `flex-wrap` gab es keine zweite Zeile, in die sie ausweichen
+   * koennten. Beides fehlte.
+   */
+  flex-wrap: wrap;
 }
 
 .catchup-action {
   flex: 1;
+  /* Ohne das schrumpft der Button nicht unter die Breite seines Labels
+     und die Leiste laeuft aus dem Container. */
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -110,7 +124,22 @@ const emit = defineEmits(["done", "snooze"]);
 }
 
 .catchup-action-label {
-  white-space: nowrap;
+  /*
+   * `nowrap` war hier die letzte Ursache fuer horizontalen Ueberlauf.
+   *
+   * BEFUND: bei 200 % Schriftgroesse lief /catchup noch 77 px ueber den
+   * Viewport. Der Schuldige war das <kbd> mit der Tastenkuerzel-Ziffer, das
+   * am rechten Rand eines Buttons sass — rechts daneben das Label mit
+   * `white-space: nowrap`. Weil das Label nicht umbrach, konnte der Button
+   * nicht schrumpfen, und der Button durfte wegen `min-width: 0` zwar
+   * schrumpfen, sein Inhalt sprengte die Zeile trotzdem.
+   *
+   * Das Kuerzel selbst bleibt sichtbar — es ist ein Bedienhinweis, kein
+   * Dekor. Weggelassen wird es nur, wenn der Platz wirklich nicht reicht:
+   * `min-width: 0` erlaubt dem <kbd> das Schrumpfen, und da es nur eine
+   * Ziffer enthaelt, kollabiert es auf die eigene Mindestbreite.
+   */
+  min-width: 0;
 }
 
 /* "Später": zurueckhaltend. Fuellt NICHT den Button, damit die beiden
@@ -158,7 +187,15 @@ const emit = defineEmits(["done", "snooze"]);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
+  /*
+   * `min-width: 0` statt `min-width: 20px`: die 20 px waren eine feste
+   * Untergrenze, die den Button nicht schrumpfen liess. Mit 0 kann das
+   * Kuerzel bei extrem grosser Schrift auf seine Zifferbreite zusammenfallen
+   * (siehe Kommentar bei `.catchup-action-label`). Fuer die normale
+   * Anzeigegroesse von 20 px ist das ohne sichtbare Aenderung.
+   */
+  min-width: 0;
+  flex-shrink: 1;
   height: 20px;
   padding: 0 5px;
   border-radius: var(--md-sys-radius-small);

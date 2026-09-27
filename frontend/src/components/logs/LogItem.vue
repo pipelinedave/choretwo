@@ -158,6 +158,25 @@ function handleUndo() {
 }
 
 .log-chore-title {
+  /*
+   * Einszeilig ja, aber KUERZEN statt aus der Karte laufen.
+   *
+   * BEFUND: `white-space: nowrap` allein liess den Chore-Titel aus der
+   * Log-Karte laufen — `.log-item-text` hatte scrollWidth 390 bei
+   * clientWidth 290, und /logs lief bereits bei 100 % Schriftgroesse 67 px
+   * ueber den Viewport. Bei 150 % waren es 247 px.
+   *
+   * `text-overflow: ellipsis` wirkt nur zusammen mit `overflow: hidden` und
+   * `white-space: nowrap` — die drei gehoeren zusammen. Zusaetzlich `block`,
+   * weil die Kurzform auf Inline-Elementen nicht greift: sie braucht eine
+   * eigene Box, deren Breite begrenzt werden kann.
+   *
+   * Umbruch statt Abschneiden waere hier falsch: eine Log-Zeile ist ein
+   * Einzeiler, ein mehrzeiliger Titel zerlegt das Raster.
+   */
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
