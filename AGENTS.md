@@ -13,14 +13,15 @@ Dieses Projekt verwendet **spezialisierte Subagents** für jede Domain. Der Prim
 | chore, log, ai-copilot, FastAPI, recurrence, undo, NLP, intent, Pydantic, SQLAlchemy | **ben** |
 | notification, Celery, push, Gotify, scheduler, preferences | **nelly** |
 | test, pytest, Vitest, Playwright, coverage, TDD, unit test, mock fixture | **tessa** |
-| Docker, Kubernetes, Flux, CI/CD, Helm, ingress, cert-manager, deploy, staging, production | **kira** |
+| Vercel-Deploy, Env-Vars (VITE_*), Domains, Build-Logs, Production-Check | **vera** (globaler Agent, einziger mit Vercel-Zugriff) |
+| Docker-Compose nur lokal (Dev) | kein Deploy-Agent nötig, Doku unten |
 | unclear scope, cross-service, API integration, full-stack both directions | **dean** |
 
 ### Spezialisten-Regeln
 
 - **IMMER spezialisierte Agenten verwenden** — NEVER `general` wenn ein Spezialist passt
 - Cross-cutting Tasks → `dean` (Supervisor, koordiniert mehrere Agents)
-- Infrastruktur/Deployment → `kira`
+- Vercel-Deployment → `vera` (global). `kira`/k3s/Flux ist für choretwo STILLGELEGT — NIE für Deployments nutzen.
 - Spezialisten haben strikte File-Scopes (sogar `.opencode/agents/*.md`)
 
 ## Current Status
@@ -44,42 +45,30 @@ Dieses Projekt verwendet **spezialisierte Subagents** für jede Domain. Der Prim
 - `ai-copilot-service` (Python/FastAPI) - NLP, suggestions
 - `frontend` (Vue 3) - PWA
 
-**Infrastructure:**
-- FluxCD (GitOps) - NOT ArgoCD
-- nginx-ingress (path-based routing)
-- cert-manager + letsencrypt-prod
-- Dex (OIDC provider)
-- SealedSecrets
-- Single Postgres (4 schemas: auth, chores, logs, notifications)
-- Redis (cache + queue)
+**Production (STAND 28.09.2026 — k3s/Flux STILLGELEGT):**
+- Hosting: Vercel (Projekt `choretwo`, productionBranch `main`)
+- Frontend: statischer Build aus `frontend/dist` (`npm ci && npm run build`)
+- Backend: EIN Python-Serverless-Monolith via `api/index.py` (FastAPI aus `monolith/main.py`,
+  Vendor via `monolith/sync_vendor.py` im Build generiert)
+- Routing: `vercel.json` rewrites (`/api/*` → Monolith, Rest → SPA)
+- Domains: `choretwo.stillon.top` (prod), `choretwo.vercel.app`
+- Deploy: Push auf `main` → Vercel Git-Integration baut+deployt automatisch nach Production.
+  KEIN k3s, KEIN Flux, KEIN DockerHub, KEIN k3s-config mehr.
+- Alte k3s-Artefakte (`docker-compose*.yml`, `.github/workflows/build-and-push.yaml`,
+  `update-kubernetes-deployment.yaml`, `docs/DEPLOYMENT.md`-k3s-Teile) sind STALE/DEPRECATED.
+
+**Lokal (Dev):** Docker-Compose (Postgres, Redis, Monolith :8000, Vite :3000) — nur Entwicklung, kein Deployment.
 
 ## Key Patterns
 
-### Flux Integration
-```yaml
-# apps/choretwo-staging.yaml - Flux Kustomization
-dependsOn:
-  - name: dex
-  - name: nginx-ingress
-  - name: cert-manager
-interval: 5m  # reconciliation
+### Vercel Routing (vercel.json)
+```json
+// /api/* → Python-Monolith (api/index.py), alles andere → SPA (index.html)
+{ "source": "/api/:path*", "destination": "/api/index.py" },
+{ "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
 ```
-
-### Ingress Pattern (nginx-ingress)
-```yaml
-annotations:
-  cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  rules:
-    - host: choretwo.stillon.top
-      paths:
-        - /api/auth → auth-service
-        - /api/chores → chore-service
-        - /api/logs → log-service
-        - /api/notify → notification-service
-        - /api/ai → ai-copilot-service
-        - / → frontend
-```
+Build: `cd frontend && npm ci && npm run build && cd .. && python3 monolith/sync_vendor.py`
+Cron: `/api/notify/run-due` täglich 07:00 (vercel.json `crons`).
 
 ### Database Pattern
 Single Postgres instance, 4 schemas:
@@ -175,80 +164,29 @@ make lint-chore # ruff
 make lint-frontend # eslint
 ```
 
-## Build & Deploy
-
-### Build Images
-```bash
-make build-all          # Build all service images
-make build-auth         # Build single service image
-make push-all           # Push all images to DockerHub
-```
+## Build & Deploy (Vercel, Stand 28.09.2026)
 
 ### Deploy Flow
-1. Push to main → GitHub Actions builds and pushes images to DockerHub
-2. GitHub Actions calls update-kubernetes-deployment workflow
-3. Workflow updates k3s-config repo (pipelinedave/k3s-config) with new image tags
-4. Flux reconciles from k3s-config repo (5min interval) → staging
-5. E2E tests run automatically on staging
-6. Manual approval required for production
-7. Deploy production via tag push (v*)
+1. Auf `main` pushen → Vercel Git-Integration baut automatisch (`vercel.json` buildCommand)
+2. Vendor-Sync läuft im Build (`monolith/sync_vendor.py` → `monolith/vendor/*`, gitignored)
+3. Bei grünem Build → automatisches Production-Deploy (`choretwo.stillon.top`)
+4. Verifizieren: `https://choretwo.stillon.top/health` → `{"status":"ok",...}`
+5. Build-Logs/Env-Vars/Domains: NUR über `vera` (Vercel-REST-API)
 
-### GitHub Secrets Required
+### Vercel Env-Vars (Production)
 ```
-DOCKERHUB_USERNAME=pipelinedave
-DOCKERHUB_TOKEN=<DockerHub token>
-K3S_CONFIG_TOKEN=<Personal Access Token with write access to k3s-config repo>
+DATABASE_URL / JWT_SECRET / USE_MOCK_AUTH / CORS_ORIGINS (inkl. Vercel-Domains!)
+VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+LLM_BASE_URL / LLM_MODEL / LLM_API_KEY (Secret, nie ins Repo)
+RUN_STARTUP_MIGRATIONS=false (Serverless: keine DDL im Cold-Start)
 ```
+Setzen/prüfen NUR über `vera`. NIEMALS Secrets ins Repo oder in Logs.
 
-### Flux Commands
-```bash
-# Check Flux status (in k3s-config repo context)
-flux get kustomizations -n flux-system
-
-# Force reconcile (in k3s-config repo context)
-flux reconcile kustomization choretwo-staging -n flux-system
-
-# Trace issues
-flux trace kustomization choretwo-staging -n flux-system
-```
-
-## Kustomize Structure (in k3s-config repo)
-```
-k3s-config/ (https://github.com/pipelinedave/k3s-config)
-├── apps/
-│   ├── choretwo-staging.yaml      # Flux Kustomization for staging
-│   └── choretwo-production.yaml   # Flux Kustomization for production
-└── kustomize/choretwo/
-    ├── base/
-    │   ├── auth-service/
-    │   ├── chore-service/
-    │   ├── log-service/
-    │   ├── notification-service/
-    │   ├── ai-copilot-service/
-    │   ├── frontend/
-    │   ├── postgres/
-    │   ├── redis/
-    │   └── kustomization.yaml
-    ├── overlays/
-    │   ├── staging/
-    │   └── production/
-    └── namespaces/
-        ├── choretwo-staging.yaml
-        └── choretwo-production.yaml
-```
-
-## SealedSecrets
-```bash
-# Create secret (temporary file)
-kubectl create secret generic my-secret \
-  --from-literal=password=changeme \
-  -n choretwo --dry-run=client -o yaml > secret.yaml
-
-# Seal it
-kubeseal --format yaml < secret.yaml > secret-sealed.yaml
-
-# Add to kustomization.yaml, delete unsealed version
-```
+### DEPRECATED (nicht mehr nutzen)
+- `make build-all / push-all` (DockerHub), `.github/workflows/build-and-push.yaml`,
+  `update-kubernetes-deployment.yaml`, `deploy-staging.yaml`, `deploy-production.yaml`
+- `flux ...`, `kubectl ...`, `kubeseal ...`, k3s-config-Repo
+- `K3S_CONFIG_TOKEN`, `DOCKERHUB_*`-Secrets für choretwo-Deployments
 
 ## Choremane Patterns (Reuse)
 - Read `choremane/backend/app/main.py` for FastAPI patterns
@@ -259,7 +197,7 @@ kubeseal --format yaml < secret.yaml > secret-sealed.yaml
 
 ## OpenViking Integration
 - Indexed repos: `choremane`, `k3s-config`, `fastapi`, `vue-core`, `gin`, `openhands`, `go-redis`
-- Use `ov search`, `ov grep`, `ov read` for patterns
+- Use `ov search`, `ov grep`, `ov read` for patterns (NICHT mehr: k3s-config — stillgelegt)
 - Add new repos via `ov add-resource <url> --to viking://resources/<name> --timeout <seconds>`
 
 ## Testing Requirements
@@ -282,19 +220,19 @@ make coverage-check
 ```
 
 ## Domain Schema
-All ingresses follow: `<app>.stillon.top`
-- `choretwo.stillon.top` - production
-- `choretwo-staging.stillon.top` - staging
+- `choretwo.stillon.top` - production (Vercel-Alias)
+- `choretwo.vercel.app` - production (Vercel-Default)
+- `choretwo-staging.stillon.top` - Vercel-Alias (kein separates k3s-Staging mehr)
 
 ## Common Pitfalls
 
 1. **Session cookies**: Set `https_only=true` in production, `same_site="lax"`
-2. **CORS**: Allow `allow_origins=["*"]` but `allow_credentials=True`
-3. **Flux pruning**: Never add `namespace.yaml` to kustomize (create manually)
-4. **PVC protection**: Add `finalizers: [kubernetes.io/pvc-protection]`
-5. **Secrets**: NEVER commit unsealed secrets
-6. **Schema isolation**: Each service uses `DATABASE_URL?schema=<name>`
-7. **Flux dependencies**: Always add `dependsOn: dex` for auth-dependent services
+2. **CORS**: `CORS_ORIGINS`-Env auf Vercel muss ALLE Domains enthalten (ersetzt Defaults komplett!) — siehe `monolith/main.py:58`
+3. **Secrets**: NEVER commit secrets; Vercel Env-Vars nur über `vera`
+4. **Schema isolation**: Each service uses shared DB via `monolith/database.py`
+5. **Vendor**: `monolith/vendor/*` ist gitignored — Fixes IMMER in `services/*/app/`, Sync via `monolith/sync_vendor.py`
+6. **Serverless**: keine DDL im Request-Path (`RUN_STARTUP_MIGRATIONS=false` auf Vercel), `maxDuration: 60` für `api/index.py`
+7. **k3s/Flux/kubectl/DockerHub gehört NICHT mehr zu choretwo** — Deploy-Fragen immer an `vera`
 
 ## Recent Fixes (Important Context)
 
@@ -334,8 +272,9 @@ All ingresses follow: `<app>.stillon.top`
 - `mcp-protocol-builder` - MCP server development
 
 ## References
-- PRD: `docs/PRD.md`
+- PRD: `docs/PRD.md` (teilweise stale: k3s/Flux-Teile ignorieren)
 - Choremane PRD: `/home/dhallmann/projects/choremane/prd.md`
-- K3s docs: `/home/dhallmann/projects/k3s-config/docs/`
-- Workflow: `/home/dhallmann/projects/k3s-config/docs/concepts/workflow.md`
-- Documentation: `docs/` directory (GETTING_STARTED.md, ARCHITECTURE.md, etc.)
+- Vercel-Config: `vercel.json`, Entrypoint: `api/index.py`, Monolith: `monolith/main.py`
+- Documentation: `docs/` directory (ACHTUNG: `DEPLOYMENT.md`, `ARCHITECTURE.md`, `PRD*.md` enthalten
+  noch stale k3s/Flux-Anleitungen — im Zweifel gilt DIESE Datei + `vera`)
+- OpenViking Indexed Repos: `choremane`, `fastapi`, `vue-core`, `gin`, `openhands`, `go-redis`
