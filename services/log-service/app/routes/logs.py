@@ -1,5 +1,3 @@
-from datetime import datetime
-from typing import Optional
 from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from sqlalchemy.orm import Session
 import json
@@ -8,6 +6,7 @@ from app.database import get_db
 from app.schemas import ChoreLogCreate, ChoreLogResponse, UndoRequest, UndoResponse
 from app.services.log_service import create_log, get_logs, get_log_by_id
 from app.services.undo_service import undo_action
+from app.utils import to_utc_iso
 
 router = APIRouter(prefix="/api/logs")
 
@@ -36,7 +35,7 @@ async def list_logs(
                 "id": row[0],
                 "chore_id": row[1],
                 "done_by": row[2],
-                "done_at": row[3].isoformat() if row[3] else None,
+                "done_at": to_utc_iso(row[3]),
                 "action_details": action_details,
                 "action_type": row[5],
                 "chore_title": row[6] if row[6] else None,
@@ -65,7 +64,7 @@ async def get_log(request: Request, log_id: int, db: Session = Depends(get_db)):
         "id": row[0],
         "chore_id": row[1],
         "done_by": row[2],
-        "done_at": row[3].isoformat() if row[3] else None,
+        "done_at": to_utc_iso(row[3]),
         "action_details": action_details,
         "action_type": row[5],
         "chore_title": row[6] if row[6] else None,
@@ -90,7 +89,7 @@ async def create_log_entry(
         "id": log_entry.id,
         "chore_id": log_entry.chore_id,
         "done_by": log_entry.done_by,
-        "done_at": log_entry.done_at.isoformat(),
+        "done_at": to_utc_iso(log_entry.done_at),
         "action_type": log_entry.action_type,
         "action_details": log_entry.action_details,
     }

@@ -1,10 +1,14 @@
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.database import Base
+
+
+def utcnow():
+    return datetime.now(timezone.utc)
 
 
 class ChoreLog(Base):
@@ -14,7 +18,7 @@ class ChoreLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     chore_id = Column(Integer, nullable=True)
     done_by = Column(String(255), nullable=True)
-    done_at = Column(DateTime, default=datetime.utcnow)
+    done_at = Column(DateTime, default=utcnow)
     action_type = Column(String(50), nullable=False)
     action_details = Column(JSONB, nullable=True)
 

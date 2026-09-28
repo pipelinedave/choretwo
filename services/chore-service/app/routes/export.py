@@ -4,7 +4,7 @@ from sqlalchemy import text
 import json
 
 from app.database import get_db
-from app.utils import log_action
+from app.utils import log_action, to_utc_iso
 
 router = APIRouter(prefix="/api")
 
@@ -52,7 +52,7 @@ async def export_data(request: Request, db: Session = Depends(get_db)):
             "id": row[0],
             "chore_id": row[1],
             "done_by": row[2],
-            "done_at": row[3].isoformat() if row[3] else None,
+            "done_at": to_utc_iso(row[3]),
             "action_type": row[4],
             "action_details": row[5]
             if isinstance(row[5], dict)

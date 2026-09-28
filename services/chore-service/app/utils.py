@@ -1,9 +1,23 @@
 import json
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timezone
+from typing import Optional
 from sqlalchemy import text
 
 from app.database import SessionLocal
+
+
+def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize datetime as UTC ISO-8601 with explicit offset.
+
+    Duplicated from log-service (cross-service import impractical).
+    Naive datetimes are treated as UTC; output is Z-suffixed.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def log_action(chore_id, done_by, action_type, action_details=None):

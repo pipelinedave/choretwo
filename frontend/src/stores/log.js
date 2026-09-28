@@ -54,11 +54,30 @@ const getActionDescription = (action, details) => {
   }
 };
 
+const parseTimestamp = (timestamp) => {
+  if (timestamp == null) return new Date(NaN);
+  if (timestamp instanceof Date) return timestamp;
+  if (typeof timestamp === "number") return new Date(timestamp);
+  if (typeof timestamp !== "string") return new Date(timestamp);
+  const s = timestamp.trim();
+  // Bereits mit TZ-Designator (Z oder ±hh:mm / ±hhmm / ±hh am Ende)? -> untouched
+  if (/[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s) || /[+-]\d{4}$/.test(s) || /[+-]\d{2}$/.test(s)) {
+    return new Date(s);
+  }
+  // Naive ISO UTC (YYYY-MM-DDTHH:mm:ss + optional .SSS) -> als UTC interpretieren
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) {
+    return new Date(s + "Z");
+  }
+  return new Date(s);
+};
+
 const formatTimeAgo = (timestamp) => {
   if (!timestamp) return "";
   const now = new Date();
-  const then = new Date(timestamp);
+  const then = parseTimestamp(timestamp);
   const diffMs = now - then;
+  // Zukuenftige Timestamps durch Clock-Skew (<60s) -> "just now" statt negativ
+  if (diffMs < 0 && diffMs > -60000) return "just now";
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
   const diffHour = Math.floor(diffMin / 60);
