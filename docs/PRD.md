@@ -1,22 +1,20 @@
 choretwo - Product Requirements Document (PRD)
 Executive Summary
-choretwo is a microservices-based chore management platform building on choremane's foundation. It decomposes the monolith into 5 specialized services with proper separation of concerns, while maintaining choremane's core features: Material You PWA, Dex-based auth, undo-capable log system, and AI copilot integration.
-Infrastructure Reality
+choretwo is a chore management platform building on choremane's foundation: Material You PWA, Supabase magic-link auth (Go/Dex-legacy nur noch lokal), undo-capable log system, and AI copilot integration. Production runs as ONE Python-FastAPI monolith (vendored services) + static frontend on Vercel (Stand 28.09.2026).
+Infrastructure Reality (verifiziert an Code, Stand 28.09.2026)
 What Exists:
-- FluxCD (not ArgoCD) - 5-min reconciliation
-- nginx-ingress with path-based routing
-- cert-manager + letsencrypt-prod
-- Dex OIDC provider (Google/GitHub auth)
-- SealedSecrets operator
-- OpenWebUI + Ollama (AI infrastructure)
-- Single K3s cluster
+- Vercel-Projekt `choretwo`, productionBranch `main` — Push auf main deployt automatisch
+- EIN Python-Monolith via `api/index.py` (`monolith/main.py`), Vendor generiert (`sync_vendor.py`)
+- Supabase Auth (Magic-Link) + Postgres; Cron `/api/notify/run-due` 07:00 täglich
+- Lokal: Docker-Compose + Vite (Dev only)
 Domain Schema:
-- choretwo.stillon.top - production
-- choretwo-staging.stillon.top - staging
-Architecture
+- choretwo.stillon.top - production (Vercel)
+- choretwo.vercel.app - production (Vercel-Default)
+(Staging-Umgebung `choretwo-staging.stillon.top` stillgelegt 09/2026.)
+Architecture (Prod: Vercel — statisches Frontend + EIN Python-Monolith)
 ┌────────────────────────────────────────────────────────────┐
-│                    nginx-ingress                            │
-│          (path-based routing, TLS termination)             │
+│              Vercel (rewrites + TLS)                        │
+│   /health + /api/* → Monolith, Rest → SPA (index.html)     │
 └────────────────┬───────────────────────────────────────────┘
                  │
     ┌────────────┼───────────┬───────────┬──────────┬─────────┐
@@ -28,7 +26,9 @@ Architecture
 ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌──────────┐  ┌────────┐
 │  Auth  │  │ Chore  │  │  Log   │  │Notify  │  │ AI Copilot│  │Frontend│
 │Service │  │Service │  │Service │  │Service │  │ Service  │  │ (Vue3) │
-│  (Go)  │  │(Python)│  │(Python)│  │ (Node) │  │ (Python) │  └────────┘
+│  (Go, legacy) │  │(Python)│  │(Python)│  │(Python) │  │ (Python) │  └────────┘
+(Prod: alle vier Python-Services laufen vendored in EINEM Monolith auf Vercel;
+Go-auth/Dex nur noch lokaler Mock-Login. Ursprungs-Diagramm unten historisch.)
 └────────┘  └────────┘  └────────┘  └────────┘  └──────────┘
     │           │           │           │            │
     └───────────┴───────────┴───────────┴────────────┘
@@ -38,20 +38,20 @@ Architecture
             ▼                       ▼
     ┌─────────────────┐     ┌─────────────────┐
     │    Postgres     │     │     Redis       │
-    │  (4 schemas)    │     │  (cache+queue)  │
+    │ (3 schemas)     │     │ Vercel-Cron+DB   │
     └─────────────────┘     └─────────────────┘
 Service Specifications
 1. Auth Service (Go/Gin)
 Responsibilities:
 - JWT token issuance/verification
-- Dex OIDC integration (reuse choremane pattern)
+- Supabase magic-link auth in prod; Go/Dex-legacy nur noch lokaler Mock-Login (reuse choremane pattern)
 - User session management with secure cookies
 - Rate limiting per user
 Tech Stack:
 - Go 1.21+
 - Gin framework
 - JWT: github.com/golang-jwt/jwt/v5
-- Dex client integration
+- Supabase/JWKS-Verifikation im Monolith (`monolith/auth.py`)
 API Endpoints:
 - GET /api/auth/login - Initiate OAuth flow
 - GET /api/auth/callback - OAuth callback
@@ -127,17 +127,15 @@ Undo Logic (from choremane):
 - updated → Restore previous_state
 - marked_done → Reset done=false, restore due_date
 - archived → Set archived = FALSE
-4. Notification Service (Node.js/Express)
+4. Notification Service (Python/FastAPI — früher Node-Plan, umgesetzt in Python)
 Responsibilities:
-- Push notification scheduling
+- Push notification scheduling (Vercel-Cron `/api/notify/run-due`, `CRON_SECRET`)
 - Browser notification delivery
 - User preference management
 - Gotify integration (optional)
 Tech Stack:
-- TypeScript 5.x
-- Node.js 20 LTS
-- Express or Fastify
-- Bull (Redis-based queue)
+- Python 3.12
+- FastAPI
 - Schema: notifications
 API Endpoints:
 - GET /api/notify/preferences - User notification settings
@@ -204,9 +202,8 @@ Key Features (from choremane):
 - Dark/light mode sync
 - PWA installable
 Database Design
-Single Postgres, 4 schemas:
+Single Postgres, 3 schemas (chores/logs/notifications):
 -- Schema creation (init script)
-CREATE SCHEMA auth;
 CREATE SCHEMA chores;
 CREATE SCHEMA logs;
 CREATE SCHEMA notifications;
@@ -214,122 +211,12 @@ Connection Pattern:
 DATABASE_URL=postgres://user:pass@host:5432/choretwo?schema=chores
 Each service connects only to its schema for isolation.
 Migration Strategy:
-- Per-schema migrations
-- Migration jobs in K8s (initContainers or Jobs)
-- Version tracking per schema
-Kubernetes Deployment
-Flux Integration Pattern
-# apps/choretwo-staging.yaml
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: choretwo-staging
-  namespace: flux-system
-spec:
-  targetNamespace: choretwo-staging
-  interval: 5m
-  path: ./kustomize/choretwo/overlays/staging
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  wait: true
-  timeout: 5m
-  dependsOn:
-    - name: dex
-    - name: nginx-ingress
-    - name: cert-manager
-Ingress Configuration
-# kustomize/choretwo/base/ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: choretwo-ingress
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - choretwo.stillon.top
-      secretName: choretwo-tls
-  rules:
-    - host: choretwo.stillon.top
-      http:
-        paths:
-          - path: /api/auth
-            pathType: Prefix
-            backend:
-              service:
-                name: auth-service
-                port:
-                  number: 80
-          - path: /api/chores
-            pathType: Prefix
-            backend:
-              service:
-                name: chore-service
-                port:
-                  number: 80
-          # ... other services
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
-Kustomize Structure
-k3s-config/kustomize/choretwo/
-├── base/
-│   ├── auth-service/
-│   │   ├── deployment.yaml
-│   │   ├── service.yaml
-│   │   ├── hpa.yaml
-│   │   └── kustomization.yaml
-│   ├── chore-service/
-│   ├── log-service/
-│   ├── notification-service/
-│   ├── ai-copilot-service/
-│   ├── frontend/
-│   ├── postgres/
-│   │   ├── deployment.yaml
-│   │   ├── service.yaml
-│   │   ├── pvc.yaml  # with finalizers
-│   │   └── kustomization.yaml
-│   ├── redis/
-│   │   ├── deployment.yaml
-│   │   ├── service.yaml
-│   │   ├── pvc.yaml  # with finalizers
-│   │   └── kustomization.yaml
-│   ├── ingress.yaml
-│   └── kustomization.yaml
-├── overlays/
-│   ├── staging/
-│   │   ├── kustomization.yaml
-│   │   └── patches/
-│   └── production/
-│       ├── kustomization.yaml
-│       └── patches/
-└── namespaces/
-    ├── choretwo-staging.yaml  # Created manually, NOT in kustomize
-    └── choretwo-production.yaml
-PVC Protection (Critical)
-# ALWAYS include this finalizer
-metadata:
-  finalizers:
-    - kubernetes.io/pvc-protection
-SealedSecrets Pattern
-# Create (temporary file, NEVER commit)
-kubectl create secret generic choretwo-secrets \
-  --from-literal=postgres-password='changeme' \
-  --from-literal=jwt-secret='another-secret' \
-  -n choretwo --dry-run=client -o yaml > secret.yaml
-# Seal it
-kubeseal --format yaml < secret.yaml > secret-sealed.yaml
-# Add to kustomization.yaml, delete unsealed version
-rm secret.yaml
+- Per-schema DDL in `monolith/database.py` (Single Source of Truth)
+- Lokal automatisch; Prod `RUN_STARTUP_MIGRATIONS=false` (keine DDL im Serverless-Cold-Start)
+Vercel Deployment
+- Push auf `main` → Vercel baut (`frontend`-Build + `sync_vendor.py`) und deployt Production
+- Rewrites: `/health` + `/api/*` → Monolith, Rest → SPA; Cron `/api/notify/run-due` 07:00
+- Env-Vars ausschließlich auf Vercel, verwaltet via `vera` (Agent)
 CI/CD Pipeline
 GitHub Actions Workflow
 # .github/workflows/ci.yml
@@ -378,26 +265,15 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
-  deploy-staging:
+  deploy-production: # ENTFALLEN — Vercel auto-deployt Push auf main
     needs: [build, security]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Update k3s-config
-        run: |
-          # Update image tags in overlays/staging
-          # Commit and push to k3s-config repo
-  deploy-production:
-    needs: [deploy-staging]
-    if: startsWith(github.ref, 'refs/tags/choretwo/prod/v')
+    if: false # stillgelegt 09/2026
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Deploy production
         run: |
-          # Update k3s-config with production tags
-          # Commit and push
+          # Vercel Git-Integration deployt automatisch — kein Workflow nötig
 Pre-commit Hooks
 # .pre-commit-config.yaml
 repos:
@@ -517,31 +393,31 @@ lint-frontend:  # npm run lint
 build:          # make build-all
 build-auth:     # docker build -t auth-service ./services/auth-service
 build-all:      # Build all images
-# Deployment
-deploy-staging: # Update k3s-config staging overlay
-deploy-prod:    # Update k3s-config production overlay
+# Deployment — ENTFALLEN (heute Vercel-Auto-Deploy, kein Make-Target nötig)
+deploy-staging: # GELÖSCHT (war: Cluster-Staging-Overlay)
+deploy-prod:    # GELÖSCHT (war: Cluster-Production-Overlay)
 # Utilities
 clean:          # docker-compose down -v
 reset-db:       # docker-compose down -v && docker-compose up -d
 Common Pitfalls
 1. Session cookies: https_only=true in production, same_site="lax"
-2. CORS: allow_origins=["*"] with allow_credentials=True
-3. Flux pruning: Never add namespace.yaml to kustomize (create manually)
-4. PVC protection: Always add finalizers: [kubernetes.io/pvc-protection]
-5. Secrets: NEVER commit unsealed secrets
-6. Schema isolation: Always use DATABASE_URL?schema=<name>
-7. Flux dependencies: Always add dependsOn: dex for auth-dependent services
-8. Ingress rewrite: nginx-ingress requires rewrite-target annotation
+2. CORS: `CORS_ORIGINS`-Env auf Vercel ersetzt Defaults KOMPLETT (nie `*` mit Credentials)
+3. Altes Cluster-Setup: STILLGELEGT (09/2026) — keine Manifeste/Overlays mehr anfassen
+4. (Volume-Schutzregeln des alten Clusters entfallen mit Vercel)
+5. Secrets: NIE ins Repo — nur Vercel-Env via `vera`
+6. Schema isolation: Single Postgres, `chores`/`logs`/`notifications` (siehe `monolith/database.py`)
+7. (Dex-Abhängigkeiten entfallen — Auth = Supabase, Go-legacy nur lokal)
+8. (altes Ingress-Routing entfällt — Routing = `vercel.json` rewrites)
 Success Criteria
-- All 5 microservices deployed and communicating
-- Auth flow working with Dex (Google/GitHub)
+- All 4 Python services vendored in ONE monolith, deployed on Vercel
+- Auth flow working with Supabase magic-link (Go/Dex-legacy nur lokal)
 - Chore CRUD with undo capability
-- Notifications delivered per user preferences
-- AI copilot handles natural language commands
+- Notifications via Vercel-Cron per user preferences
+- AI copilot handles natural language commands (Synthetic/GLM, Regex-Fallback ohne Key)
 - PWA installable and offline-capable
 - Test coverage meets thresholds
-- CI/CD pipeline fully automated
-- Staging and production environments isolated
+- CI pipeline automated (Vercel auto-deploys main)
+- Production health: `/health` → `{"status":"ok","service":"choretwo-monolith"}`
 Non-Goals
 - Multi-housing support (beyond multi-user chores)
 - In-app user registration (OAuth providers only)
@@ -560,9 +436,9 @@ Implementation Status
 - Basic CRUD for chores implemented
 
 ⬜ In Progress
-- Production auth with Dex integration
-- Notification service implementation
-- AI copilot NLP integration
+- Go/Dex-Prod-Pfad entfernen oder offiziell als tot markieren (legacy nur lokal)
+- Notification/Cron-Härtung (Prod-Beobachtung)
+- AI copilot Tuning
 - Full E2E test suite
 
 ⬜ Planned
@@ -573,9 +449,8 @@ Implementation Status
 
 References
 - Choremane PRD: /home/dhallmann/projects/choremane/prd.md
-- K3s Workflow: /home/dhallmann/projects/k3s-config/docs/concepts/workflow.md
-- Adding Apps Guide: /home/dhallmann/projects/k3s-config/docs/guides/adding-applications.md
-- OpenViking Indexed Repos: choremane, k3s-config, fastapi, vue-core, gin, openhands, go-redis
+- OpenViking Indexed Repos: choremane, fastapi, vue-core, gin, openhands, go-redis
+  (Cluster-Config-Repo entkoppelt — altes Setup stillgelegt 09/2026)
 - Documentation: docs/ (GETTING_STARTED.md, ARCHITECTURE.md, DEVELOPMENT.md, API.md, TESTING.md, DEPLOYMENT.md, TROUBLESHOOTING.md)
 ---
 END OF PRD

@@ -20,7 +20,6 @@ services/ai-copilot-service/ @pipelinedave
 frontend/ @pipelinedave
 
 # Infrastructure & Deployment
-k3s-config/ @pipelinedave
 .github/workflows/ @pipelinedave
 docker-compose.yml @pipelinedave
 Makefile @pipelinedave

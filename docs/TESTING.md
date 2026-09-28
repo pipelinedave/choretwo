@@ -13,20 +13,20 @@ Testing strategies, frameworks, and coverage requirements.
     /Integration\   - Service-to-service (pytest, Go test)
    /------------\
   /              \
- /    Unit Tests  \  - Fast feedback (pytest, Go test, Jest)
+ /    Unit Tests  \  - Fast feedback (pytest, Go test, Vitest)
 /------------------\
 ```
 
 ## Coverage Requirements
 
-| Service | Unit | Integration | E2E | Total |
-|---------|------|-------------|-----|-------|
-| Auth | 90% | 80% | - | 85% |
-| Chore | 90% | 80% | - | 85% |
-| Log | 90% | 80% | - | 85% |
-| Notification | 85% | 75% | - | 80% |
-| AI Copilot | 80% | 70% | - | 75% |
-| Frontend | 80% | - | 70% | 75% |
+| Service | Coverage-Ziel |
+|---------|------|
+| Auth (Go) | 90% |
+| Chore | 90% |
+| Log | 90% |
+| Notification | 85% |
+| AI Copilot | 80% |
+| Frontend | 80% |
 
 ## Unit Testing
 
@@ -385,8 +385,8 @@ def mock_dex_client():
 ### GitHub Actions
 
 ```yaml
-# .github/workflows/test.yml
-name: Test
+# .github/workflows/ci.yaml (vereinfacht — Source of Truth ist die Datei selbst)
+name: CI
 
 on: [push, pull_request]
 
@@ -461,43 +461,26 @@ jobs:
 
 ## E2E Test Environments
 
-### Staging Environment
+E2E läuft lokal gegen den Compose-Stack (Vite `:3000` + Monolith `:8000` +
+Go-auth `:8001`), seriell (`workers: 1`, Chromium + Firefox — siehe
+`frontend/playwright.config.js`, `baseURL: http://localhost:3000`).
 
-```yaml
-# E2E tests run against staging before production deploy
-name: E2E Tests
-
-on:
-  workflow_run:
-    workflows: ["Deploy Staging"]
-    types: [completed]
-
-jobs:
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: cd frontend && npm ci
-
-      - name: Run E2E tests
-        env:
-          PLAYWRIGHT_BASE_URL: https://choretwo-staging.stillon.top
-        run: cd frontend && npm run test:e2e
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: frontend/playwright-report/
+```bash
+# Stack starten, dann:
+cd frontend && npm run test:e2e
 ```
+
+Manueller Smoke-Test nach jedem Prod-Deploy (Ersatz für das stillgelegte
+Staging, siehe Checkliste unten):
+
+```bash
+curl https://choretwo.stillon.top/health
+# → {"status":"ok","service":"choretwo-monolith"}
+```
+
+Historisch lief E2E gegen `https://choretwo-staging.stillon.top` per
+früheren Staging-Workflow — stillgelegt 09/2026, Workflow
+gelöscht. `PLAYWRIGHT_BASE_URL` existiert im Repo nicht mehr.
 
 ## Test Reporting
 
@@ -606,7 +589,7 @@ locust -f tests/performance/test_load.py --host=http://localhost:8002
 - [ ] Coverage thresholds met
 - [ ] Linting passes
 - [ ] Security scan clean
-- [ ] Manual smoke test on staging
+- [ ] Manual smoke test on production (`/health` + Login + Chore anlegen)
 
 ### Post-deployment
 

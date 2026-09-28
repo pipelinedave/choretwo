@@ -1,569 +1,102 @@
 # Architecture
 
 System architecture, service responsibilities, and data flow.
+Stand: 28.09.2026 — Produktion = Vercel + Python-Monolith (verifiziert an
+`vercel.json`, `api/index.py`, `monolith/main.py`, `monolith/auth.py`,
+`monolith/database.py`, `frontend/src/stores/auth.js`).
 
 ## System Overview
 
-Choretwo is a microservices-based chore management platform with 6 independent services communicating through HTTP APIs.
-
-```mermaid
-graph TB
-    subgraph "Client Layer"
-        Browser[Web Browser / PWA]
-        Mobile[Mobile PWA]
-    end
-
-    subgraph "Infrastructure Layer"
-        Ingress[nginx-ingress]
-        Postgres[PostgreSQL]
-        Redis[Redis]
-    end
-
-    subgraph "Application Layer"
-        Frontend[Frontend<br/>Vue 3]
-        Auth[Auth Service<br/>Go/Gin]
-        Chore[Chore Service<br/>Python/FastAPI]
-        Log[Log Service<br/>Python/FastAPI]
-        Notify[Notification Service<br/>Node/Express]
-        AI[AI Copilot<br/>Python/FastAPI]
-    end
-
-    Browser --> Ingress
-    Mobile --> Ingress
-    Ingress --> Frontend
-    Ingress --> Auth
-    Ingress --> Chore
-    Ingress --> Log
-    Ingress --> Notify
-    Ingress --> AI
-
-    Auth --> Postgres
-    Chore --> Postgres
-    Log --> Postgres
-    Notify --> Postgres
-
-    Auth --> Redis
-    Chore --> Redis
-    Notify --> Redis
+```
+Browser / PWA
+    │  HTTPS
+    ▼
+Vercel (Projekt `choretwo`)
+├── frontend/dist (statisch, aus `frontend/`)
+└── api/index.py ──▶ monolith/main.py (FastAPI, maxDuration 60s)
+        ├── /api/chores/*  ← chore-service (Vendor)
+        ├── /api/logs/*    ← log-service (Vendor)
+        ├── /api/notify/*  ← notification-service (Vendor)
+        ├── /api/ai/*      ← ai-copilot-service (Vendor)
+        └── /health        → {"status":"ok","service":"choretwo-monolith"}
+                │
+                ▼
+        Postgres (Supabase, 3 Schemas: chores/logs/notifications)
+        + Cron GET /api/notify/run-due (täglich 07:00, CRON_SECRET-Bearer)
 ```
 
-## Service Architecture
-
-### Service Responsibilities
-
-| Service | Language | Port | Primary Responsibility |
-|---------|----------|------|------------------------|
-| Frontend | Vue 3 | 3000 | PWA UI, state management |
-| Auth | Go | 8001 | Authentication, sessions, JWT |
-| Chore | Python | 8002 | Chore CRUD, recurrence logic |
-| Log | Python | 8003 | Audit trail, undo operations |
-| Notification | Node.js | 8004 | Push notifications, scheduling |
-| AI Copilot | Python | 8005 | NLP, smart suggestions |
-
-### Service Communication Pattern
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant A as Auth Service
-    participant C as Chore Service
-    participant L as Log Service
-    participant N as Notify Service
-
-    U->>F: Login
-    F->>A: POST /api/auth/login
-    A-->>F: JWT token + session cookie
-    F->>A: GET /api/auth/user (verify)
-    A-->>F: User info
-
-    U->>F: Create chore
-    F->>C: POST /api/chores (with JWT)
-    C->>L: POST /api/logs (audit)
-    C-->>F: Chore created
-    L-->>C: Log entry created
-    C->>N: POST /api/notify/schedule
-    N-->>C: Notification scheduled
-```
-
-## Database Architecture
-
-### Schema Isolation
-
-Single PostgreSQL instance with schema-based isolation:
-
-```mermaid
-graph LR
-    subgraph "PostgreSQL: choretwo"
-        subgraph "Schema: auth"
-            A1[users]
-            A2[sessions]
-            A3[tokens]
-        end
-
-        subgraph "Schema: chores"
-            C1[chores]
-            C2[assignments]
-            C3[recurrence_rules]
-        end
-
-        subgraph "Schema: logs"
-            L1[chore_logs]
-            L2[action_history]
-        end
-
-        subgraph "Schema: notifications"
-            N1[notification_preferences]
-            N2[scheduled_notifications]
-        end
-    end
-
-    Auth[Auth Service] --> A1
-    Auth --> A2
-    Auth --> A3
-
-    Chore[Chore Service] --> C1
-    Chore --> C2
-    Chore --> C3
-
-    Log[Log Service] --> L1
-    Log --> L2
-
-    Notify[Notify Service] --> N1
-    Notify --> N2
-```
-
-### Core Tables
-
-#### Auth Schema
-```sql
-CREATE TABLE auth.users (
-    email VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    avatar_url TEXT,
-    provider VARCHAR(50),
-    provider_id VARCHAR(255),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE auth.sessions (
-    id UUID PRIMARY KEY,
-    user_email VARCHAR(255) REFERENCES auth.users(email),
-    jwt_token TEXT,
-    expires_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-#### Chores Schema
-```sql
-CREATE TABLE chores.chores (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    interval_days INT NOT NULL DEFAULT 7,
-    due_date DATE NOT NULL,
-    done BOOLEAN DEFAULT FALSE,
-    done_by VARCHAR(255),
-    last_done DATE,
-    owner_email VARCHAR(255),
-    is_private BOOLEAN DEFAULT FALSE,
-    archived BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE chores.assignments (
-    chore_id INT REFERENCES chores.chores(id),
-    user_email VARCHAR(255) REFERENCES auth.users(email),
-    assigned_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY (chore_id, user_email)
-);
-```
-
-#### Logs Schema
-```sql
-CREATE TABLE logs.chore_logs (
-    id SERIAL PRIMARY KEY,
-    chore_id INT,
-    user_email VARCHAR(255),
-    action_type VARCHAR(50) NOT NULL,
-    action_details JSONB,
-    previous_state JSONB,
-    current_state JSONB,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_chore_logs_chore_id ON logs.chore_logs(chore_id);
-CREATE INDEX idx_chore_logs_user_email ON logs.chore_logs(user_email);
-CREATE INDEX idx_chore_logs_created_at ON logs.chore_logs(created_at);
-```
-
-#### Notifications Schema
-```sql
-CREATE TABLE notifications.notification_preferences (
-    user_email VARCHAR(255) PRIMARY KEY REFERENCES auth.users(email),
-    enabled BOOLEAN DEFAULT TRUE,
-    notify_times JSONB DEFAULT '["09:00", "18:00"]',
-    notify_overdue BOOLEAN DEFAULT TRUE,
-    notify_soon BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE notifications.scheduled_notifications (
-    id SERIAL PRIMARY KEY,
-    user_email VARCHAR(255),
-    chore_id INT,
-    scheduled_for TIMESTAMP,
-    sent_at TIMESTAMP,
-    notification_type VARCHAR(50),
-    processed BOOLEAN DEFAULT FALSE
-);
-```
-
-## Authentication Flow
-
-### OAuth2 with Dex (Production)
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant A as Auth Service
-    participant D as Dex (OIDC)
-    participant P as PostgreSQL
-
-    U->>F: Click "Login with Google"
-    F->>A: GET /api/auth/login
-    A->>D: Redirect to Dex OAuth
-    D->>U: Show login page
-    U->>D: Authenticate with Google
-    D->>A: Callback with auth code
-    A->>D: Exchange code for token
-    D-->>A: ID token + user info
-    A->>P: Store/update user in auth.users
-    A->>A: Generate JWT
-    A->>A: Create session cookie
-    A->>F: Redirect with JWT
-    F->>A: GET /api/auth/user (verify JWT)
-    A-->>F: User profile
-    F->>F: Store in Pinia store
-```
-
-### Mock Auth (Development)
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant A as Auth Service
-
-    U->>F: Enter email
-    F->>A: POST /api/auth/login {email}
-    A->>A: Generate mock JWT
-    A->>A: Create session
-    A-->>F: JWT + user info
-    F->>F: Store in Pinia store
-```
-
-### JWT Structure
-
-```json
-{
-  "sub": "user@example.com",
-  "name": "User Name",
-  "iat": 1640000000,
-  "exp": 1640086400,
-  "iss": "choretwo-auth",
-  "aud": "choretwo-frontend"
-}
-```
-
-## API Gateway Pattern
-
-### nginx-ingress Configuration
-
-All external traffic routes through nginx-ingress with path-based routing:
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: choretwo-ingress
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  ingressClassName: nginx
-  tls:
-    - hosts:
-        - choretwo.stillon.top
-      secretName: choretwo-tls
-  rules:
-    - host: choretwo.stillon.top
-      http:
-        paths:
-          - path: /api/auth
-            pathType: Prefix
-            backend:
-              service: auth-service
-              port:
-                number: 80
-          - path: /api/chores
-            pathType: Prefix
-            backend:
-              service: chore-service
-              port:
-                number: 80
-          - path: /api/logs
-            pathType: Prefix
-            backend:
-              service: log-service
-              port:
-                number: 80
-          - path: /api/notify
-            pathType: Prefix
-            backend:
-              service: notify-service
-              port:
-                number: 80
-          - path: /api/ai
-            pathType: Prefix
-            backend:
-              service: ai-service
-              port:
-                number: 80
-          - path: /
-            pathType: Prefix
-            backend:
-              service: frontend
-              port:
-                number: 80
-```
-
-## Caching Strategy
-
-### Redis Usage
-
-| Service | Cache Key Pattern | Purpose | TTL |
-|---------|-------------------|---------|-----|
-| Auth | `session:{jwt_token}` | Session validation | 24h |
-| Chore | `chore:{id}` | Chore data | 5m |
-| Chore | `user_chores:{email}` | User chore list | 5m |
-| Notify | `prefs:{email}` | User preferences | 1h |
-
-### Cache Invalidation
-
-```mermaid
-graph LR
-    A[Write Operation] --> B{Cache Key?}
-    B -->|Yes| C[Update Database]
-    B -->|No| D[Update Database]
-    C --> E[Delete Cache Key]
-    D --> F[No Cache]
-    E --> G[Next Read Fetches Fresh]
-```
-
-## Frontend Architecture
-
-### State Management (Pinia)
-
-```mermaid
-graph TB
-    subgraph "Pinia Stores"
-        Auth[auth store<br/>user, token, login/logout]
-        Chore[chore store<br/>chores, loading, filters]
-        Log[log store<br/>logs, undo queue]
-        Notify[notify store<br/>preferences, permissions]
-    end
-
-    subgraph "UI Components"
-        Dashboard[Dashboard]
-        ChoreList[Chore List]
-        ChoreDetail[Chore Detail]
-        Settings[Settings]
-    end
-
-    Auth --> Dashboard
-    Chore --> ChoreList
-    Chore --> ChoreDetail
-    Log --> ChoreList
-    Notify --> Settings
-```
-
-### Component Hierarchy
-
-```
-App.vue
-├── AppHeader.vue
-│   ├── UserMenu.vue
-│   └── ThemeToggle.vue
-├── RouterView
-│   ├── LoginView.vue
-│   ├── DashboardView.vue
-│   │   ├── ChoreStats.vue
-│   │   ├── UpcomingChores.vue
-│   │   └── RecentLogs.vue
-│   ├── ChoreListView.vue
-│   │   ├── ChoreCard.vue
-│   │   ├── FilterPills.vue
-│   │   └── AddChoreButton.vue
-│   ├── LogView.vue
-│   └── SettingsView.vue
-└── AppFooter.vue
-```
-
-## Service-to-Service Communication
-
-### HTTP API Calls
-
-Services communicate via HTTP with JWT authentication:
-
-```go
-// Auth service validates JWT, adds user context
-func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        token := extractToken(c)
-        claims, err := validateJWT(token)
-        if err != nil {
-            c.JSON(401, gin.H{"error": "invalid token"})
-            c.Abort()
-            return
-        }
-        c.Set("user_email", claims.Subject)
-        c.Next()
-    }
-}
-```
-
-### Error Handling
-
-```json
-{
-  "error": "Chore not found",
-  "code": "CHORE_NOT_FOUND",
-  "details": {
-    "chore_id": 123
-  }
-}
-```
-
-## Security Architecture
-
-### Security Layers
-
-1. **Transport Layer**: TLS 1.3 (cert-manager + letsencrypt-prod)
-2. **Authentication**: JWT + secure session cookies
-3. **Authorization**: Service-level auth middleware
-4. **Data Isolation**: Schema-based database isolation
-5. **Secrets Management**: SealedSecrets for K8s
-
-### CORS Configuration
-
-```go
-config := cors.DefaultConfig()
-config.AllowOrigins = []string{"https://choretwo.stillon.top"}
-config.AllowCredentials = true
-config.AllowHeaders = []string{"Authorization", "Content-Type"}
-config.MaxAge = 12 * time.Hour
-```
-
-## Scalability Considerations
-
-### Horizontal Scaling
-
-- **Stateless services**: Auth, Chore, Log, AI can scale horizontally
-- **Session storage**: Redis-backed sessions for auth service
-- **Database**: Read replicas for chore queries (future)
-
-### Performance Optimization
-
-- **CDN**: Static assets served via CDN (future)
-- **Caching**: Redis for frequently accessed data
-- **Database indexing**: Composite indexes on user_email + status
-- **Lazy loading**: Frontend code splitting by route
-
-## Deployment Architecture
-
-### K3s Cluster Structure
-
-```mermaid
-graph TB
-    subgraph "K3s Cluster"
-        subgraph "Namespace: choretwo-staging"
-            F1[Frontend x2]
-            A1[Auth x2]
-            C1[Chore x2]
-            L1[Log x2]
-            N1[Notify x2]
-            AI1[AI x2]
-        end
-
-        subgraph "Namespace: default"
-            P[Postgres]
-            R[Redis]
-        end
-
-        subgraph "System"
-            Ingress[nginx-ingress]
-            Flux[FluxCD]
-            Cert[cert-manager]
-        end
-    end
-
-    Ingress --> F1
-    Ingress --> A1
-    Ingress --> C1
-    Ingress --> L1
-    Ingress --> N1
-    Ingress --> AI1
-
-    F1 --> P
-    A1 --> P
-    C1 --> P
-    L1 --> P
-
-    A1 --> R
-    C1 --> R
-    N1 --> R
-```
-
-## Monitoring & Observability
-
-### Health Checks
-
-```yaml
-livenessProbe:
-  httpGet:
-    path: /api/auth/health
-    port: 8000
-  initialDelaySeconds: 10
-  periodSeconds: 30
-
-readinessProbe:
-  httpGet:
-    path: /api/auth/health
-    port: 8000
-  initialDelaySeconds: 5
-  periodSeconds: 10
-```
-
-### Logging Strategy
-
-- **Structured logging**: JSON format
-- **Centralized logging**: Fluentd + Elasticsearch (future)
-- **Log retention**: 7 days in K8s, 30 days in ELK
-
-## Future Enhancements
-
-1. **WebSocket Support**: Real-time chore updates
-2. **GraphQL API**: Flexible data fetching
-3. **Multi-region**: Geo-distributed deployment
-4. **Event Sourcing**: Chore state as event stream
-5. **ML Pipeline**: Advanced AI predictions
+Lokal (Dev): Docker-Compose (Postgres/Redis/Monolith :8000, Go-auth :8001)
++ Vite-Dev :3000 (Proxy `/api/auth` → :8001, restliche `/api/*` → :8000).
+
+## Services
+
+| Teil | Tech | Prod | Lokal | Verantwortung |
+|------|------|------|-------|---------------|
+| Frontend | Vue 3/Pinia/Vite/PWA | `frontend/dist` auf Vercel | `:3000` (Vite) | UI, State, Magic-Link-Login |
+| Monolith | Python/FastAPI | `api/index.py` (Serverless) | `:8000` | chores, logs, notify, ai in EINEM Prozess |
+| Go-auth | Go/Gin | **nicht deployed (legacy)** | `:8001` | nur lokale Dev/E2E (Mock-Auth) |
+| Postgres | Supabase | `DATABASE_URL` | Compose `postgres:16` | Schemas `chores`, `logs`, `notifications` |
+
+Vendor-Prinzip: `monolith/sync_vendor.py` kopiert `services/*/app` nach
+`monolith/vendor/<service>/app` und schreibt `app.*`-Imports um. Der Vendor ist
+gitignored — Fixes IMMER in `services/*/app/`.
+
+## Authentication (was wirklich benutzt wird)
+
+- **Prod:** Supabase Magic-Link im Frontend (`VITE_SUPABASE_URL`/
+  `VITE_SUPABASE_ANON_KEY`, siehe `frontend/src/stores/auth.js`). Das JWT
+  (ES256) verifiziert der Monolith nativ via JWKS (`JWT_JWKS_URL`,
+  `monolith/auth.py`). Fällt JWKS zurück, gilt HS256 mit `JWT_SECRET`.
+- **Lokal/E2E:** `USE_MOCK_AUTH=true` → `X-User-Email`-Header gilt als
+  Identität (Playwright ohne OIDC-Flow). **In Prod `false`** — sonst Bypass.
+- **Legacy/tot in Prod:** Go-auth-service + Dex-OAuth. Der Go-Code existiert
+  noch (`services/auth-service`, Dex-Init in `cmd/main.go`) und dient lokal als
+  Mock-Login (`/api/auth/login`), wird aber in Prod weder gebaut noch geroutet.
+  Öffentlich lesbar ohne Login: nur `GET /api/chores*` und `/api/export*`
+  (Shared-Chores; Service-Schicht filtert Private via `owner_email`).
+
+## Routing & Serverless-Grenzen (`vercel.json`)
+
+- Rewrites: `/health` + `/api/:path*` → `/api/index.py`, Rest → `/index.html`.
+- `maxDuration: 60` — lange Requests (Import/Export) müssen darunter bleiben.
+- `RUN_STARTUP_MIGRATIONS=false` in Prod: keine DDL im Cold-Start; Migrationen
+  laufen extern/lokal. Lokal default `true`.
+- DB-Pool env-driven (`DB_POOL_SIZE`/`DB_MAX_OVERFLOW`, am Pooler z. B. `1`/`1`);
+  TLS (`sslmode=require`) außerhalb localhost automatisch (`monolith/database.py`).
+- CORS: `CORS_ORIGINS` (kommagetrennt) **ersetzt Defaults komplett**
+  (`monolith/main.py`) — auf Vercel alle Domains setzen.
+
+## Database (Schema Isolation)
+
+Single Postgres, ein Schema pro Service. Init: `scripts/init-db.sql`.
+
+- `chores.chores` (+ assignments/recurrence), `logs.chore_logs`,
+  `notifications.notification_preferences` + `scheduled_notifications`.
+  (Vollständige DDL: `monolith/database.py` `_migrate_*` — Single Source of Truth.)
+- Alle vier Vendor-Pakete teilen sich EINE Engine (`monolith/database.py`
+  bindet `engine`/`SessionLocal`/`get_db` in die Service-Module ein).
+- Backend spricht snake_case, Frontend camelCase (`normalizeChore()` im
+  Pinia-Store).
+
+## Frontend (Pinia + Komponenten)
+
+Stores: `auth` (Supabase-Session + Legacy-Mock), `chore`, `log`,
+`notification`, `settings`. Kern-Komponenten: `ChoreCard`, `FilterPills`,
+`CatchUpCard`, `SnoozeSheet`, Settings-Modals; Views: Chores/CatchUp/Logs/AI/Home/Login/Callback.
+
+## Security (Prod)
+
+1. TLS via Vercel (kein eigenes Zert-Management mehr).
+2. Echte JWT-Signaturprüfung (JWKS/HS256), Mock-Header nur mit `USE_MOCK_AUTH=true`.
+3. Cron-Endpoint nur mit `CRON_SECRET`-Bearer (pfad-restringiert).
+4. Secrets ausschließlich als Vercel-Env-Vars (via `vera`) — nie im Repo.
+
+## Historisch (stillgelegt 09/2026)
+
+6 Einzel-Deployments (Go-auth :8001, chore :8002, log :8003, notify :8004,
+ai :8005) auf eigenem Cluster mit eigenem Ingress und Registry-Images.
+Ersetzt durch Vercel-Monolith oben. Reste nur noch in der Git-Historie.
 
 ---
 
-**Next**: [DEVELOPMENT.md](./DEVELOPMENT.md) - Set up your development environment
+**Next**: [DEVELOPMENT.md](./DEVELOPMENT.md) - Local development setup

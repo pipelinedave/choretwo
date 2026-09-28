@@ -3,7 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/pipelinedave/choretwo-frontend.svg)](https://hub.docker.com/r/pipelinedave/choretwo-frontend)
 
-A microservices-based chore management platform with Material You PWA design, built for modern households.
+A chore management platform with Material You PWA design, built for modern households.
+Prod runs on **Vercel** (Projekt `choretwo`): static frontend + ONE Python-FastAPI
+monolith (`api/index.py`). Lokal: Docker-Compose + Vite.
 
 ## 🚀 Quick Start
 
@@ -22,7 +24,7 @@ cd frontend && npm run dev
 ## ✨ Features
 
 - **Material You PWA** - Modern, beautiful UI with dark/light theme
-- **OAuth2 Authentication** - Dex integration with Google/GitHub (mock auth for dev)
+- **Supabase Magic-Link Auth** (Prod; Mock-Auth lokal)
 - **Undo-Capable Logs** - Every action can be undone from activity log
 - **AI Copilot** - Natural language commands ("Mark dishes done", "Add laundry every 3 days")
 - **Real-time Sync** - Automatic refresh on window focus
@@ -33,8 +35,9 @@ cd frontend && npm run dev
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                    Docker Compose                           │
-│  (or K3s + FluxCD for production deployment)                │
+│                    Vercel (Prod)                            │
+│  frontend/dist (statisch) + api/index.py → Monolith (FastAPI)│
+│  Rewrites: /api/* → Monolith, Rest → SPA                    │
 └────────────────┬───────────────────────────────────────────┘
                  │
      ┌───────────┼───────────┬───────────┬──────────┬─────────┐
@@ -47,38 +50,38 @@ cd frontend && npm run dev
 ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌──────────┐  ┌────────┐
 │  Auth  │  │ Chore  │  │  Log   │  │Notify  │  │ AI Copilot│  │Frontend│
 │Service │  │Service │  │Service │  │Service │  │ Service  │  │ (Vue3) │
-│  (Go)  │  │(Python)│  │(Python)│  │ (Node) │  │ (Python) │  └────────┘
+│  (Go,  │  │(Python)│  │(Python)│  │ (Python)│  │ (Python) │  └────────┘
+│ legacy)│  │        │  │        │  │        │  │          │             │
+│(lokal) │  │        │  │        │  │        │  │          │             │
 └────────┘  └────────┘  └────────┘  └────────┘  └──────────┘
     │           │           │           │            │
     └───────────┴───────────┴───────────┴────────────┘
+        (Prod: EIN Prozess — monolith/main.py, Vendor generiert)
                         │
             ┌───────────┴───────────┐
             ▼                       ▼
     ┌─────────────────┐     ┌─────────────────┐
-    │    Postgres     │     │     Redis       │
-    │  (4 schemas)    │     │  (cache+queue)  │
+    │    Postgres     │     │  Vercel-Cron    │
+    │  (3 schemas)    │     │ /api/notify/    │
     └─────────────────┘     └─────────────────┘
 ```
 
 ## 📦 Services
 
-| Service | Tech | Port | Description |
+| Service | Tech | Port (lokal) | Description |
 |---------|------|------|-------------|
-| **Auth Service** | Go/Gin | 8001 | JWT, Dex OIDC, sessions |
-| **Chore Service** | Python/FastAPI | 8002 | CRUD, recurrence, import/export |
-| **Log Service** | Python/FastAPI | 8003 | Audit trail, undo capability |
-| **Notification Service** | Node/Express | 8004 | Push notifications, preferences |
-| **AI Copilot Service** | Python/FastAPI | 8005 | NLP, suggestions, Synthetic GLM integration |
-| **Frontend** | Vue 3/Pinia | 3000 | Material You PWA |
+| **Monolith** | Python/FastAPI | 8000 | Chore/log/notify/AI vendored in EINEM Prozess (Prod: `api/index.py` auf Vercel) |
+| **Go-auth** (legacy, nur lokal) | Go/Gin | 8001 | Mock-Login für Dev/E2E — in Prod weder gebaut noch geroutet |
+| **Frontend** | Vue 3/Pinia | 3000 | Material You PWA (Prod: `frontend/dist` statisch) |
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: Vue 3, Pinia, Vite, Hammer.js, PWA
-- **Auth**: Go 1.21+, Gin, JWT, Dex OIDC
-- **Services**: Python 3.12, FastAPI, SQLAlchemy 2.0
-- **Database**: PostgreSQL 16 (schema isolation)
-- **Cache/Queue**: Redis 7
-- **DevOps**: Docker, Docker Compose, K3s, FluxCD, nginx-ingress
+- **Auth**: Supabase Magic-Link (Prod), Mock-Auth lokal
+- **Services**: Python 3.12, FastAPI, SQLAlchemy 2.0 (vendored Monolith)
+- **Database**: PostgreSQL (Supabase Prod, schema isolation)
+- **Prod**: Vercel (statisch + Serverless-Monolith, Cron, `vercel.json`)
+- **Lokal**: Docker, Docker Compose, Vite
 
 ## 📚 Documentation
 
@@ -87,7 +90,7 @@ cd frontend && npm run dev
 - [Development Guide](docs/DEVELOPMENT.md) - Local development workflow
 - [API Reference](docs/API.md) - Service endpoints
 - [Testing](docs/TESTING.md) - Unit, integration, and E2E tests
-- [Deployment](docs/DEPLOYMENT.md) - Production deployment with FluxCD
+- [Deployment](docs/DEPLOYMENT.md) - Production auf Vercel
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Agent Instructions](AGENTS.md) - Guidelines for AI agents
 
@@ -114,18 +117,18 @@ make coverage-check
 
 ## 🚢 Deployment
 
-**Production Stack:** K3s + FluxCD + nginx-ingress + cert-manager
+**Production:** Vercel-Projekt `choretwo` (branch `main` auto-deployt).
 
 **Domains:**
-- Production: `choretwo.stillon.top`
-- Staging: `choretwo-staging.stillon.top`
+- Production: `choretwo.stillon.top` + `choretwo.vercel.app`
 
 **Deploy Flow:**
-1. Push to main → GitHub Actions builds images
-2. Flux reconciles (5min interval) → staging
-3. E2E tests run on staging
-4. Manual approval → production
-5. Tag-based production deployment
+1. Push auf `main` → Vercel baut (Frontend + `sync_vendor.py`)
+2. Grün → automatisches Production-Deploy
+3. Verifizieren: `/health` → `{"status":"ok","service":"choretwo-monolith"}`
+4. Env-Vars/Domains/Logs nur via `vera` (Vercel-Agent)
+
+Details: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## 🤝 Development Workflow
 
@@ -139,7 +142,8 @@ make coverage-check
 ## 📝 Recent Changes
 
 **v1.0.0 (Current)** - Initial release
-- ✅ Complete Microservices Architecture
+- ✅ Python-Monolith auf Vercel (statt 6 Einzel-Deployments)
+- ✅ Supabase Magic-Link Auth (Go/Dex nur noch lokales Legacy)
 - ✅ Material You PWA with 20+ components
 - ✅ Dex OAuth2 with mock auth fallback
 - ✅ Swipe gestures (Hammer.js)

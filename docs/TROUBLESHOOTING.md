@@ -1,393 +1,131 @@
 # Troubleshooting Guide
-Common issues, debugging strategies, and solutions for Choretwo.
+
+Common issues and solutions. Stand: 28.09.2026 (Prod = Vercel + Monolith).
+
 ## Quick Reference
+
 | Issue | Likely Cause | Solution |
 |-------|-------------|----------|
 | Port already in use | Another service using port | `lsof -i :PORT` and kill process |
 | Database connection failed | Wrong credentials or service down | Check postgres container status |
-| JWT validation failed | Expired or invalid token | Regenerate token or check secret |
-| CORS errors | Wrong origin configuration | Verify CORS settings in service |
-| Flux not reconciling | Git sync issues | Check Flux logs and status |
-| Build failed | Dependency issues | Clear cache and rebuild |
-## Service-Specific Issues
-### Auth Service (Go)
-#### Issue: "JWT token expired"
-**Symptoms:**
-- 401 Unauthorized errors
-- Users logged out unexpectedly
-**Solutions:**
+| JWT validation failed | Expired/invalid token or wrong JWKS | Check `JWT_*` env (via `vera` in prod) |
+| CORS errors in prod | `CORS_ORIGINS` incomplete | All domains via `vera` setzen (ersetzt Defaults!) |
+| Vercel build failed | Frontend build or `sync_vendor.py` | Build-Logs via `vera`, lokal reproduzieren |
+| Cron 401 | `CRON_SECRET` mismatch | Via `vera` abgleichen |
+
+## Production (Vercel)
+
+Alles unter dieser Sektion läuft über `vera` (einziger Vercel-Zugang).
+Nie Secrets in Logs/Shell-History schreiben.
+
+### Build schlägt fehl
+
+1. Build-Logs im Vercel-Dashboard öffnen (via `vera`).
+2. Lokal 1:1 reproduzieren:
+   `cd frontend && npm ci && npm run build && cd .. && python3 monolith/sync_vendor.py`
+3. Typisch: kaputter Frontend-Build oder `services/*/app`-Verzeichnis fehlt
+   (Vendor wird generiert — nie `monolith/vendor` committen/fixen).
+
+### CORS-Fehler in Prod
+
+`CORS_ORIGINS` auf Vercel **ersetzt die Defaults komplett**
+(`monolith/main.py`). Fehlende Domain = blockiert. Alle Domains inkl.
+`choretwo.stillon.top` + `choretwo.vercel.app` kommagetrennt setzen (via `vera`).
+
+### Überall 401
+
+- `USE_MOCK_AUTH` muss in Prod `false` sein (sonst `X-User-Email`-Bypass).
+- Frontend muss `Authorization: Bearer <Supabase-JWT>` schicken.
+- `JWT_JWKS_URL`/`JWT_ISSUER`/`JWT_AUDIENCE` prüfen (via `vera`).
+
+### Cron `/api/notify/run-due` 401t
+
+Der Endpoint akzeptiert NUR `Authorization: Bearer $CRON_SECRET`
+(`monolith/auth.py`, pfad-restringiert). Secret auf Vercel vs. Cron-Config
+abgleichen (via `vera`).
+
+### AI nur generisch / `llm_connected: false`
+
+`LLM_API_KEY` fehlt/ungültig → Regex-Fallback per Design. Status:
+`GET /api/ai/status`. Key via `vera` rotieren. `LLM_BASE_URL` muss bis `/v1`
+zeigen (Client hängt `/chat/completions` an).
+
+### DB-Timeouts / langsame Cold-Starts
+
+- `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` zu groß für den Pooler (z. B. `1`/`1`).
+- `RUN_STARTUP_MIGRATIONS` muss in Prod `false` sein (keine DDL im Cold-Start).
+
+### Rollback
+
+Vercel-Dashboard → Deployments → letztes grünes Deployment promoten.
+
+## Lokal (Docker Compose)
+
+### Monolith startet nicht / DB-Fehler
+
 ```bash
-# Check JWT expiry setting
-echo $JWT_EXPIRY  # Should be reasonable (e.g., 24h)
-# Regenerate token
-curl http://localhost:8001/api/auth/login \
-  -d '{"email": "test@example.com"}'
-# Check token in browser DevTools
-# Application → Cookies → Find JWT token
-Issue: "Dex callback failed"
-Symptoms:
-- OAuth flow stuck at callback
-- "Invalid redirect_uri" error
-Solutions:
-# Verify Dex configuration
-kubectl get configmap dex -n auth-system -o yaml
-# Check redirect URIs match
-# Should be: http://localhost:3000/auth-callback (dev)
-# or https://choretwo.stillon.top/auth-callback (prod)
-# Restart auth service
-docker-compose restart auth-service
-Issue: "Mock auth not working"
-Symptoms:
-- Login button doesn't respond
-- No token returned
-Solutions:
-# Check environment variable
-docker-compose exec auth-service env | grep MOCK
-# Verify USE_MOCK_AUTH=true in .env
-# Restart with correct env
-docker-compose up -d --force-recreate auth-service
-Chore Service (Python)
-Issue: "Chore not created"
-Symptoms:
-- POST /api/chores returns 500
-- No error message
-Solutions:
-# Check service logs
-docker-compose logs chore-service --tail=50
-# Verify database connection
-docker-compose exec chore-service python -c "
-from app.database import engine
-print(engine.connect())
-"
-# Check schema exists
-docker-compose exec postgres psql -U choretwo -d choretwo -c "\dt chores.*"
-Issue: "Recurrence calculation wrong"
-Symptoms:
-- Due dates incorrect
-- Interval not applied properly
-Solutions:
-# Debug recurrence logic
-from app.utils.recurrence import calculate_due_date
-print(calculate_due_date(last_done="2024-01-01", interval_days=7))
-# Should output: 2024-01-08
-# Check timezone handling
-# Ensure all dates use UTC
-Issue: "Import/export fails"
-Symptoms:
-- Large imports timeout
-- Export returns empty file
-Solutions:
-# Check memory limits
-docker-compose exec chore-service free -h
-# Increase timeout for imports
-# Set IMPORT_TIMEOUT=300 in .env
-# Verify file size
-ls -lh import-file.json
-# Should be < 10MB for dev
-Log Service (Python)
-Issue: "Undo not working"
-Symptoms:
-- POST /api/undo returns success but no change
-- Chore state unchanged
-Solutions:
-# Check log entry exists
-docker-compose exec postgres psql -U choretwo -d choretwo \
+docker compose ps
+docker compose logs --tail=50 monolith
+docker compose exec postgres psql -U choretwo -d choretwo -c "SELECT 1"
+# Schemas prüfen (Single Source of Truth: monolith/database.py)
+docker compose exec postgres psql -U choretwo -d choretwo -c "\dt chores.*"
+# Reset (dev only!)
+docker compose down -v
+```
+
+### Mock-Login geht nicht
+
+```bash
+docker compose exec monolith env | grep MOCK   # muss true sein (Dev)
+# USE_MOCK_AUTH=true in .env, dann neu starten
+```
+
+### Chore wird nicht angelegt (500)
+
+```bash
+docker compose logs monolith --tail=50
+# Vendor kaputt? Neu generieren (Fixes gehören in services/*/app/):
+python3 monolith/sync_vendor.py
+```
+
+### Undo geht nicht
+
+```bash
+docker compose exec postgres psql -U choretwo -d choretwo \
   -c "SELECT * FROM logs.chore_logs ORDER BY id DESC LIMIT 5"
-# Verify action_type is valid
-# Should be: created, updated, marked_done, archived
-# Check previous_state JSON
-# Must contain all fields needed for restoration
-Issue: "Log retention not working"
-Symptoms:
-- Logs table growing indefinitely
-- Old logs not deleted
-Solutions:
-# Check retention policy config
-docker-compose exec log-service env | grep RETENTION
-# Manually run cleanup
-docker-compose exec log-service python -c "
-from app.utils.retention import cleanup_old_logs
-cleanup_old_logs(days=30)
-"
-# Verify cleanup
-docker-compose exec postgres psql -U choretwo -d choretwo \
-  -c "SELECT COUNT(*) FROM logs.chore_logs"
-Notification Service (Node)
-Issue: "Notifications not sent"
-Symptoms:
-- No browser notifications
-- Scheduled queue not processing
-Solutions:
-# Check Redis connection
-docker-compose exec notification-service node -e "
-const redis = require('redis');
-const client = redis.createClient();
-client.on('error', (err) => console.error(err));
-client.connect().then(() => console.log('Connected'));
-"
-# Check queue status
-docker-compose exec notification-service node -e "
-const queue = require('./app/queue');
-queue.getWaiting().then(console.log);
-"
-# Verify browser permission granted
-# Check browser: Settings → Privacy → Notifications
-Issue: "Bull queue stuck"
-Symptoms:
-- Jobs not processing
-- Queue shows stuck
-Solutions:
-# Flush Redis queue (dev only!)
-docker-compose exec redis redis-cli FLUSHALL
-# Restart notification service
-docker-compose restart notification-service
-# Check for dead jobs
-docker-compose exec notification-service node -e "
-const queue = require('./app/queue');
-queue.getFailed().then(failed => console.log('Failed:', failed.length));
-"
-AI Copilot Service (Python)
-Issue: "LLM provider rejects the API key (401/403)"
-Symptoms:
-- /api/ai/status shows status "degraded" and llm_connected false
-- Log: "LLM-Provider ... lehnt den API-Key ab (401)"
-Solutions:
-# Check the configured provider and whether a key is set
-docker-compose exec ai-copilot-service env | grep LLM_
-# Verify the key is valid (value must never be committed)
-curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $LLM_API_KEY" \
-  https://api.synthetic.new/openai/v1/models
-# 401/403 = key wrong or expired -> rotate the key in .env / k8s secret
-# In k8s the key lives in secret choretwo-secrets under key llm-api-key
-Issue: "LLM provider unreachable / timeout"
-Symptoms:
-- Log: "LLM-Provider nicht erreichbar: ..."
-- Chat still works but intents come from the deterministic fallback
-Solutions:
-# Check base URL (must point up to /v1, the client appends /chat/completions)
-docker-compose exec ai-copilot-service env | grep LLM_BASE_URL
-# Test connectivity from inside the container
-docker-compose exec ai-copilot-service python -c \
-  "import httpx; print(httpx.get('https://api.synthetic.new/openai/v1/models', timeout=5).status_code)"
-# Check DNS/egress from the cluster if this only fails in k3s
-Issue: "Copilot answers with low confidence / generic intents"
-Symptoms:
-- confidence always 0.5-0.6 (regex fallback values)
-- No LLM calls in the logs
-Solutions:
-# LLM_API_KEY is empty -> the deterministic regex fallback is active by design
-# Set the key and restart the service
-docker-compose restart ai-copilot-service
-# Verify via status endpoint
-curl -s -H "X-User-Email: you@example.com" http://localhost:8005/api/ai/status
-Issue: "NLP parsing fails"
-Symptoms:
-- Commands not recognized
-- Returns generic error
-Solutions:
-# Test the intent parser directly
-docker-compose exec ai-copilot-service python -c "
-import asyncio
-from app.nlp.intent_parser import parse_intent_deterministic
-result = parse_intent_deterministic('Mark dishes done')
-print(result)
-# Should output: {'intent': 'mark_done', 'parameters': {'chore_name': 'dishes'}, 'confidence': 0.6}
-"
-# If the LLM path fails, check the logs for LLMError warnings —
-# the deterministic fallback keeps the chat alive by design.
-Frontend (Vue)
-Issue: "White screen / blank page"
-Symptoms:
-- No content loaded
-- Console shows errors
-Solutions:
-# Check browser console for errors
-# F12 → Console tab
-# Verify all services running
-docker-compose ps
-# Clear browser cache
-# DevTools → Application → Clear storage
-# Check service worker
-# DevTools → Application → Service Workers → Unregister
-Issue: "Authentication loop"
-Symptoms:
-- Redirects to login repeatedly
-- Can't stay logged in
-Solutions:
-// Check localStorage for token
-// DevTools → Console → localStorage.getItem('token')
-// Clear auth state
-localStorage.clear()
-localStorage.removeItem('token')
-localStorage.removeItem('user')
-window.location.reload()
-// Check cookie settings
-// DevTools → Application → Cookies → Check domain/path
-Issue: "PWA not installing"
-Symptoms:
-- No install prompt
-- "Add to home screen" missing
-Solutions:
-# Verify HTTPS (required for PWA)
-# DevTools → Application → Manifest
-# Check service worker registration
-navigator.serviceWorker.getRegistrations()
-# Ensure manifest.json is valid
-curl http://localhost:3000/manifest.json
-Database Issues
-PostgreSQL Connection Problems
-Issue: "Connection refused"
-Symptoms:
-- All services fail to connect
-- "ECONNREFUSED 127.0.0.1:5432"
-Solutions:
-# Check postgres is running
-docker-compose ps postgres
-# Check port binding
-docker-compose port postgres 5432
-# Test connection
-docker-compose exec postgres psql -U choretwo -c "SELECT 1"
-# Check for port conflict
-lsof -i :5432
-Issue: "Schema does not exist"
-Symptoms:
-- "schema \"chores\" does not exist"
-- Query fails immediately
-Solutions:
-# Create missing schema
-docker-compose exec postgres psql -U choretwo -d choretwo <<EOF
-CREATE SCHEMA chores;
-CREATE SCHEMA auth;
-CREATE SCHEMA logs;
-CREATE SCHEMA notifications;
-EOF
-# Or run init script
-docker-compose exec postgres psql -U choretwo -d choretwo < scripts/init-schemas.sql
-Issue: "Database locked"
-Symptoms:
-- "relation already exists"
-- Migration fails
-Solutions:
-# Find blocking connections
-docker-compose exec postgres psql -U choretwo -d choretwo -c "
-SELECT pid, usename, datname, client_addr, state, query
-FROM pg_stat_activity
-WHERE datname = 'choretwo';
-"
-# Terminate specific connection
-docker-compose exec postgres psql -U choretwo -d choretwo -c "
-SELECT pg_terminate_backend(PID);
-"
-# Or drop and recreate (dev only!)
-docker-compose down -v
-docker-compose up -d
-Redis Connection Problems
-Issue: "Redis connection timeout"
-Symptoms:
-- Cache operations fail
-- Queue not working
-Solutions:
-# Check redis is running
-docker-compose ps redis
-# Test connection
-docker-compose exec redis redis-cli ping
-# Should return: PONG
-# Check Redis logs
-docker-compose logs redis --tail=50
-Kubernetes/Flux Issues
-Flux Not Reconciling
-Issue: "Kustomization not applied"
-Symptoms:
-- Changes not deployed
-- Flux status shows stale
-Solutions:
-# Check Flux status
-flux get kustomizations -n flux-system
-# Force reconcile
-flux reconcile kustomization choretwo-staging -n flux-system --with-source
-# Check Flux logs
-kubectl logs -n flux-system -l app.kubernetes.io/name=flux -f
-# Verify GitRepository is synced
-flux get gitrepositories -n flux-system
-Issue: "Image not found"
-Symptoms:
-- Pod in ImagePullBackOff
-- "manifest unknown" error
-Solutions:
-# Check image exists on DockerHub
-docker pull pipelinedave/auth-service:latest
-# Verify image tag in Kustomize
-cat k3s-config/kustomize/choretwo/overlays/staging/deployment.yaml
-# Check DockerHub credentials
-kubectl get secrets -n choretwo-staging
-# Manually pull image
-kubectl set image deployment/auth-service \
-  auth-service=pipelinedave/auth-service:latest \
-  -n choretwo-staging
-Issue: "Secret decryption failed"
-Symptoms:
-- SealedSecrets not decrypting
-- "unable to decrypt" error
-Solutions:
-# Check sealed-secrets controller
-kubectl get pods -n kube-system | grep sealed
-# Verify certificate
-kubeseal --fetch-cert > cert.pem
-# Re-seal secret
-kubectl create secret generic my-secret \
-  --from-literal=key=value -n choretwo-staging --dry-run=client -o yaml > secret.yaml
-kubeseal --format yaml < secret.yaml > sealed-secret.yaml
-kubectl apply -f sealed-secret.yaml
-Pod Issues
-Issue: "CrashLoopBackOff"
-Symptoms:
-- Pod restarting continuously
-- Can't access service
-Solutions:
-# Check pod status
-kubectl get pods -n choretwo-staging
-# View pod logs
-kubectl logs -n choretwo-staging deploy/auth-service --previous
-# Describe pod for events
-kubectl describe pod -n choretwo-staging <pod-name>
-# Check resource limits
-kubectl top pods -n choretwo-staging
-# Exec into pod (if it starts)
-kubectl exec -it -n choretwo-staging <pod-name> -- /bin/sh
-Issue: "Pending pods"
-Symptoms:
-- Pod stuck in Pending state
-- No nodes available
-Solutions:
-# Check why pending
-kubectl describe pod -n choretwo-staging <pod-name>
-# Check node capacity
-kubectl get nodes
-kubectl describe node <node-name>
-# Check resource requests
-kubectl get deploy -n choretwo-staging -o yaml | grep -A 5 resources:
-Build/CI Issues
-Docker Build Failures
-Issue: "Build context too large"
-Symptoms:
-- Build hangs
-- "context size exceeds limit"
-Solutions:
-# Check .dockerignore
-cat .dockerignore
-# Exclude unnecessary files
-echo "node_modules" >> .dockerignore
-echo "*.md" >> .dockerignore
-echo "tests/" >> .dockerignore
-# Build with specific context
-docker build -t auth-service ./services/auth-service
-Issue: "Layer caching issues"
-Symptoms:
-- Build extremely slow
-- Dependencies re-downloading
-Solutions:
-# Clear build cache
-docker builder prune -a
-# Use buildx for better caching
-docker buildx build --cache-from type=local,src=/tmp/buildx-cache \
-  --cache-to type=local,dest=/tmp/buildx-cache-new -t auth-service
+# action_type muss gültig sein (created/updated/marked_done/archived),
+# previous_state muss alle Restore-Felder enthalten
+```
+
+### Notifications kommen nicht
+
+- Cron lokal manuell triggern (mit `CRON_SECRET` aus `.env`):
+  `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:8000/api/notify/run-due`
+- Prefs prüfen: `notifications.notification_preferences`-Tabelle.
+- Browser-Permission prüfen (Settings → Privacy → Notifications).
+
+### Copilot-Antworten generisch (lokal)
+
+```bash
+docker compose exec monolith env | grep LLM_
+# LLM_API_KEY leer → Regex-Fallback per Design. Key in .env setzen, neu starten.
+curl -s -H "X-User-Email: you@example.com" http://localhost:8000/api/ai/status
+```
+
+### Frontend weiß / Auth-Loop
+
+- Console (F12) lesen; `docker compose ps` (Monolith :8000 oben?).
+- Auth-State resetten: `localStorage.clear()` + Reload.
+- PWA: `http://localhost:3000/manifest.json` erreichbar? Service-Worker ggf. deregistrieren.
+
+## Build/CI (GitHub Actions)
+
+CI (`ci.yaml`) + Security (`security.yaml`) laufen pro Push/PR. Bei Rot:
+Actions-Log lesen, lokal `make test-all` / `make lint-all` reproduzieren.
+Die gelöschten Alt-Workflows (`build-and-push`, `deploy-*`,
+`update-kubernetes-deployment`) scheiterten bei jedem Push — sie sind weg,
+Vercel baut selbst.
+
+## Historisch
+
+Altes Cluster-Troubleshooting (Reconcile, Image-Pull, Secret-Sealing) ist ersatzlos entfallen — bei Bedarf Git-Historie.

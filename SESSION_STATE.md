@@ -1,5 +1,10 @@
 # Choretwo - Current Session State
 
+> **Aktuell (28.09.2026): Prod = Vercel (`choretwo`, Branch `main` auto-deployt).**
+> Docs auf Vercel-Stand gebracht, k3s/Flux-Workflows gelöscht, `PRD_base.md` entfernt
+> (von `PRD.md` superseded). Alles darunter ist Historie (Log, nicht umgeschrieben).
+
+
 ## Last Updated
 **Date:** September 22, 2026
 **Session:** CatchUp stale-done Fix — Stack filterte erledigte Chores falsch
