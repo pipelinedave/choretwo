@@ -19,13 +19,6 @@
       <CopilotBar v-if="showAiBar" />
     </transition>
 
-    <!-- Welcome section -->
-    <div class="welcome-section">
-      <p class="welcome-text">
-        Welcome back, {{ authStore.user?.email?.split("@")[0] || "User" }}!
-      </p>
-    </div>
-
     <!-- Performance Bar (Household Health 0-100) -->
     <PerformanceBar :score="choreStore.householdHealth" />
 

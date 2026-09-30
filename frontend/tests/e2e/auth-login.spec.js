@@ -43,7 +43,7 @@ test.describe("Authentication Login Flow", () => {
     await page.waitForURL("/", { timeout: 15000 });
     await expect(page).toHaveURL("/");
 
-    await expect(page.locator("text=Welcome back")).toBeVisible();
+    await expect(page.locator("text=CHORETWO")).toBeVisible();
   });
 
   test("should store token in localStorage after login", async ({ page }) => {
