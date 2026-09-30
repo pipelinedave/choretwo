@@ -109,10 +109,33 @@ def migrate_rooms(conn, seed: bool = True) -> None:
     """Legt rooms + chores.room_id an. Idempotent.
 
     `conn` ist eine SQLAlchemy Connection (nicht autocommit) — der Aufrufer
-    committet. In `_seed_rooms` wird bewusst ein zweites Mal geprüft:
-    ON CONFLICT braucht den UNIQUE-Index aus CREATE_ROOMS_NAME_UNIQUE.
+    committet.
+
+    VORAUSSETZUNG: `chores.chores` muss existieren. Diese Migration
+    haengt an der Tabelle (Spalte, Index, FK). Der normale Weg ruft
+    deshalb erst die chores-DDL und dann diese Funktion auf —
+    `database.py::run_migrations()`, und der Prod-Runner
+    (`scripts/run_migrations.py`) benutzt aus genau dem Grund
+    `run_migrations()` statt `migrate_rooms()`.
+
+    Wird sie doch direkt aufgerufen und chores.chores fehlt, bricht sie
+    hier mit einer lesbaren Meldung ab statt mit einem rohen
+    Foreign-Key-Fehler aus `ALTER TABLE`.
     """
     from sqlalchemy import text
+
+    exists = conn.execute(
+        text(
+            "SELECT count(*) FROM information_schema.tables "
+            "WHERE table_schema='chores' AND table_name='chores'"
+        )
+    ).scalar_one()
+    if not exists:
+        raise RuntimeError(
+            "migrate_rooms() setzt chores.chores voraus, die Tabelle fehlt. "
+            "database.py::run_migrations() (bzw. scripts/run_migrations.py) "
+            "legt sie vorher an — bitte die aufrufen, nicht diese Funktion."
+        )
 
     conn.execute(text("CREATE SCHEMA IF NOT EXISTS chores"))
     conn.execute(text(CREATE_ROOMS_TABLE))
