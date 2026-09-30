@@ -83,6 +83,14 @@
                 />
               </div>
 
+              <!-- Raum. Optional: "No room" ist ein vollwertiger Wert. -->
+              <RoomPicker
+                ref="roomPickerRef"
+                id-prefix="card-room"
+                v-model="editableChore.roomId"
+                @update:pending-room="onPendingRoom"
+              />
+
               <div class="form-group custom-checkbox-wrapper">
                 <input
                   type="checkbox"
@@ -176,6 +184,22 @@
               aria-label="Private chore"
               >🔒</span
             >
+            <!--
+              Der Raum-Chip sitzt VOR dem Titel, im selben Flex-Band wie
+              der Checkbox-Kreis.
+
+              Warum im Band und nicht als eigene Zeile: das Feature soll
+              den Chore-Titel verkuerzen ("Boden wischen Schlafzimmer" ->
+              "Boden wischen"), und eine eigene Zeile wuerde jede Karte
+              hoeher machen. Der Chip ist bewusst kompakt, schrumpft
+              nicht (`flex-shrink: 0`) und laesst dem Titel den Rest der
+              Zeile. Bei 320 px Viewport greift die bestehende Umbruch-
+              regel unter 380 px, dort bekommt `.chore-left` ohnehin die
+              volle Breite und der Titel bricht um.
+
+              Ohne Raum rendert RoomChip nichts — kein Platzhalter.
+            -->
+            <RoomChip :room="chore.room" />
             <span class="chore-title" :class="{ 'line-through': isDoneToday }">
               {{ chore.name }}
             </span>
@@ -233,6 +257,8 @@ import { useAuthStore } from "@/stores/auth";
 import { isDoneToday as isChoreDoneToday } from "@/utils/choreBuckets";
 import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
 import ChoreVisual from "@/components/chores/ChoreVisual.vue";
+import RoomChip from "@/components/chores/RoomChip.vue";
+import RoomPicker from "@/components/chores/RoomPicker.vue";
 
 const props = defineProps({
   chore: { type: Object, required: true },
@@ -270,7 +296,23 @@ const editableChore = ref({
   interval: props.chore.interval || props.chore.interval_days || 1,
   isPrivate: !!(props.chore.isPrivate ?? props.chore.is_private),
   archived: !!props.chore.archived,
+  roomId: props.chore.roomId ?? props.chore.room_id ?? null,
 });
+
+/**
+ * Ein im Picker getippter, noch nicht existierender Raum.
+ *
+ * Wird NICHT sofort angelegt: sonst bliebe bei einem abgebrochenen Edit
+ * ein leerer Raum in der Haushaltsliste stehen. Stattdessen wandert der
+ * Entwurf ueber `updateChore` nach aussen; wer den Chore speichert, legt
+ * den Raum zuerst an und setzt dann dessen ID.
+ */
+const pendingRoomDraft = ref(null);
+const roomPickerRef = ref(null);
+
+function onPendingRoom(room) {
+  pendingRoomDraft.value = room;
+}
 
 watch(
   () => props.chore,
@@ -283,7 +325,9 @@ watch(
         interval: newVal.interval || newVal.interval_days || 1,
         isPrivate: !!(newVal.isPrivate ?? newVal.is_private),
         archived: !!newVal.archived,
+        roomId: newVal.roomId ?? newVal.room_id ?? null,
       };
+      pendingRoomDraft.value = null;
     }
   },
   { deep: true },
@@ -560,10 +604,30 @@ function saveChore() {
     owner_email: editableChore.value.isPrivate
       ? props.chore.owner_email || authStore.user?.email || null
       : null,
+    /*
+     * `room_id` wird IMMER mitgeschickt, auch wenn null.
+     *
+     * Das ist der Punkt, an dem es leicht stillschweigend schiefgeht: das
+     * Backend unterscheidet "Feld fehlt" (Raum unangetastet) von
+     * `room_id: null` (Raum ENTFERNEN) ueber `exclude_unset`. Ohne das
+     * Feld koennte der User im Edit-Formular keinen Raum mehr wegnehmen
+     * — der Request waere "unveraendert", und der Raum bliebe stehen.
+     */
+    room_id: editableChore.value.roomId ?? null,
+    roomId: editableChore.value.roomId ?? null,
   };
+
+  // Der Raum-Entwurf (Name/Farbe/Icon) geht als Objekt mit. Der Parent
+  // legt ihn an und setzt die zurueckgegebene ID — die Chore kann einen
+  // Raum also auch beim allerersten Speichern bekommen, ohne dass der
+  // Raum vorher schon existieren muss.
+  if (pendingRoomDraft.value) {
+    choreData.pendingRoom = { ...pendingRoomDraft.value };
+  }
 
   emit("updateChore", choreData);
   editMode.value = false;
+  pendingRoomDraft.value = null;
 }
 
 function handleArchive() {

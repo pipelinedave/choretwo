@@ -29,6 +29,7 @@
         -->
         <NotificationSettings />
         <AppearanceSettings />
+        <RoomsSettings />
         <DataSettings />
         <AiSettingsSection ref="aiSection" />
       </div>
@@ -54,6 +55,7 @@ import { useSettingsStore } from "@/stores/settings";
 import NotificationSettings from "@/components/settings/NotificationSettings.vue";
 import AppearanceSettings from "@/components/settings/AppearanceSettings.vue";
 import DataSettings from "@/components/settings/DataSettings.vue";
+import RoomsSettings from "@/components/settings/RoomsSettings.vue";
 import AiSettingsSection from "@/components/settings/AiSettingsSection.vue";
 
 const emit = defineEmits(["close"]);

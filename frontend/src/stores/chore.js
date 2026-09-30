@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { choreApi } from "@/api";
+import { useRoomStore } from "@/stores/room";
 import { bucketChores, normalizeToLocalDate } from "@/utils/choreBuckets";
 
 const normalizeChore = (raw) => {
@@ -23,10 +24,28 @@ const normalizeChore = (raw) => {
     is_private: !!(chore.is_private ?? chore.isPrivate),
     done: !!chore.done,
     archived: !!chore.archived,
+    // Raum (optional). Das Backend bettet den Kurzdatensatz ein, damit der
+    // Chip Icon + Farbe ohne zweiten Request bekommt. Das Muster ist
+    // bewusst inline statt importiert: `normalizeRoom` liegt im room-Store,
+    // und ein Import hier wuerde einen Zyklus ueber `@/api` aufziehen.
+    roomId: chore.room_id ?? chore.roomId ?? null,
+    room_id: chore.room_id ?? chore.roomId ?? null,
+    room: chore.room
+      ? {
+          ...chore.room,
+          id: chore.room.id,
+          name: chore.room.name,
+          color: chore.room.color,
+          icon: chore.room.icon,
+          isPersonal: !!(chore.room.is_personal ?? chore.room.isPersonal),
+          is_personal: !!(chore.room.is_personal ?? chore.room.isPersonal),
+        }
+      : null,
   };
 };
 
 export const useChoreStore = defineStore("chores", () => {
+  const roomStore = useRoomStore();
   const chores = ref([]);
   // Merkt beim markDone den ursprünglichen due_date pro Chore, damit undoDone
   // ihn wiederherstellen kann (Backend zieht due_date beim Done nach vorn).
@@ -137,6 +156,40 @@ export const useChoreStore = defineStore("chores", () => {
     }
   }
 
+  /**
+   * Loest ein `pendingRoom`-Objekt (Name/Farbe/Icon, im Picker getippt) zu
+   * einer echten room_id auf.
+   *
+   * Ablauf: gibt es den Raum schon, wird er wiederverwendet (ein 409 vom
+   * Backend waere hier ein Aerger, kein Fehler — der User wollte
+   * schliesslich genau diesen Raum benutzen). Sonst wird er angelegt.
+   *
+   * Bewusst hier im Store und nicht in den Views: HomeView und ChoresView
+   * rufen beide `addChore`/`updateChore` auf, und die Logik an zwei
+   * Stellen zu duplizieren heisst, sie an einer Stelle zu vergessen.
+   */
+  async function resolveRoomId(choreData) {
+    const draft = choreData?.pendingRoom;
+    if (!draft?.name) return null;
+
+    const name = String(draft.name).trim();
+    if (!name) return null;
+
+    const existing = roomStore.rooms.find(
+      (r) => r.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (existing) return existing.id;
+
+    const room = await roomStore.createRoom({
+      name,
+      color: draft.color,
+      icon: draft.icon,
+      isPersonal: !!draft.isPersonal,
+      sortOrder: 0,
+    });
+    return room.id;
+  }
+
   async function addChore(choreData) {
     try {
       const payload = { name: choreData.name };
@@ -147,6 +200,18 @@ export const useChoreStore = defineStore("chores", () => {
       const dueDate = choreData.dueDate || choreData.due_date;
       if (dueDate) payload.due_date = dueDate;
       payload.is_private = !!(choreData.private || choreData.is_private);
+
+      // Raum: erst einen getippten Entwurf aufloesen, dann die ID
+      // mitschicken. Ohne Raum bleibt das Feld weg bzw. null — beides ist
+      // gueltig, ein Chore muss keinen Raum haben.
+      if (choreData.pendingRoom?.name) {
+        payload.room_id = await resolveRoomId(choreData);
+      } else {
+        const roomId = choreData.roomId ?? choreData.room_id ?? null;
+        if (roomId !== null && roomId !== undefined) {
+          payload.room_id = roomId;
+        }
+      }
 
       const response = await choreApi.post("/", payload);
       const created = normalizeChore(response.data.chore || response.data);
@@ -180,6 +245,25 @@ export const useChoreStore = defineStore("chores", () => {
         Object.prototype.hasOwnProperty.call(updates, "is_private")
       ) {
         payload.is_private = !!(updates.private ?? updates.is_private);
+      }
+
+      /*
+       * Raum beim Update.
+       *
+       * `room_id: null` MUSS mitgeschickt werden, wenn der User den Raum
+       * entfernt: das Backend haengt die Entscheidung an `exclude_unset`,
+       * ein fehlendes Feld bedeutet "unveraendert". Deshalb wird hier
+       * unterschieden, ob die Komponente den Raum ueberhaupt im Payload
+       * fuehrt — wenn ja, geht auch null raus.
+       */
+      if (updates.pendingRoom?.name) {
+        payload.room_id = await resolveRoomId(updates);
+      } else if (
+        Object.prototype.hasOwnProperty.call(updates, "roomId") ||
+        Object.prototype.hasOwnProperty.call(updates, "room_id")
+      ) {
+        const roomId = updates.roomId ?? updates.room_id ?? null;
+        payload.room_id = roomId === "" ? null : roomId;
       }
 
       const response = await choreApi.put(`/${id}`, payload);

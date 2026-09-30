@@ -154,6 +154,26 @@
      Light/Dark-Vollstaendigkeitspruefung desselben Tests. */
   --chore-bg: var(--color-due-far-future);
 
+  /* === Raum-Chip ========================================================
+     NUR die statische Chrome des Chips. Die RaumFARBE selbst ist kein
+     Token: sie kommt aus der Datenbank, ist pro Raum verschieden und
+     laesst sich deshalb nicht in `:root` abbilden. Sie wird als
+     Inline-Style gesetzt, die Schriftfarbe daraus berechnet
+     (utils/roomColor.js). In Komponenten darf darum fuer die Raumfarbe
+     keine CSS-Custom-Property referenziert werden — der Token-Test
+     wuerde sie als undefiniert failen.
+
+     Die Werte sind auf die bestehenden Achsen abgeleitet (Spacing +
+     Radius), damit der Chip nicht eine eigene, danebenliegende
+     Geometrie aufspannt. Beide Theme-Bloecke fuehren sie, weil der
+     Test Light/Dark-Vollstaendigkeit prueft. */
+  --room-chip-radius: 10px;
+  --room-chip-padding-x: 7px;
+  --room-chip-padding-y: 3px;
+  --room-chip-gap: 4px;
+  --room-chip-font-size: 0.72rem;
+  --room-chip-shadow: 0 1px 2px rgb(var(--md-sys-color-shadow-rgb) / 0.18);
+
   /* === Elevation / Shadows ==============================================
      Aufgebaut auf dem Shadow-RGB-Triplet, damit die Tiefenachse Light/Dark
      nur an einer Stelle umschaltet wird. */
@@ -350,6 +370,20 @@
      Theme-Bloecken stehen, sonst verletzt es die
      Light/Dark-Vollstaendigkeitspruefung in design-tokens.spec.js. */
   --chore-bg: var(--color-due-far-future);
+
+  /* Raum-Chip: dieselben Stufen wie in `:root`. Sie unterscheiden sich
+     bewusst NICHT zwischen den Themes — der Chip traegt seine own
+     Raumfarbe als Inline-Style und rechnet die Schriftfarbe daraus, er
+     ist also in beiden Themes gleich lesbar. Ein Dark-Override wuerde
+     hier nur eine zweite Wahrheit schaffen, die es nicht braucht. Die
+     Zeilen muessen trotzdem hier stehen (gleiche Werte), weil der Test
+     eine Light/Dark-Vollstaendigkeitspruefung macht. */
+  --room-chip-radius: 10px;
+  --room-chip-padding-x: 7px;
+  --room-chip-padding-y: 3px;
+  --room-chip-gap: 4px;
+  --room-chip-font-size: 0.72rem;
+  --room-chip-shadow: 0 1px 2px rgb(var(--md-sys-color-shadow-rgb) / 0.3);
 
   /* Dark-Mode-Varianten der ergaenzten MD-Sys-Rollen: die Light-Mode-Werte
      waeren auf dunklen Surfaces entweder unsichtbar (Container) oder zu

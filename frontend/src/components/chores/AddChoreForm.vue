@@ -48,6 +48,21 @@
             />
           </div>
 
+          <!--
+            Raum. Optional — "No room" ist ein vollwertiger Wert, und ein
+            Chore ohne Raum bleibt voll gueltig. Der Raum-Entwurf (Name,
+            Farbe, Icon) geht als `pendingRoom` mit; wer die Chore
+            speichert, legt den Raum zuerst an und traegt dessen ID ein.
+          -->
+          <div class="form-group">
+            <RoomPicker
+              ref="roomPickerRef"
+              id-prefix="add-chore-room"
+              v-model="formData.roomId"
+              @update:pending-room="onPendingRoom"
+            />
+          </div>
+
           <div class="form-group custom-checkbox-wrapper">
             <input
               type="checkbox"
@@ -101,6 +116,7 @@
 import { ref, watch, computed } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import ChoreSpinner from "@/components/layout/ChoreSpinner.vue";
+import RoomPicker from "@/components/chores/RoomPicker.vue";
 
 const submitting = ref(false);
 
@@ -114,6 +130,13 @@ const props = defineProps({
 const emit = defineEmits(["submit", "addChore", "close", "cancel", "archive"]);
 const authStore = useAuthStore();
 
+const roomPickerRef = ref(null);
+const pendingRoom = ref(null);
+
+function onPendingRoom(room) {
+  pendingRoom.value = room;
+}
+
 const getTodayDate = () => {
   const today = new Date();
   return today.toISOString().split("T")[0];
@@ -124,6 +147,7 @@ const formData = ref({
   interval: 7,
   dueDate: getTodayDate(),
   isPrivate: false,
+  roomId: null,
 });
 
 const editing = computed(() => !!props.chore);
@@ -144,14 +168,18 @@ watch(
         interval: newChore.interval || newChore.interval_days || 7,
         dueDate: dueStr,
         isPrivate: !!(newChore.isPrivate ?? newChore.is_private),
+        roomId: newChore.roomId ?? newChore.room_id ?? null,
       };
+      pendingRoom.value = null;
     } else {
       formData.value = {
         name: "",
         interval: 7,
         dueDate: getTodayDate(),
         isPrivate: false,
+        roomId: null,
       };
+      pendingRoom.value = null;
     }
   },
   { immediate: true },
@@ -171,7 +199,17 @@ function onSubmit() {
     owner_email: formData.value.isPrivate
       ? props.chore?.owner_email || authStore.user?.email || null
       : null,
+    // `room_id: null` ist hier richtig und beabsichtigt: beim EDIT
+    // entfernt es einen Raum, beim CREATE bedeutet es "kein Raum".
+    room_id: formData.value.roomId ?? null,
+    roomId: formData.value.roomId ?? null,
   };
+
+  // Neu getippter Raum: Name/Farbe/Icon mitgeben, der Parent legt ihn an.
+  const draft = roomPickerRef.value?.getPendingRoom?.() || pendingRoom.value;
+  if (draft) {
+    result.pendingRoom = { ...draft };
+  }
 
   emit("submit", result);
   emit("addChore", result);
