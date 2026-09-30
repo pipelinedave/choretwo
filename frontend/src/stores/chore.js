@@ -54,6 +54,22 @@ export const useChoreStore = defineStore("chores", () => {
   const loading = ref(false);
   const error = ref(null);
   const filter = ref("all");
+  /*
+   * Die ZWEITE Filter-Achse: Raum, unabhaengig von der Faelligkeit.
+   *
+   * `filter` beantwortet "WANN?", `roomFilter` beantwortet "WO?" — zwei
+   * verschiedene Fragen, also zwei Werte. Sie werden unten per UND
+   * angewandt, nicht als Ersetzung: "Was ist heute in der Kueche faellig?"
+   * ist eine Verfeinerung von "Was ist heute faellig?", kein Wechsel
+   * darauf. Ein gemeinsamer Wert wuerde die zweite Auswahl die erste
+   * loeschen lassen — fachlich falsch und fuer den User nicht
+   * unterscheidbar (es waere nur weg).
+   *
+   * `null` statt "all": ein Raum hat eine numerische ID, es gibt keinen
+   * Raum mit dem Namen "all". Der Wert ist damit eindeutig und muss
+   * nicht gegen einen Sentinel-String geprueft werden.
+   */
+  const roomFilter = ref(null);
   const totalCounts = ref({
     all: 0,
     overdue: 0,
@@ -82,7 +98,17 @@ export const useChoreStore = defineStore("chores", () => {
 
   const bucketedChores = computed(() => bucketChores(sortedByUrgency.value));
 
-  const filteredChores = computed(() => {
+  /*
+   * Schritt 1 der Filterkette: nur die Faelligkeit.
+   *
+   * Bewusst als eigener Computed, weil `roomCounts` (die Zaehler der
+   * Raum-Filterzeile) genau diese Zwischenmenge braucht: "wie viele
+   * Chores hat die Kueche, wenn ich zusaetzlich 'heute' gewaehlt habe".
+   * Aus `filteredChores` liest man das nicht mehr ab, dort ist der Raum
+   * schon mit gefiltert — die Zaehler wuerden sich gegenseitig
+   * wegdifferenzieren und eine leere Liste zeigen.
+   */
+  const dueFilteredChores = computed(() => {
     if (filter.value === "completed") {
       return sortedByUrgency.value.filter((c) => c.done);
     }
@@ -92,7 +118,71 @@ export const useChoreStore = defineStore("chores", () => {
     return sortedByUrgency.value.filter((c) => !c.archived);
   });
 
+  /*
+   * Schritt 2: der Raum als UND-Filter auf Schritt 1.
+   *
+   * Kein Ersetzen, kein Zuruecksetzen. Steht kein Raum, ist die Liste
+   * unveraendert.
+   */
+  const filteredChores = computed(() => {
+    const base = dueFilteredChores.value;
+    const roomId = roomFilter.value;
+    if (roomId === null || roomId === undefined) return base;
+    // Chores ohne Raum fallen bei gesetztem Raumfilter weg: die Frage
+    // lautet "was ist in der Kueche", nicht "was ist ueberall ausser
+    // der Kueche".
+    return base.filter((c) => (c.roomId ?? c.room_id ?? null) === roomId);
+  });
+
   const bucketCounts = computed(() => bucketedChores.value.counts);
+
+  /*
+   * Chores pro Raum, gezaehlt auf der FAELLIGKEITS-Achse.
+   *
+   * Deshalb `dueFilteredChores` und nicht `filteredChores`: die Zeile
+   * zeigt dem User, was die zweite Auswahl bewirken wuerde. Ein Zaehler,
+   * der den Raum schon kennt, kann nichts mehr beitragen.
+   *
+   * Keys sind die Raum-IDs, Werte die Anzahl. `null` (Chores ganz ohne
+   * Raum) wird bewusst NICHT gezaehlt: dafuer gibt es keinen Raum und
+   * keinen Chip, ein Zaehler ohne Chip waere toter Code.
+   */
+  const roomCounts = computed(() => {
+    const counts = {};
+    for (const chore of dueFilteredChores.value) {
+      const roomId = chore.roomId ?? chore.room_id ?? null;
+      if (roomId === null || roomId === undefined) continue;
+      counts[roomId] = (counts[roomId] || 0) + 1;
+    }
+    return counts;
+  });
+
+  /**
+   * Setzt oder schaltet den Raumfilter. Erneuter Klick auf denselben Raum
+   * hebt ihn auf — das entspricht dem Verhalten der Faelligkeits-Pills
+   * (zweites Kippen = "all") und braucht kein sichtbares Clear.
+   */
+  function setRoomFilter(roomId) {
+    roomFilter.value = roomId ?? null;
+  }
+
+  function toggleRoomFilter(roomId) {
+    roomFilter.value =
+      roomFilter.value === (roomId ?? null) ? null : (roomId ?? null);
+  }
+
+  /**
+   * Hebt NUR den Raumfilter auf. Bewusst nicht die Faelligkeit: die beiden
+   * Achsen sind unabhaengig, und ein "alles zuruecksetzen" an einem der
+   * beiden Knoepfe wuerde die andere Auswahl ungefragt loeschen.
+   */
+  function clearRoomFilter() {
+    roomFilter.value = null;
+  }
+
+  function clearFilter() {
+    filter.value = "all";
+  }
 
   const stats = computed(() => {
     const total = chores.value.length;
@@ -420,6 +510,7 @@ export const useChoreStore = defineStore("chores", () => {
     loading,
     error,
     filter,
+    roomFilter,
     sortedByUrgency,
     sortedArchivedChores,
     bucketedChores,
@@ -442,6 +533,11 @@ export const useChoreStore = defineStore("chores", () => {
     unarchiveChore,
     deleteChore,
     setFilter,
+    clearFilter,
+    roomCounts,
+    setRoomFilter,
+    toggleRoomFilter,
+    clearRoomFilter,
     clearError,
   };
 });

@@ -3,6 +3,21 @@
     <!-- Filter pills -->
     <FilterPills v-model:filter="choreStore.filter" :stats="choreStore.stats" />
 
+    <!--
+      Raum-Filter: zweite Achse, gleiche Bildsprache.
+
+      Reihenfolge bewusst: die Zeile sitzt direkt unter der
+      Faelligkeits-Zeile, damit die Kette "erst WANN, dann WO" von oben
+      nach unten gelesen wird. Sie ist additiv — beide Zeilen bleiben
+      gleichzeitig aktiv und ihre Auswahl verfeinert sich gegenseitig.
+    -->
+    <RoomFilterPills
+      :room-filter="choreStore.roomFilter"
+      :counts="choreStore.roomCounts"
+      @update:room-filter="choreStore.setRoomFilter"
+      @clear="choreStore.clearRoomFilter"
+    />
+
     <!-- Performance bar -->
     <PerformanceBar :score="choreStore.householdHealth" label="Health" />
 
@@ -52,9 +67,11 @@
 import { ref, computed, onMounted } from "vue";
 import { useChoreStore } from "@/stores/chore";
 import { useAuthStore } from "@/stores/auth";
+import { useRoomStore } from "@/stores/room";
 import LoadingSpinner from "@/components/layout/LoadingSpinner.vue";
 import EmptyState from "@/components/chores/EmptyState.vue";
 import FilterPills from "@/components/chores/FilterPills.vue";
+import RoomFilterPills from "@/components/chores/RoomFilterPills.vue";
 import PerformanceBar from "@/components/layout/PerformanceBar.vue";
 import ChoreCard from "@/components/chores/ChoreCard.vue";
 import AddChoreForm from "@/components/chores/AddChoreForm.vue";
@@ -62,9 +79,28 @@ import UndoBanner from "@/components/logs/UndoBanner.vue";
 
 const choreStore = useChoreStore();
 const authStore = useAuthStore();
+// Fuer die Raum-Filterzeile. Der Raum-Chip auf der Karte bringt seinen
+// Raum eingebettet mit, die Filterzeile braucht aber ALLE Raeume —
+// inklusive derer, die gerade kein Chore haben. Das ist derselbe Store
+// wie im Room-Picker, also dieselbe Quelle.
+const roomStore = useRoomStore();
 
 const showAddForm = ref(false);
 const completingIds = ref(new Set());
+
+/**
+ * Die Faelligkeits-Labels fuer den Leerzustand. Als Objekt statt als
+ * ternaere Kette: die Liste waechst sonst mit jeder neuen Bucket-
+ * Konstante an einer Stelle, die man beim Lesen des Leerzustands
+ * zuerst sucht.
+ */
+const DUE_LABEL = {
+  overdue: "Overdue",
+  today: "Due today",
+  tomorrow: "Due tomorrow",
+  thisWeek: "Due this week",
+  upcoming: "Due later",
+};
 
 const filteredChores = computed(() => {
   const base = choreStore.filteredChores;
@@ -77,15 +113,40 @@ const filteredChores = computed(() => {
 });
 
 const filterMessage = computed(() => {
-  const filter = choreStore.filter;
-  if (filter === "completed") return "No completed chores yet.";
-  if (filter === "overdue") return "No overdue chores. Great job!";
-  if (filter === "due-soon") return "No chores due soon.";
+  /*
+   * Nennt beide Achsen, wenn beide gesetzt sind. "No chores to show"
+   * bei einer von zwei aktiven Filtern ist die verwirrendste moegliche
+   * Antwort: der User sieht eine leere Liste und weiss nicht, welche der
+   * beiden Auswahlen sie verursacht hat.
+   */
+  const room = roomNameOf(choreStore.roomFilter);
+  const due = DUE_LABEL[choreStore.filter];
+
+  if (room && due) return `No chores in ${room} that are ${due.toLowerCase()}.`;
+  if (room) return `No chores in ${room}.`;
+  if (choreStore.filter === "completed") return "No completed chores yet.";
+  if (choreStore.filter === "overdue") return "No overdue chores. Great job!";
+  if (choreStore.filter === "due-soon") return "No chores due soon.";
   return "No chores to show.";
 });
 
+/** Raum-ID -> Name. Der Store haelt beide Schreibweisen, der Room-Store ist die Quelle. */
+function roomNameOf(roomId) {
+  if (roomId === null || roomId === undefined) return null;
+  return roomStore.roomById.get(roomId)?.name || null;
+}
+
 onMounted(async () => {
-  await choreStore.fetchChores();
+  /*
+   * Beide Requests parallel: die Raumliste ist unabhaengig von den
+   * Chores, und das sequentialisieren wuerde die Zeit bis zur ersten
+   * Renderbaren Liste verdoppeln — auf dem Handy der Unterschied
+   * zwischen "sofort da" und "nach zwei Funk-Roundtrips".
+   *
+   * `fetchRooms` ist selbst fehlertolerant (faellt auf eine leere Liste
+   * zurueck), ein Fehler blockiert die Chores also nicht.
+   */
+  await Promise.all([choreStore.fetchChores(), roomStore.fetchRooms()]);
 });
 
 async function handleToggle(choreId) {
