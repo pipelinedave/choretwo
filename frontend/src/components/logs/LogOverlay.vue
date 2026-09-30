@@ -19,7 +19,22 @@
     >
       <div class="handle-bar"></div>
       <div class="handle-content" v-if="logStore.latestEntry">
-        <div class="entry-display">
+        <!--
+          Die Aktionsklasse traegt den Farbcode. Sie wird an `.entry-display`
+          gesetzt, weil DIESES Element die Log-Aktionsachse aufspannt
+          (`--log-action` -> `--log-action-ink` / `--log-action-tint`) —
+          Handle und Expanded-Zeile teilen sich damit dieselbe Quelle.
+        -->
+        <div
+          class="entry-display"
+          :class="logActionClass(logStore.latestEntry.action)"
+        >
+          <span class="action-icon" aria-hidden="true">
+            <span
+              class="mdi"
+              :class="logActionIcon(logStore.latestEntry.action)"
+            ></span>
+          </span>
           <span class="chore-pill" v-if="logStore.latestEntry.choreName">
             {{ logStore.latestEntry.choreName }}
           </span>
@@ -73,7 +88,12 @@
           class="log-entry"
         >
           <div class="entry-info">
-            <div class="entry-display">
+            <!-- Gleiche Aktionsklasse wie im Handle: beide Zeilen
+                 sprechen dieselbe Codesprache. -->
+            <div class="entry-display" :class="logActionClass(entry.action)">
+              <span class="action-icon" aria-hidden="true">
+                <span class="mdi" :class="logActionIcon(entry.action)"></span>
+              </span>
               <span class="chore-pill" v-if="entry.choreName">{{
                 entry.choreName
               }}</span>
@@ -114,6 +134,7 @@
 <script setup>
 import { ref, watch, onMounted, computed } from "vue";
 import { useLogStore } from "@/stores/log";
+import { logActionClass, logActionIcon } from "@/utils/logAction";
 
 const props = defineProps({
   isOpen: {
@@ -281,25 +302,124 @@ async function handleRevert(entry) {
   flex-shrink: 0;
 }
 
+/* === Aktions-Farbcode ==================================================
+   Der Log kodiert jeden Eintrag nach Aktionstyp. Das ist die visuelle
+   Sprache der ChoreCards, eine Ebene tiefer: die ChoreCard faerbt ihre
+   FLAECHE nach Dringlichkeit, der Log-Eintrag faerbt ein Icon nach
+   Aktion. Beide stammen aus derselben Token-Achse.
+
+   `--log-action` setzt die Komponente pro Aktionsklasse (unten). Die
+   beiden abgeleiteten Werte mischen in variables.css gegen
+   `--color-text` und sind deshalb in beiden Themes kontraststark.
+   Grund fuer die Mischung statt einer fertigen Farbe pro Aktion: die
+   Pastell-Achsen (`--md-sys-color-completed`, `--color-archived`) sind
+   im Light Mode ~1.1:1 gegen die Karte. Als Text, als Icon und als
+   Fuellung fuer weisse Schrift sind sie unbrauchbar — sie sind als
+   Flaeche gedacht. Details und Messwerte in variables.css. */
 .entry-display {
+  --log-action: var(--color-text-muted);
+  --log-action-ink: color-mix(
+    in srgb,
+    var(--log-action) 32%,
+    var(--color-text)
+  );
+  --log-action-tint: color-mix(in srgb, var(--log-action) 20%, transparent);
+
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 1;
   min-width: 0;
+  /*
+   * `nowrap` + `overflow: hidden` bleiben Pflicht: die Zeile bricht
+   * nicht um, der Ueberhang wird am Ende abgeschnitten. Das ist der
+   * dokumentierte Befund aus LogItem.vue — `nowrap` allein liess den
+   * Titel aus der Karte laufen (247 px bei 150 % Schriftgroesse).
+   */
   flex-wrap: nowrap;
   overflow: hidden;
+}
+
+/* Reihenfolge ist Semantik, nicht Geschmack: `unarchived` MUSS vor
+   `archived` stehen, weil "chore:unarchived" das Wort "archived"
+   enthaelt. Sonst kaeme jede Restoring-Aktion als "archived" daher. */
+.entry-display.log-completed {
+  --log-action: var(--md-sys-color-completed);
+}
+.entry-display.log-created {
+  --log-action: var(--color-primary);
+}
+.entry-display.log-updated {
+  --log-action: var(--md-sys-color-secondary);
+}
+.entry-display.log-unarchived {
+  --log-action: var(--color-due-30-days);
+}
+.entry-display.log-archived {
+  --log-action: var(--color-archived);
+}
+.entry-display.log-deleted {
+  --log-action: var(--color-danger);
+}
+
+/* Ruecknehmen, Import, Export und unbekannte Aktionen teilen sich
+   bewusst den neutralen Ton aus `:root`. Sie bekommen hier KEINE eigene
+   Farbe, weil fuer sie keine freie semantische Achse existiert und
+   eine erfundene besserwuenscht als eine falsche waere.
+   Ausdruecklich ausgeschrieben statt dem Default ueberlassen: sonst
+   waere "neutral" ein stiller Nebenwirkung des nicht getroffenen
+   Falls und nicht eine Entscheidung. */
+.entry-display.log-undone,
+.entry-display.log-imported,
+.entry-display.log-exported,
+.entry-display.log-activity {
+  --log-action: var(--color-text-muted);
+}
+
+/* Icon-Pille: traegt den Code. Fuellung ist die abgeleitete Tinte,
+   nicht die Pastell-Achse — sonst waere das Glyph unsichtbar. */
+.action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: var(--md-sys-radius-full);
+  background: var(--log-action-ink);
+  color: var(--color-on-accent);
+  font-size: 0.9rem;
 }
 
 .chore-pill {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   padding: 3px 9px;
-  background: var(--color-primary);
-  color: white;
-  border-radius: 14px;
+  /*
+   * Der Chip traegt nur noch einen Hauch der Aktionsfarbe
+   * (`--log-action-tint`) statt einer gefuellten Flaeche. Grund: der
+   * Chore-Name ist Text, und Text auf 20 % Farbe ueber einer bereits
+   * farbigen Glaskarte ist die schlechteste von allen Varianten. Die
+   * Farbe kodiert die AKTION — das macht das Icon daneben. So bleibt
+   * der Name in beiden Themes auf der Text-Achse und damit lesbar.
+   */
+  background: var(--log-action-tint);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-glass-subtle);
+  border-radius: var(--md-sys-radius-full);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
+  /*
+   * Kurzform bleibt Pflicht, unveraendert bei 140 px.
+   *
+   * BEFUND (aus LogItem.vue): `white-space: nowrap` allein liess den
+   * Chore-Titel aus der Karte laufen — bei 150 % Schriftgroesse waren
+   * es 247 px Ueberlauf. Die drei gehoeren zusammen: eine eigene Box,
+   * begrenzte Breite, Abschneiden statt Umbruch. Umbruch waere hier
+   * zusaetzlich falsch, weil `.entry-display` `nowrap` ist — der Titel
+   * wuerde die Zeile sprengen statt sich anzupassen.
+   */
   white-space: nowrap;
   max-width: 140px;
   overflow: hidden;
@@ -311,12 +431,25 @@ async function handleRevert(entry) {
   font-weight: 500;
   color: var(--color-text);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .user-text {
   font-size: 0.8rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+  /*
+   * Der Nutzer ist die entbehrlichste Angabe der Zeile. Ohne
+   * `flex-shrink: 0` wuerde er als erstes zerdrueckt und der eigentliche
+   * Inhalt beschnitten — das Umgekehrte ist richtig: der Chip und der
+   * Aktionstext stehen links und duerfen ruhig abgeschnitten werden,
+   * aber nie so weit, dass der Chore-Name unlesbar wird. `min-width: 0`
+   * erlaubt dem Flex-Item das Schrumpfen ueberhaupt.
+   */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
 
 .time-ago {
@@ -373,7 +506,16 @@ async function handleRevert(entry) {
   align-items: center;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid var(--color-surface-lighter);
+  /*
+   * Die Trennlinie war `--color-surface-lighter`, also rgba(255,255,255,
+   * 0.55) im Light Mode. Auf einer hellen Flaeche ist eine weisse Linie
+   * so gut wie unsichtbar — die Eintraege wirkten dadurch wie eine
+   * formlose Liste. Dieselbe Zahl in Tinte, nur schwach: 8 % Tinte
+   * trennt in beiden Themes, weil `--color-text` dem Theme folgt.
+   * Der 8-%-Wert ist die einzige freie Zahl hier und dieselbe, die
+   * ChoreCard fuer ihre Kartenkante benutzt.
+   */
+  border-bottom: 1px solid color-mix(in srgb, var(--color-text) 8%, transparent);
   gap: 12px;
 }
 

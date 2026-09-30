@@ -21,6 +21,11 @@
 
 <script setup>
 import { computed } from "vue";
+import {
+  logActionClass,
+  logActionIcon,
+  logActionText,
+} from "@/utils/logAction";
 
 const props = defineProps({
   log: {
@@ -41,38 +46,16 @@ const canUndo = computed(() => {
   return undoableActions.includes(props.log.action);
 });
 
-const logClass = computed(() => {
-  const action = props.log.action;
-  if (action.includes("completed")) return "log-completed";
-  if (action.includes("created")) return "log-created";
-  if (action.includes("updated")) return "log-updated";
-  if (action.includes("archived")) return "log-archived";
-  if (action.includes("unarchived")) return "log-unarchived";
-  return "";
-});
-
-const logIcon = computed(() => {
-  const action = props.log.action;
-  if (action.includes("completed")) return "mdi-check-circle";
-  if (action.includes("created")) return "mdi-plus-circle";
-  if (action.includes("updated")) return "mdi-pencil-circle";
-  if (action.includes("archived")) return "mdi-archive";
-  if (action.includes("unarchived")) return "mdi-archive-open";
-  if (action.includes("deleted")) return "mdi-delete";
-  return "mdi-history";
-});
-
-const actionText = computed(() => {
-  const action = props.log.action;
-  if (action.includes("completed")) return "completed";
-  if (action.includes("created")) return "created";
-  if (action.includes("updated")) return "updated";
-  if (action.includes("archived")) return "archived";
-  if (action.includes("unarchived")) return "unarchived";
-  if (action.includes("deleted")) return "deleted";
-  if (action.includes("undo")) return "undid";
-  return "did something to";
-});
+/*
+ * Semantik kommt aus utils/logAction.js — dieselbe Quelle, die
+ * LogOverlay.vue benutzt. Vorher stand hier eine eigene
+ * if-Kette, und die war bereits falsch: `archived` wurde vor
+ * `unarchived` geprueft, also war "chore:unarchived" unerreichbar und
+ * wurde als "archived" beschriftet UND eingefaerbt. Details in der Util.
+ */
+const logClass = computed(() => logActionClass(props.log.action));
+const logIcon = computed(() => logActionIcon(props.log.action));
+const actionText = computed(() => logActionText(props.log.action));
 
 const choreDisplayTitle = computed(() => {
   if (props.log.chore_title) return props.log.chore_title;
@@ -118,31 +101,57 @@ function handleUndo() {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: var(--log-action-ink);
+  color: var(--color-on-accent);
+}
+
+/* === Aktions-Farbcode ==================================================
+   Dieselbe Achse wie in LogOverlay.vue und dieselbe Quelle
+   (`--log-action*` aus variables.css), damit /logs und das Activity-Log
+   auf Home dieselbe Codesprache sprechen. Die Semantik (welche Aktion
+   welche Klasse und welches Icon bekommt) steht in utils/logAction.js —
+   hier nur die Farbe.
+
+   Vorher stand hier `color: white` auf `--md-sys-color-completed`, also
+   weisses Glyph auf #d3ead8: 1.27:1 im Light Mode, bei
+   `--color-archived` 1.43:1. Die 3:1-Grenze fuer grafische Objekte
+   (WCAG 1.4.11) ist damit klar verfehlt — ein Kontrastfehler, kein
+   Geschmack. Die abgeleitete Tinte loest das und liegt in beiden
+   Themes ueber 5:1. */
+.log-item-icon {
+  --log-action: var(--color-text-muted);
+  --log-action-ink: color-mix(
+    in srgb,
+    var(--log-action) 32%,
+    var(--color-text)
+  );
 }
 
 .log-item-icon.log-completed {
-  background-color: var(--md-sys-color-completed);
-  color: white;
+  --log-action: var(--md-sys-color-completed);
 }
-
 .log-item-icon.log-created {
-  background-color: var(--md-sys-color-primary);
-  color: white;
+  --log-action: var(--color-primary);
 }
-
 .log-item-icon.log-updated {
-  background-color: var(--md-sys-color-secondary);
-  color: white;
+  --log-action: var(--md-sys-color-secondary);
 }
-
-.log-item-icon.log-archived {
-  background-color: var(--md-sys-color-outline);
-  color: white;
-}
-
 .log-item-icon.log-unarchived {
-  background-color: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
+  --log-action: var(--color-due-30-days);
+}
+.log-item-icon.log-archived {
+  --log-action: var(--color-archived);
+}
+.log-item-icon.log-deleted {
+  --log-action: var(--color-danger);
+}
+
+/* Wie im LogOverlay: neutral, aber ausdruecklich. Siehe dort. */
+.log-item-icon.log-undone,
+.log-item-icon.log-imported,
+.log-item-icon.log-exported,
+.log-item-icon.log-activity {
+  --log-action: var(--color-text-muted);
 }
 
 .log-item-content {

@@ -188,6 +188,49 @@
      Fleck auf dunklem Grund, da genueigt eine Haarlinie. */
   --room-chip-inset: inset 0 0 0 rgb(var(--md-sys-color-white-rgb) / 0.5);
 
+  /* === Log-Aktionsachse ==================================================
+     Der Activity-Log kodiert seine Eintraege nach Aktionstyp. Drei
+     Tokens, alle drei mit derselben Rolle in BEIDEN Log-Oberflaechen
+     (LogOverlay auf Home, LogItem auf /logs), damit die beiden nicht
+     auseinanderlaufen.
+
+     `--log-action` wird pro Aktion von der Komponente ueberschrieben
+     (LogOverlay: `.entry-display.log-completed { --log-action: ... }`).
+     Die beiden abgeleiteten Werte reichen aus genau einem Grund nicht
+     als fertige Farben: die Pastell-Achsen, an die die Semantik gebunden
+     ist, sind als FLAECHE gedacht, nicht als Schrift.
+
+     `--md-sys-color-completed` ist im Light Mode #d3ead8. Als
+     Fuellung mit weissem Glyph — so baute es `LogItem` bisher — sind
+     das 1.27:1, bei `--color-archived` 1.43:1. Die 3:1-Grenze fuer
+     grafische Objekte (WCAG 1.4.11) ist damit klar verfehlt, und zwar
+     nicht knapp. Dieselbe Rechnung gilt fuer den alten Chore-Chip im
+     LogOverlay: weisse Schrift auf `--color-primary` ist im Light Mode
+     5.79:1 (kontraststark, aber ohne Aussage — Einheitsblau fuer jede
+     Aktion), im Dark Mode dagegen 2.77:1, weil `--color-primary` dort
+     ein helles Aqua ist. Beide alten Bauten hatten also je einen Theme,
+     in dem sie nicht funktionierten.
+
+     Deshalb wird die Achse in zwei Schritten gelesen, und beide
+     Schritte mischen gegen `--color-text`. Damit ist sie von selbst
+     theme-aufloesbar: Light hat eine dunkle Tinte, Dark eine helle,
+     also kippt die Mischung in die richtige Richtung und bleibt in
+     beiden Themes kontraststark — ohne eine zweite Handvoll Hex-Werte
+     zu pflegen.
+
+     Die Mischquoten sind die einzigen Zahlen an dieser Stelle. Beide
+     sind im Browser gemessen, nicht geschaetzt — Kontrast der
+     abgeleiteten Tinte gegen die Log-Flaeche, schlechtester Aktionstyp
+     ueber alle Aktionen hinweg, Light und Dark:
+       Icon-Flaeche  >= 5.03:1 (Light) bzw. >= 9.07:1 (Dark)
+       Glyph darauf  >= 5.58:1 (Light) bzw. >= 8.92:1 (Dark)
+     Beides ueber der 3:1-Grenze fuer grafische Objekte; das Glyph
+     traegt zusaetzlich die 4.5:1 fuer Text.
+     */
+  --log-action: var(--color-text-muted);
+  --log-action-ink: color-mix(in srgb, var(--log-action) 32%, var(--color-text));
+  --log-action-tint: color-mix(in srgb, var(--log-action) 20%, transparent);
+
   /* === Elevation / Shadows ==============================================
      Aufgebaut auf dem Shadow-RGB-Triplet, damit die Tiefenachse Light/Dark
      nur an einer Stelle umschaltet wird. */
@@ -426,4 +469,18 @@
   --md-sys-color-inverse-on-surface: #12201f;
   --md-sys-color-outline-variant: rgb(255 255 255 / 0.22);
   --md-sys-color-outline: rgb(255 255 255 / 0.38);
+
+  /* Log-Aktionsachse: dieselben drei Zeilen wie in `:root`, aus
+     demselben Grund wie bei `--room-chip-*` — die Testpruefung in
+     design-tokens.spec.js verlangt Light/Dark-Vollstaendigkeit.
+     Sie unterscheiden sich hier NICHT von Light, weil die Achse gegen
+     `--color-text` mischt und die Tinte dem Theme folgt: das
+     Dark-Ergebnis kippt dadurch von selbst in die helbe Richtung.
+     Ueberschrieben wird hier nur der Ausgangswert von `--log-action`,
+     und der zeigt auf dieselben semantischen Achsen wie im Light Mode
+     (`--md-sys-color-completed`, `--color-archived`, ...), die ihrerseits
+     im Dark-Block eigene Werte haben. */
+  --log-action: var(--color-text-muted);
+  --log-action-ink: color-mix(in srgb, var(--log-action) 32%, var(--color-text));
+  --log-action-tint: color-mix(in srgb, var(--log-action) 20%, transparent);
 }
