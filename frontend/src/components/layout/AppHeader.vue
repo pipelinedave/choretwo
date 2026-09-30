@@ -289,6 +289,38 @@ async function installPwa() {
 }
 
 .brand {
+  /*
+   * `min-width: 0` bleibt Pflicht — siehe den Befund-Kommentar an
+   * `.header-content`. Unveraendert bleibt auch `flex-wrap: wrap` dort.
+   *
+   * Der Commit-Hash (`.header-version`) ist aus dem Textfluss genommen: er
+   * steht als Sub-Label unter dem Titel statt in der Titellinie. Grund ist
+   * eine Messung, keine Geschmacksfrage — auf einem Pixel 9 (412 px, bei
+   * <=576 px Viewport also 8px Rand, 396 px nutzbare Breite) ist der Platz
+   * zwischen Logo und Aktions-Buttons nur
+   *
+   *   396 px  -  145 px Logo  -  232 px Buttons (5x40 + 4x8)  =  19 px
+   *
+   * Der Hash braucht bei 11px Monospace rund 58 px (7 Zeichen, 10px Innen-
+   * abstand, 2px Kontur). 19 < 58 heisst: an der Titellinie gibt es fuer
+   * ihn keinen Platz. Die drei moeglichen Auswege wurden verworfen:
+   *
+   *   1. Inline lassen (der alte Zustand): der Hash war Teil der
+   *      min-content-Groesse von `.brand`. Reiss die Zeile um, faellt er auf
+   *      eine zweite Zeile — und weil `body` global `overflow-wrap:
+   *      anywhere` setzt, bricht dabei das Logo als EINZELNES Wort mitten
+   *      im Wort um. Genau der gemeldete Befund.
+   *   2. `position: absolute` mit reserviertem Slot: der Slot muss als
+   *      `padding-right` auf `.brand` liegen, damit er in der Zeilen-
+   *      aufteilung des Flex-Containers mitzaehlt. Damit waere `.brand`
+   *      72 px breiter als ohne Badge, und die Buttons spruengen bei
+   *      396 px (377 px ohne Badge, 449 px mit Slot) auf eine zweite Zeile —
+   *      der Bug kehrt als Button-Umbruch zurueck.
+   *   3. Sub-Label (umgesetzt): `.brand` misst nur noch die breiteste
+   *      Inline-Box, also das Logo. Der Hash kann die Zeile weder umbrechen
+   *      noch beeinflussen, und bei 396 px bleibt der Header sogar
+   *      einzeilig (145 + 232 = 377 px).
+   */
   min-width: 0;
 }
 
@@ -296,15 +328,25 @@ async function installPwa() {
   text-decoration: none;
 }
 
+/*
+ * Der Commit-Hash ist ein SUB-LABEL unter dem Titel, nicht Teil der
+ * Titellinie. Das ist Layout, keine Kosmetik — die Begruendung steht in
+ * `.brand` weiter unten, die Messung in der Commit-Message.
+ *
+ * `display: flex` (block-level) statt `inline-flex`: der Hash beginnt damit
+ * garantiert auf einer eigenen Zeile. Als Inline-Box kann er mitten in der
+ * Titellinie umbrechen — genau der Bug, den diese Regel behebt.
+ */
 .header-version {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
   font-size: 11px;
+  line-height: 1.2;
   color: var(--color-text-dim);
   user-select: none;
-  margin-left: 8px;
-  vertical-align: middle;
+  margin-top: 3px;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .header-commit-link {
@@ -319,6 +361,21 @@ async function installPwa() {
     background 0.15s ease,
     border-color 0.15s ease;
   font-size: 11px;
+  /*
+   * Kurzformen-Guard. `git rev-parse --short` liefert 7 Zeichen, bei
+   * Pruefziffern-Kollision auch 8 — das passt bei 11px Monospace in jeden
+   * der normalen Faelle. Ohne diese Zeilen waere ein laengerer Hash aber
+   * ein unzerbrechliches Wort im Inline-Fluss, und `overflow-wrap: anywhere`
+   * (main.css, body) wuerde ihn dann mitten im Hash umbrechen statt ihn zu
+   * kuerzen. `min-width: 0` ist noetig, weil die automatische
+   * Mindestbreite eines Flex-Items sonst die volle Wortbreite ist.
+   */
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .header-commit-link:hover {
