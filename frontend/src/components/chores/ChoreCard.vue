@@ -185,19 +185,28 @@
               >🔒</span
             >
             <!--
-              Der Raum-Chip sitzt VOR dem Titel, im selben Flex-Band wie
-              der Checkbox-Kreis.
+              Raum-Chip, Instanz 1 von 2 (Band-Position, >480 px sichtbar).
 
-              Warum im Band und nicht als eigene Zeile: das Feature soll
-              den Chore-Titel verkuerzen ("Boden wischen Schlafzimmer" ->
-              "Boden wischen"), und eine eigene Zeile wuerde jede Karte
-              hoeher machen. Der Chip ist bewusst kompakt, schrumpft
-              nicht (`flex-shrink: 0`) und laesst dem Titel den Rest der
-              Zeile. Bei 320 px Viewport greift die bestehende Umbruch-
-              regel unter 380 px, dort bekommt `.chore-left` ohnehin die
-              volle Breite und der Titel bricht um.
+              Im breiten Layout sitzt der Chip VOR dem Titel, im selben
+              Flex-Band wie der Checkbox-Kreis. Das verkuerzt den
+              Chore-Titel ("Boden wischen Schlafzimmer" -> "Boden wischen")
+              und haelt die Karte einzeilig.
 
-              Ohne Raum rendert RoomChip nichts — kein Platzhalter.
+              Auf schmalen Geraeten (<=480 px, z. B. Pixel 9 mit 412 px CSS-
+              Breite) gehoert der Chip in die Meta-Zeile UNTER den Titel —
+              dort steht Instanz 2 in `.chore-right`, und genau eine der
+              beiden Instanzen ist je Breakpoint sichtbar (Regeln beim
+              Medienquery-Block am Ende des Style-Blocks).
+
+              Warum zwei Instanzen statt einer umgehängten: CSS kann ein
+              Element nicht in ein anderes Elternelement umhaengen, und
+              `.chore-left` darf nicht aufgeloest werden — es traegt die
+              Stacking-Stufe und den Text-Halo (siehe dort). Der Chip ist
+              zustandslos und rein darstellerisch, das Duplikat ist darum
+              gefahrlos; `RoomChip` selbst bleibt unveraendert.
+
+              Ohne Raum rendert RoomChip nichts — kein Platzhalter, beide
+              Instanzen verschwinden zusammen.
             -->
             <RoomChip :room="chore.room" />
             <span class="chore-title" :class="{ 'line-through': isDoneToday }">
@@ -221,6 +230,13 @@
           <ChoreVisual :chore="chore" :urgency="urgencyClass" :size="56" />
 
           <div class="chore-right">
+            <!--
+              Raum-Chip, Instanz 2 von 2 (Meta-Zeile, nur <=480 px sichtbar).
+              Begruendung und Umschalt-Regeln: siehe Instanz 1 und den
+              Medienquery-Block am Ende des Style-Blocks. Reihenfolge wie
+              im Entwurf: Chip, Faelligkeit, Intervall.
+            -->
+            <RoomChip :room="chore.room" />
             <transition name="fade" mode="out-in">
               <div v-if="isCompleting" class="completing-badge">
                 <ChoreSpinner
@@ -932,50 +948,6 @@ function handleArchive() {
   word-break: break-word;
 }
 
-/*
- * Schmale Geraete: der Titel braucht eine eigene Zeile.
- *
- * BEFUND: bei 320 px Viewport rendert der Titel EIN ZEICHEN PRO ZEILE und
- * die Karte wird mehrere hundert Pixel hoch. Ursache ist eine Rechnung, die
- * bei schmalen Geraeten schlecht aufgeht: von 252 px nutzbarer Breite
- * (320 minus 2x18 Padding) gehen 56 px an das Motiv und 127 px an
- * `.chore-right` — und `.chore-right` hat `flex-shrink: 0`, gibt also
- * nichts ab. Bleiben 45 px fuer `.chore-left`. Bei `word-break: break-word`
- * bricht daraufhin jedes einzelne Zeichen um.
- *
- * Der Sichtbericht fuehrte das auf die KI-Bilder zurueck, weil dort der
- * Effekt zuerst auffiel. Der Header-Überlauf, der die Karten tatsaechlich
- * abschnitt, ist davon getrennt und in AppHeader.vue behoben.
- *
- * Die Loesung ist bewusst ein Umbruch und keine Verkleinerung: die
- * Faelligkeitsangabe rueckt in eine zweite Zeile unter den Titel und
- * rechtsbuendig ausgerichtet. Titel und Faelligigkeit bleiben lesbar, und
- * bei normalen Breiten (ab 381 px) aendert sich gar nichts.
- */
-@media (max-width: 380px) {
-  .chore-content {
-    flex-wrap: wrap;
-    row-gap: 4px;
-  }
-
-  /* Reihenfolge auf dieser Breite: Titel oben, darunter Faelligkeit und
-     Motiv. Ohne `order` stuende das Motiv allein auf einer Zwischenzeile,
-     weil es vor `.chore-right` im DOM steht. */
-  .chore-left {
-    order: 1;
-    flex: 1 1 100%;
-  }
-  .chore-right {
-    order: 2;
-    flex: 1 1 auto;
-    min-width: 0;
-    justify-content: flex-end;
-  }
-  .chore-content :deep(.chore-visual) {
-    order: 3;
-  }
-}
-
 .chore-right {
   position: relative;
   z-index: 1;
@@ -983,6 +955,20 @@ function handleArchive() {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+}
+
+/*
+ * Die Meta-Zeilen-Instanz des Raum-Chips (zweite `<RoomChip>`-Instanz im
+ * Template, siehe dort) ist im Desktop-Layout ausgeblendet — dort lebt der
+ * Chip im Band vor dem Titel in `.chore-left`. Erst der Medienquery-Block
+ * unten (<=480 px) blendet sie ein und die Band-Instanz aus.
+ *
+ * Der Selektor ist absichtlich mit `.chore-right` qualifiziert: (0,3,0)
+ * schlaegt die `.room-chip[data-v]`-Grundregel der Komponente (0,2,0)
+ * unabhaengig von der Bundle-Reihenfolge der beiden Style-Bloecke.
+ */
+.chore-right .room-chip {
+  display: none;
 }
 
 .chore-due {
@@ -1008,6 +994,144 @@ function handleArchive() {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--color-text);
+}
+
+/*
+ * Schmale Geraete: zweizeiliges Karten-Layout (Entscheid David, 01.10.2026).
+ *
+ * BEFUND: Der Raum-Chip sass im selben Band wie Check-Knopf und Titel und
+ * gab keine Breite her (`flex-shrink: 0`, `white-space: nowrap`). Nach dem
+ * Raum-Backfill (30.09.2026: 71 Chores auf 11 Raeume) traegt fast jede
+ * Karte einen Chip, oft mit langen Labels ("Tuergriffe & Lichtschalter").
+ * Die Rechnung auf einem Pixel 9 (412 px CSS-Breite): 376 px nutzbar minus
+ * 56 px Motiv minus ~110 px Faelligkeitsangabe (`.chore-right`,
+ * `flex-shrink: 0`) minus 36 px Check-Knopf+Gap — dem Titel blieben 60-90 px,
+ * er brach haesslich um, und die Karten explodierten in der Hoehe. Der alte
+ * Notfall-Fallback griff erst unter 380 px und auf dem Pixel 9 darum nie.
+ *
+ * NEUES LAYOUT bis 480 px (darueber bleibt das einzeilige Layout unveraendert):
+ *
+ *   Zeile 1:  Check-Knopf + Titel — der Titel bekommt die volle Restbreite
+ *             und bricht natuerlich um.
+ *   Zeile 2:  Raum-Chip + Faelligkeit + Intervall ("Meta-Zeile"), um
+ *             Check-Breite + Band-Gap (36 px) eingerueckt, also buendig
+ *             UNTER dem Titel statt am Kartenrand.
+ *   rechts:   Motiv, ueber beide Zeilen gespannt und vertikal zentriert.
+ *
+ * Die Aufteilung ist ein Grid statt Flex-Wrapping: nur so spannt das Motiv
+ * sauber beide Zeilen, und Zeile 2 bleibt unabhaengig von der Titellaenge
+ * positioniert.
+ *
+ * Stacking und Text-Halo bleiben unangetastet: `.chore-content` bekommt
+ * weiterhin KEINEN z-index (sonst isoliert es `mix-blend-mode: multiply`
+ * des Motivs — siehe den langen Kommentar an `.chore-content`), und die
+ * Stufen samt Halo liegen weiter auf `.chore-left`/`.chore-right`, gelten
+ * damit auch fuer die Meta-Zeile. Ein Grid erzeugt fuer sich keinen
+ * Stacking-Kontext, der Blend mischt also weiter gegen den Kartengrund.
+ *
+ * Dieser Block steht bewusst NACH den Grundregeln von `.chore-content` und
+ * `.chore-right`: bei gleicher Spezifitaet entscheidet die Quellreihenfolge,
+ * und `row-gap` hier muss das `gap`-Shorthand der Grundregeln ueberschreiben.
+ */
+@media (max-width: 480px) {
+  .chore-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    row-gap: 6px;
+  }
+
+  .chore-left {
+    grid-area: 1 / 1;
+  }
+
+  /* Motiv: rechte Spalte ueber beide Zeilen. `align-items: center` aus der
+     Grundregel zentriert es im gespannten Bereich. */
+  .chore-content :deep(.chore-visual) {
+    grid-area: 1 / 2 / 3 / 3;
+  }
+
+  /*
+   * Meta-Zeile. Hier lebt die zweite Raum-Chip-Instanz; das `display: none`
+   * der Grundregel wird aufgehoben, die Band-Instanz in `.chore-left`
+   * dafuer ausgeblendet (siehe unten im selben Block).
+   *
+   * Der Chip DARF hier schrumpfen (RoomChip ellipsisiert sein Label selbst,
+   * `RoomChip.vue` bleibt unveraendert) — sonst sprengt
+   * "Tuergriffe & Lichtschalter" die Zeile auf 320 px. `flex-wrap` und
+   * `min-width: 0` halten die Zeile auch bei grosser Systemschrift
+   * (150-175 %, chore-fontscale.spec.js) innerhalb des Kartenrands.
+   */
+  .chore-right {
+    grid-area: 2 / 1;
+    min-width: 0;
+    padding-left: 36px; /* Check-Knopf 28 px + Band-Gap 8 px */
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .chore-right .room-chip {
+    display: inline-flex;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .chore-right .due-info {
+    min-width: 0;
+  }
+
+  /* Die Band-Instanz des Raum-Chips hat auf dieser Breite ausgedient. */
+  .chore-left .room-chip {
+    display: none;
+  }
+
+  /* Die Band-Instanz des Raum-Chips hat auf dieser Breite ausgedient. */
+  .chore-left .room-chip {
+    display: none;
+  }
+
+  /* Die Archiv-Ansicht hat keinen Check-Knopf — ohne Einzug ausrichten.
+     (Der private Schloss-Icon-Versatz von 14 px wird bewusst ignoriert.) */
+  .chore-card.archived-view .chore-right {
+    padding-left: 0;
+  }
+}
+
+/*
+ * Notfall-Fallback unter 380 px (absorbiert den alten `max-width: 380px`-
+ * Block, der vor dem zweizeiligen Layout hier stand).
+ *
+ * Das zweizeilige Layout oben gibt dem Titel die volle Restbreite von
+ * `minmax(0, 1fr)` — aber die Spalte schrumpft mit dem Viewport mit. Bei
+ * 320 px bleiben dem Titel neben Check-Knopf und Motiv nur ~150 px, der
+ * bewusst extreme Test-Titel aus chore-layout.spec.js
+ * ("Wohnzimmerfenster und Balkontuer gruendlich abwischen") braeuchte dafuer
+ * 4 Zeilen — der Test kippt bei seiner Drei-Zeilen-Grenze, und die Karte
+ * wird sehr hoch.
+ *
+ * Deshalb wird hier NUR das Motiv verkleinert (56 -> 36 px) und der
+ * Spaltenabstand geglaettet (12 -> 8 px): das gibt der Titelspalte ~16 px
+ * zurueck, der Test-Titel passt wieder in 3 Zeilen (die Drei-Zeilen-Grenze
+ * von chore-layout.spec.js), und Zeile 1/Zeile 2/Motiv-rechts bleibt als
+ * Struktur unangetastet.
+ *
+ * Das `!important` ist keine Flucht aus der Kaskade, sondern die einzige
+ * Moeglichkeit, das Motiv zu skalieren: `ChoreVisual` setzt Groesse und
+ * Seitenverhaeltnis als INLINE-Style aus der `size`-Prop (ChoreVisual.vue,
+ * `rootStyle`). Eine Prop auf Viewport reagieren zu lassen wuerde JS in die
+ * Darstellung ziehen; das `!important` bleibt eine lokale Ausnahme mit
+ * explizitem Grund.
+ */
+@media (max-width: 380px) {
+  .chore-content {
+    column-gap: 8px;
+  }
+
+  .chore-content :deep(.chore-visual) {
+    width: 36px !important;
+    height: 36px !important;
+  }
 }
 
 /* Inline Edit Form */
