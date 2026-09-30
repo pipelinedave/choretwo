@@ -4,6 +4,9 @@ from sqlalchemy import text
 import json
 
 from app.database import get_db
+from app.models import Room
+from app.schemas import RoomCreate
+from app.services.room_service import get_room_by_name
 from app.utils import log_action, to_utc_iso
 
 router = APIRouter(prefix="/api")
@@ -15,9 +18,11 @@ async def export_data(request: Request, db: Session = Depends(get_db)):
 
     chores_query = db.execute(
         text("""
-        SELECT id, name, interval_days, due_date, done, done_by, archived, owner_email, is_private, last_done
-        FROM chores.chores
-        WHERE archived = FALSE AND (is_private = FALSE OR (is_private = TRUE AND owner_email = :email))
+        SELECT c.id, c.name, c.interval_days, c.due_date, c.done, c.done_by, c.archived, c.owner_email, c.is_private, c.last_done,
+               c.room_id, r.name
+        FROM chores.chores c
+        LEFT JOIN chores.rooms r ON r.id = c.room_id
+        WHERE c.archived = FALSE AND (c.is_private = FALSE OR (c.is_private = TRUE AND c.owner_email = :email))
     """),
         {"email": user_email},
     )
@@ -35,8 +40,30 @@ async def export_data(request: Request, db: Session = Depends(get_db)):
             "owner_email": row[7],
             "is_private": row[8],
             "last_done": row[9].isoformat() if row[9] else None,
+            # Raum per NAME, nicht per ID: die room_id ist lokal und
+            # bedeutet in einer anderen Datenbank nichts. Der Import
+            # loest den Namen auf bzw. legt den Raum an.
+            "room_name": row[11],
         }
         chores.append(chore)
+
+    # Raeume mit exportieren, damit ein Import in eine frische DB die
+    # Farben/Icons mitnimmt und nicht nur leere Namen erzeugt.
+    rooms = [
+        {
+            "name": r[0],
+            "color": r[1],
+            "icon": r[2],
+            "is_personal": r[3],
+            "sort_order": r[4],
+        }
+        for r in db.execute(
+            text("""
+            SELECT name, color, icon, is_personal, sort_order
+            FROM chores.rooms ORDER BY sort_order, name
+        """)
+        )
+    ]
 
     logs_query = db.execute(
         text("""
@@ -66,7 +93,7 @@ async def export_data(request: Request, db: Session = Depends(get_db)):
         None, user_email, "export", {"chore_count": len(chores), "log_count": len(logs)}
     )
 
-    return {"chores": chores, "logs": logs}
+    return {"chores": chores, "rooms": rooms, "logs": logs}
 
 
 @router.post("/import")
@@ -81,10 +108,49 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
     if not import_data.get("chores"):
         raise HTTPException(status_code=400, detail="No chores data found")
 
+    # 1) Raeume anlegen. Die Icon-/Farbwerte werden gegen die Allowlist
+    #    validiert; ein fremder/kaputter Wert faellt auf Default zurueck,
+    #    statt den ganzen Import zu sprengen.
+    for room in import_data.get("rooms") or []:
+        try:
+            payload = RoomCreate(
+                name=room["name"],
+                color=room.get("color", "#c6e7dc"),
+                icon=room.get("icon", "home"),
+                is_personal=bool(room.get("is_personal", False)),
+                sort_order=int(room.get("sort_order", 0)),
+            )
+            if get_room_by_name(db, payload.name) is None:
+                db.add(
+                    Room(
+                        name=payload.name,
+                        color=payload.color,
+                        icon=payload.icon,
+                        is_personal=payload.is_personal,
+                        sort_order=payload.sort_order,
+                    )
+                )
+        except Exception as e:
+            print(f"Skipping room {room.get('name')} on import: {e}")
+    db.commit()
+
+    # 2) Chores importieren und den Raum ueber seinen NAMEN aufloesen.
     imported_chores = []
 
     for chore in import_data["chores"]:
         try:
+            room_id = None
+            room_name = chore.get("room_name")
+            if room_name:
+                room = get_room_by_name(db, room_name)
+                if room is None:
+                    # Raum existiert in dieser DB noch nicht -> anlegen.
+                    # Sonst waere der importierte Chore still verwais't.
+                    room = Room(name=room_name.strip(), color="#c6e7dc", icon="home")
+                    db.add(room)
+                    db.flush()
+                room_id = room.id
+
             if chore.get("id"):
                 existing = db.execute(
                     text("""
@@ -98,7 +164,8 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
                         text("""
                         UPDATE chores.chores
                         SET name = :name, interval_days = :interval_days, due_date = :due_date,
-                            is_private = :is_private, owner_email = :owner_email, last_done = :last_done
+                            is_private = :is_private, owner_email = :owner_email, last_done = :last_done,
+                            room_id = :room_id
                         WHERE id = :id
                     """),
                         {
@@ -110,6 +177,7 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
                             if chore.get("is_private", False)
                             else None,
                             "last_done": chore.get("last_done"),
+                            "room_id": room_id,
                             "id": chore["id"],
                         },
                     )
@@ -121,8 +189,8 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
             # Session-Pinning, currval wäre dort nicht zuverlässig.
             new_id = db.execute(
                 text("""
-                INSERT INTO chores.chores (name, interval_days, due_date, archived, owner_email, is_private, last_done)
-                VALUES (:name, :interval_days, :due_date, :archived, :owner_email, :is_private, :last_done)
+                INSERT INTO chores.chores (name, interval_days, due_date, archived, owner_email, is_private, last_done, room_id)
+                VALUES (:name, :interval_days, :due_date, :archived, :owner_email, :is_private, :last_done, :room_id)
                 RETURNING id
             """),
                 {
@@ -135,6 +203,7 @@ async def import_data(request: Request, db: Session = Depends(get_db)):
                     else None,
                     "is_private": chore.get("is_private", False),
                     "last_done": chore.get("last_done"),
+                    "room_id": room_id,
                 },
             ).scalar_one()
             imported_chores.append({"id": new_id, "status": "created"})

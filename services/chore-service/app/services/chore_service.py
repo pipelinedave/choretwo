@@ -3,10 +3,29 @@ from typing import List, Optional, Tuple
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.models import Chore
+from app.models import Chore, Room
 from app.schemas import ChoreCreate, ChoreUpdate
 from app.services.recurrence import calculate_next_due_date
 from app.utils import log_action
+
+
+class UnknownRoom(Exception):
+    """Die gesetzte room_id existiert nicht.
+
+    Wird in der Route zu HTTP 400 uebersetzt. Ohne diese Pruefung
+    faelle ein ungueltiger FK erst beim COMMIT als IntegrityError auf und
+    kaeme als 500 nach aussen — fuer den Client eine unbrauchbare
+    Fehlermeldung statt "diesen Raum gibt es nicht".
+    """
+
+
+def _validate_room(db: Session, room_id: Optional[int]) -> Optional[int]:
+    """Prueft die room_id. None bleibt None — ein Raum ist optional."""
+    if room_id is None:
+        return None
+    if not db.query(Room.id).filter(Room.id == room_id).first():
+        raise UnknownRoom(room_id)
+    return room_id
 
 
 def get_chores(
@@ -51,6 +70,7 @@ def create_chore(db: Session, chore_data: ChoreCreate, user_email: str) -> Chore
         owner_email=user_email,
         done=False,
         archived=False,
+        room_id=_validate_room(db, chore_data.room_id),
     )
 
     db.add(chore)
@@ -67,6 +87,7 @@ def create_chore(db: Session, chore_data: ChoreCreate, user_email: str) -> Chore
             "interval_days": chore.interval_days,
             "due_date": chore.due_date.isoformat(),
             "is_private": chore.is_private,
+            "room_id": chore.room_id,
         },
     )
 
@@ -102,6 +123,12 @@ def update_chore(
     }
 
     update_data = chore_data.model_dump(exclude_unset=True)
+    # `exclude_unset` entscheidet die Semantik:
+    #   "room_id" nicht im Dict  -> Raum bleibt unangetastet
+    #   room_id=None             -> Raum wird bewusst geloest
+    #   room_id=5                -> Raum wird gesetzt (Existenz geprueft)
+    if "room_id" in update_data:
+        _validate_room(db, update_data["room_id"])
     for field, value in update_data.items():
         setattr(chore, field, value)
 
@@ -118,6 +145,7 @@ def update_chore(
                 "name": chore.name,
                 "interval_days": chore.interval_days,
                 "due_date": chore.due_date.isoformat(),
+                "room_id": chore.room_id,
             },
         },
     )

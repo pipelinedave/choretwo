@@ -34,7 +34,13 @@ if str(SERVICES_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICES_ROOT))
 
 # (Vendor-Paketname, Router-Modul, Health-Service-Name)
+#
+# REIHENFOLGE IST BEDEUTSAM: `chore.app.routes.rooms` MUSS vor
+# `chore.app.routes.chores` stehen. chores.py deklariert
+# `GET /api/chores/{chore_id}`; kommt rooms danach, matcht FastAPI
+# `GET /api/chores/rooms` auf `{chore_id}` und antwortet 422 statt 200.
 ROUTERS = [
+    ("chore", "chore.app.routes.rooms", "chore"),
     ("chore", "chore.app.routes.chores", "chore"),
     ("chore", "chore.app.routes.export", "chore"),
     ("chore", "chore.app.routes.settings", "chore"),

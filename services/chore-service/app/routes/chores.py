@@ -18,10 +18,37 @@ from app.services.chore_service import (
     get_chore_stats,
     get_household_health,
     get_chore_bucket_counts,
+    UnknownRoom,
 )
 from app.utils import log_action
 
 router = APIRouter(prefix="/api/chores")
+
+
+def _to_response(c, **overrides) -> ChoreResponse:
+    """Baut die Chore-Response inkl. Raum.
+
+    Der Raum wird eingebettet (`room` = RoomBrief, `room_id` = FK), damit
+    das Frontend Icon + Farbe + is_personal fuer den Chip in EINEM Request
+    bekommt. `c.room` ist ueber `lazy="joined"` bereits geladen, greift also
+    auch nach `db.commit()`/`db.refresh()` nicht ins Leere.
+    """
+    data = {
+        "id": c.id,
+        "name": c.name,
+        "interval_days": c.interval_days,
+        "due_date": c.due_date,
+        "done": c.done,
+        "done_by": c.done_by,
+        "last_done": c.last_done,
+        "owner_email": c.owner_email,
+        "is_private": c.is_private,
+        "archived": c.archived,
+        "room_id": c.room_id,
+        "room": c.room,
+    }
+    data.update(overrides)
+    return ChoreResponse(**data)
 
 
 @router.get("/")
@@ -34,21 +61,7 @@ async def list_chores(
     user_email = request.state.user_email
     chores = get_chores(db, user_email, page, limit)
 
-    return [
-        ChoreResponse(
-            id=c.id,
-            name=c.name,
-            interval_days=c.interval_days,
-            due_date=c.due_date,
-            done=c.done,
-            done_by=c.done_by,
-            last_done=c.last_done,
-            owner_email=c.owner_email,
-            is_private=c.is_private,
-            archived=c.archived,
-        )
-        for c in chores
-    ]
+    return [_to_response(c) for c in chores]
 
 
 @router.post("/")
@@ -56,23 +69,15 @@ async def add_chore(
     request: Request, chore: ChoreCreate, db: Session = Depends(get_db)
 ):
     user_email = request.state.user_email
-    db_chore = create_chore(db, chore, user_email)
+    try:
+        db_chore = create_chore(db, chore, user_email)
+    except UnknownRoom:
+        raise HTTPException(status_code=400, detail="Unknown room_id")
 
     return {
         "message": "Chore added successfully",
         "id": db_chore.id,
-        "chore": ChoreResponse(
-            id=db_chore.id,
-            name=db_chore.name,
-            interval_days=db_chore.interval_days,
-            due_date=db_chore.due_date,
-            done=db_chore.done,
-            done_by=db_chore.done_by,
-            last_done=db_chore.last_done,
-            owner_email=db_chore.owner_email,
-            is_private=db_chore.is_private,
-            archived=db_chore.archived,
-        ),
+        "chore": _to_response(db_chore),
     }
 
 
@@ -81,21 +86,7 @@ async def list_archived_chores(request: Request, db: Session = Depends(get_db)):
     user_email = request.state.user_email
     chores = get_archived_chores(db, user_email)
 
-    return [
-        ChoreResponse(
-            id=c.id,
-            name=c.name,
-            interval_days=c.interval_days,
-            due_date=c.due_date,
-            done=c.done,
-            done_by=c.done_by,
-            last_done=c.last_done,
-            owner_email=c.owner_email,
-            is_private=c.is_private,
-            archived=c.archived,
-        )
-        for c in chores
-    ]
+    return [_to_response(c) for c in chores]
 
 
 @router.get("/count")
@@ -127,22 +118,13 @@ async def get_single_chore(
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
 
-    return ChoreResponse(
-        id=chore.id,
-        name=chore.name,
-        interval_days=chore.interval_days,
-        due_date=chore.due_date,
+    return _to_response(
+        chore,
         # Bei Done zieht die Recurrence die Fälligkeit nach vorn. Diese
         # bereits vorgezogene due_date wird zusätzlich als new_due_date
         # zurückgegeben, damit das Frontend den "Nächste Fälligkeit"-Toast
         # anzeigen kann (store.markDone liest response.data.new_due_date).
         new_due_date=chore.due_date,
-        done=chore.done,
-        done_by=chore.done_by,
-        last_done=chore.last_done,
-        owner_email=chore.owner_email,
-        is_private=chore.is_private,
-        archived=chore.archived,
     )
 
 
@@ -154,7 +136,10 @@ async def update_single_chore(
     db: Session = Depends(get_db),
 ):
     user_email = request.state.user_email
-    chore = update_chore(db, chore_id, chore_update, user_email)
+    try:
+        chore = update_chore(db, chore_id, chore_update, user_email)
+    except UnknownRoom:
+        raise HTTPException(status_code=400, detail="Unknown room_id")
 
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
@@ -188,17 +173,12 @@ async def mark_chore_as_done(
         # vorgezogene nächste Fälligkeit (für den "Nächste Fälligkeit"-Toast).
         # mark_chore_done setzt chore.due_date bereits auf das nächste Vorkommen;
         # beim UNDO (done_by=="undo") gibt es keine neue Fälligkeit.
-        return ChoreResponse(
-            id=chore.id,
-            name=chore.name,
-            interval_days=chore.interval_days,
-            due_date=chore.due_date,
-            done=chore.done,
-            done_by=chore.done_by,
-            last_done=chore.last_done,
-            owner_email=chore.owner_email,
-            is_private=chore.is_private,
-            archived=chore.archived,
+        return _to_response(
+            chore,
+            # `new_due_date` liefert dem Frontend die durch die Recurrence
+            # vorgezogene nächste Fälligkeit (für den "Nächste Fälligkeit"-Toast).
+            # mark_chore_done setzt chore.due_date bereits auf das nächste Vorkommen;
+            # beim UNDO (done_by=="undo") gibt es keine neue Fälligkeit.
             new_due_date=chore.due_date if done_by != "undo" else None,
         )
     except ValueError as e:

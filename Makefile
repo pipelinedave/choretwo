@@ -5,7 +5,7 @@
 .PHONY: lint lint-all lint-auth lint-chore lint-log lint-notify lint-ai lint-frontend
 .PHONY: build build-all build-auth build-chore build-log build-notify build-ai build-frontend
 .PHONY: push push-all push-auth push-chore push-log push-notify push-ai push-frontend
-.PHONY: clean reset-db migrate seed
+.PHONY: clean reset-db migrate migrate-app seed
 
 help:
 	@echo "Choretwo Development Commands"
@@ -41,6 +41,12 @@ help:
 	@echo "Pushing:"
 	@echo "  make push         - Push all images to DockerHub"
 	@echo "  make push-all     - Push all images to DockerHub"
+	@echo ""
+	@echo "Database:"
+	@echo "  make migrate     - init-db.sql: Rolle, DB, Schemas (KEIN App-Schema)"
+	@echo "  make migrate-app - App-Schema (Tabellen/Spalten/Seeds) via DATABASE_URL"
+	@echo "                     -> damit erreicht eine Aenderung die Vercel-Prod"
+	@echo ""
 
 # Development
 dev:
@@ -191,6 +197,16 @@ clean:
 reset-db:
 	docker-compose down -v && docker-compose up -d
 
+# NUR Rollen/Datenbank/Schemas (init-db.sql). Legt KEIN App-Schema an.
 migrate:
 	@echo "Running database migrations..."
 	docker-compose exec postgres psql -U choretwo -d choretwo -f /docker-entrypoint-initdb.d/init-db.sql
+
+# App-Schema (Tabellen, Spalten, FKs, Seeds) gegen DATABASE_URL.
+# DAS ist der Weg, um eine neue Schema-Aenderung nach Vercel-Prod zu
+# bringen: dort laeuft RUN_STARTUP_MIGRATIONS=false, der Service-Start
+# migriert also bewusst NICHT. Aufrufen BEVOR bzw. immediately NACH dem
+# Deploy, einmal, bewusst. Idempotent. Details: docs/MIGRATIONS.md
+migrate-app:
+	@echo "Running app-schema migrations against DATABASE_URL..."
+	@python3 scripts/run_migrations.py

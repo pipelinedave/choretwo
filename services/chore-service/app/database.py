@@ -73,4 +73,19 @@ def run_migrations():
             text("CREATE INDEX IF NOT EXISTS idx_chores_done ON chores.chores(done)")
         )
         conn.commit()
+
+    # Raum-Feature: rooms-Tabelle + chores.room_id + FK + Default-Raeume.
+    # Das DDL liegt in app/migrations.py, damit Prod-Runner
+    # (scripts/run_migrations.py) und Monolith dieselben Statements
+    # benutzen. Eigener Commit-Punkt, damit ein Fehler hier die
+    # chore-Migration oben nicht rueckgaengig macht.
+    try:
+        from app.migrations import migrate_rooms
+
+        with engine.connect() as conn:
+            migrate_rooms(conn)
+            conn.commit()
+    except Exception as exc:  # pragma: no cover - nicht deterministisch
+        print(f"[WARN] Room-Migration fehlgeschlagen: {exc}")
+
     print("Database migrations completed")
