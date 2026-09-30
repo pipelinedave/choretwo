@@ -28,10 +28,17 @@ treffen. Grund: Chore-IDs sind in einer Fremd-DB nicht stabil, und ein
 Backfill, der still auf die falsche Zeile schreibt, ist schlimmer als
 einer, der abbricht.
 
+Erlaubt ist jeder der beiden Titel: der erwartete Vorher-Titel ODER
+der Ziel-Titel. Sonst waere ein zweiter Lauf auf bereits backfillten
+Daten eine Sackgasse — die vier umbenannten Chores haetten dann einen
+Titel, der weder "Vorher" noch "Nachher" ist, und der Guard wuerde
+ausloesen, obwohl das Zielbild längst erreicht ist.
+
 IDEMPOTENZ
 ----------
-Wird ein Chore erneut ausgefuehrt, aendert sich nichts (gleicher Raum,
-gleicher Titel). Der Lauf ist damit gefahrlos wiederholbar. Ohne
+Ein wiederholter Lauf aendert nichts: gleicher Raum, gleicher Titel,
+Exit 0, "Geaendert: 0". Das gilt fuer den Lauf gegen den Ausgangs-
+ZUSTAND wie gegen den bereits backfillten Datenbestand. Ohne
 `--apply` passiert NICHTS — der Default ist ein reiner Dry-Run, damit
 niemand versehentlich Produktionsdaten anfasst.
 
@@ -155,10 +162,15 @@ def main() -> int:
                         f"(erwarteter Titel: {expected!r})"
                     )
                     continue
-                if chore.name != expected:
+                # Erlaubt ist der Vorher-Titel ODER der Ziel-Titel. Damit
+                # bleibt der Guard scharf (ein wirklich unbekannter Chore
+                # faellt durch), ohne dass ein zweiter Lauf auf bereits
+                # backfillten Daten in einer Sackgasse endet.
+                if chore.name not in (expected, new_title):
                     problems.append(
                         f"Chore {chore_id}: Titel weicht ab.\n"
                         f"    erwartet: {expected!r}\n"
+                        f"    oder Ziel: {new_title!r}\n"
                         f"    in der DB: {chore.name!r}"
                     )
                     continue
