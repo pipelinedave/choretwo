@@ -173,6 +173,20 @@
   --room-chip-gap: 4px;
   --room-chip-font-size: 0.72rem;
   --room-chip-shadow: 0 1px 2px rgb(var(--md-sys-color-shadow-rgb) / 0.18);
+  /* Kontur, Bein, Persoenlichkeits-Marker. Die Farbe der Kontur ist KEIN
+     Token (sie kommt aus der DB, utils/roomColor.js -> `roomEdge`); hier
+     steht nur die Geometrie der Farbleiter. */
+  --room-chip-border-width: 1px;
+  --room-chip-personal-border-width: 2px;
+  --room-chip-personal-ring-width: 1px;
+  --room-chip-personal-tip-radius: 2px;
+  /* Innere Lichtkante. Bewusst INNEN: ihr Kontrast gilt gegen die
+     Flaeche des Chips selbst, nicht gegen die Karte — deshalb ist sie in
+     BEIDEN Themes sichtbar, ohne dass die Kontur dafuer einen
+     Theme-Override braucht. Light kraeftiger, weil dort der Chip eine
+     helle Flaeche auf heller Karte ist; im Dark Mode ist er ein heller
+     Fleck auf dunklem Grund, da genueigt eine Haarlinie. */
+  --room-chip-inset: inset 0 0 0 rgb(var(--md-sys-color-white-rgb) / 0.5);
 
   /* === Elevation / Shadows ==============================================
      Aufgebaut auf dem Shadow-RGB-Triplet, damit die Tiefenachse Light/Dark
@@ -373,17 +387,29 @@
 
   /* Raum-Chip: dieselben Stufen wie in `:root`. Sie unterscheiden sich
      bewusst NICHT zwischen den Themes — der Chip traegt seine own
-     Raumfarbe als Inline-Style und rechnet die Schriftfarbe daraus, er
-     ist also in beiden Themes gleich lesbar. Ein Dark-Override wuerde
-     hier nur eine zweite Wahrheit schaffen, die es nicht braucht. Die
-     Zeilen muessen trotzdem hier stehen (gleiche Werte), weil der Test
-     eine Light/Dark-Vollstaendigkeitspruefung macht. */
+     Raumfarbe als Inline-Style und rechnet Schrift UND Kontur daraus
+     (utils/roomColor.js), er ist also in beiden Themes gleich lesbar.
+     Ein Dark-Override wuerde hier nur eine zweite Wahrheit schaffen, die
+     es nicht braucht. Die Zeilen muessen trotzdem hier stehen (gleiche
+     Werte), weil der Test eine Light/Dark-Vollstaendigkeitspruefung
+     macht.
+
+     Die einzige Ausnahme ist `--room-chip-inset`: die innere Lichtkante
+     muss sich dem Theme anpassen. Light = heller Chip auf heller Karte,
+     also kraeftig (0.5); Dark = heller Chip auf dunkler Karte, wo eine
+     starke Innenkante ausblassen wuerde — 0.18 reicht dort als Haarlinie
+     und haelt den Chip lesbar, ohne ihn grell zu machen. */
   --room-chip-radius: 10px;
   --room-chip-padding-x: 7px;
   --room-chip-padding-y: 3px;
   --room-chip-gap: 4px;
   --room-chip-font-size: 0.72rem;
   --room-chip-shadow: 0 1px 2px rgb(var(--md-sys-color-shadow-rgb) / 0.3);
+  --room-chip-border-width: 1px;
+  --room-chip-personal-border-width: 2px;
+  --room-chip-personal-ring-width: 1px;
+  --room-chip-personal-tip-radius: 2px;
+  --room-chip-inset: inset 0 0 0 rgb(var(--md-sys-color-white-rgb) / 0.18);
 
   /* Dark-Mode-Varianten der ergaenzten MD-Sys-Rollen: die Light-Mode-Werte
      waeren auf dunklen Surfaces entweder unsichtbar (Container) oder zu
