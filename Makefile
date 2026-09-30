@@ -5,7 +5,7 @@
 .PHONY: lint lint-all lint-auth lint-chore lint-log lint-notify lint-ai lint-frontend
 .PHONY: build build-all build-auth build-chore build-log build-notify build-ai build-frontend
 .PHONY: push push-all push-auth push-chore push-log push-notify push-ai push-frontend
-.PHONY: clean reset-db migrate migrate-app seed
+.PHONY: clean reset-db migrate migrate-app backfill-rooms seed
 
 help:
 	@echo "Choretwo Development Commands"
@@ -46,6 +46,8 @@ help:
 	@echo "  make migrate     - init-db.sql: Rolle, DB, Schemas (KEIN App-Schema)"
 	@echo "  make migrate-app - App-Schema (Tabellen/Spalten/Seeds) via DATABASE_URL"
 	@echo "                     -> damit erreicht eine Aenderung die Vercel-Prod"
+	@echo "  make backfill-rooms      - Raeume fuer bestehende Chores (Dry-Run)"
+	@echo "  make backfill-rooms APPLY=1 - ... und schreibt (idempotent)"
 	@echo ""
 
 # Development
@@ -210,3 +212,10 @@ migrate:
 migrate-app:
 	@echo "Running app-schema migrations against DATABASE_URL..."
 	@python3 scripts/run_migrations.py
+
+# Backfill ist per Default ein Dry-Run: ohne APPLY=1 wird NICHTS geschrieben.
+# Das ist Absicht — ein Backfill, der im Zweifel Produktionsdaten anfasst,
+# ist schlimmer als einer, der erst einmal nur zeigt, was er tun wuerde.
+backfill-rooms:
+	@echo "Backfilling chore rooms via DATABASE_URL (APPLY=$(APPLY))..."
+	@python3 scripts/backfill_rooms.py $(if $(APPLY),--apply,)

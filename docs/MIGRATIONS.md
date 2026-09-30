@@ -118,3 +118,32 @@ matcht FastAPI die Integer-Route und antwortet **422** statt 200
 
 Abgesichert durch
 `services/chore-service/tests/test_rooms.py::test_rooms_route_is_not_swallowed_by_chore_id`.
+
+## Daten-Backfill: `scripts/backfill_rooms.py`
+
+DDL legt Tabellen an, befüllt aber keine bestehenden Zeilen. Für die
+Raum-Zuordnung der bereits vorhandenen Chores gibt es deshalb ein
+eigenes, versioniertes Skript:
+
+```bash
+make backfill-rooms                 # Dry-Run: zeigt nur, was passieren würde
+make backfill-rooms APPLY=1         # schreibt
+```
+
+**Default ist Dry-Run.** Ohne `APPLY=1` passiert nichts — das ist
+Absicht, damit niemand versehentlich Produktionsdaten anfasst.
+
+Zwei Eigenschaften, die den Prod-Lauf sicher machen:
+
+- **Doppelter Schlüssel.** Jeder Eintrag nennt Chore-ID *und* den
+  aktuell erwarteten Titel. Weicht beides ab, bricht das Skript mit
+  Exit != 0 ab, statt einen unbekannten Chore zu treffen.
+- **Atomar.** Der Abbruch passiert vor dem Commit — ein Lauf mit einer
+  einzigen Abweichung schreibt gar nichts, auch nicht die gültigen
+  Zeilen.
+
+Die Zuordnung selbst ist eine **Domänenentscheidung** und steht als
+explizite Tabelle im Skript, nicht als Heuristik über die Titel.
+„Papiermüll" ist hausweit und bekommt deshalb bewusst *keinen* Raum;
+Titel wie „Küchenfronten abwischen" werden zu „Fronten abwischen"
+entzerrt, weil der Raum jetzt als Chip danebensteht.
