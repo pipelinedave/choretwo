@@ -5,6 +5,17 @@
         <router-link to="/" class="brand-link">
           <span class="brand-title">{{ title || "CHORETWO" }}</span>
         </router-link>
+        <!-- Dezent: Git-Commit-Hash des deployed Builds, verlinkt auf GitHub -->
+        <span class="header-version">
+          <a
+            :href="githubCommitUrl"
+            target="_blank"
+            rel="noopener"
+            class="header-commit-link"
+            :title="`Build commit ${commitHash}`"
+            >{{ commitHash }}</a
+          >
+        </span>
       </div>
 
       <div class="header-actions" v-if="authStore.isAuthenticated">
@@ -164,6 +175,10 @@ const authStore = useAuthStore();
 const choreStore = useChoreStore();
 const logStore = useLogStore();
 
+// Dezent build indicator: verlinkt auf den Git-Commit dieses Deployments.
+const commitHash = __GIT_COMMIT__;
+const githubCommitUrl = `https://github.com/pipelinedave/choretwo/commit/${commitHash}`;
+
 const isGlobalSyncing = computed(() => !!(choreStore.loading || logStore.loading));
 const showMenu = ref(false);
 const menuRef = ref(null);
@@ -279,6 +294,36 @@ async function installPwa() {
 
 .brand-link {
   text-decoration: none;
+}
+
+.header-version {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-dim);
+  user-select: none;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.header-commit-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: var(--color-primary-subtle);
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border-glass-subtle);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  font-size: 11px;
+}
+
+.header-commit-link:hover {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
 }
 
 .brand-title {

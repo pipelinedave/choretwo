@@ -11,6 +11,7 @@ module.exports = {
     process: "readonly",
     global: "readonly",
     navigator: "readonly",
+    __GIT_COMMIT__: "readonly",
   },
   rules: {
     "vue/multi-word-component-names": "off",

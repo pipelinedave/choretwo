@@ -1,6 +1,28 @@
+import { execSync } from "child_process";
+import { readFileSync, existsSync } from "fs";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
+
+// Git commit hash for the dezent build indicator in the header.
+// Fallback chain: Vercel ENV -> lokaler git HEAD -> "dev".
+// (Vercel setzt VERCEL_GIT_COMMIT_SHA auf Git-Integration-Builds, sodass
+// Production den echten Hash zeigt.)
+let gitCommit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || "";
+if (!gitCommit) {
+  try {
+    gitCommit = execSync("git rev-parse --short HEAD").toString().trim();
+  } catch {
+    gitCommit = "";
+  }
+}
+if (!gitCommit) {
+  try {
+    const f = new URL("./.deploy-commit", import.meta.url);
+    if (existsSync(f)) gitCommit = readFileSync(f, "utf8").trim().slice(0, 7);
+  } catch {}
+}
+if (!gitCommit) gitCommit = "dev";
 
 const plugins = [vue()];
 
@@ -93,6 +115,9 @@ if (process.env.NODE_ENV === "production") {
 
 export default defineConfig({
   plugins,
+  define: {
+    __GIT_COMMIT__: JSON.stringify(gitCommit),
+  },
   server: {
     port: 3000,
     proxy: {
