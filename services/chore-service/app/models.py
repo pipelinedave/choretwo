@@ -74,5 +74,25 @@ class Chore(Base):
     # Client, und kein Lazy-Load nach Session-CLose).
     room = relationship("Room", back_populates="chores", lazy="joined")
 
+    @property
+    def is_effectively_done(self) -> bool:
+        """done-Status des AKTUELLEN Zyklus (zentrale Definition, Bugfix 03.11.2026).
+
+        `done` ist zyklusbezogen, nicht chorebezogen: mark_done setzt
+        done=True UND schiebt due_date auf den naechsten Zyklus. Solange
+        diese naechste Faeligkeit in der Zukunft liegt, ist der Zyklus
+        erledigt. Verstreicht sie, ist der neue Zyklus offen — auch wenn
+        das DB-Flag noch auf True steht (frueher blieb der Chore dann
+        fuer immer "erledigt", Prod-Fall Chore 28 "Wiegen").
+
+        Am Faellichkeitstag selbst (due_date == heute) gilt der Chore
+        bereits als offen (faellig heute).
+        """
+        if not self.done:
+            return False
+        if self.due_date is None:
+            return True
+        return self.due_date > date.today()
+
     def __repr__(self):
         return f"<Chore(id={self.id}, name='{self.name}', due_date={self.due_date})>"

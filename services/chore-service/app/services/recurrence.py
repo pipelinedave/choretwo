@@ -33,7 +33,13 @@ def calculate_chore_score(due_date: date, interval_days: int) -> float:
 
 
 def is_chore_overdue(chore: "Chore") -> bool:
-    return date.today() > chore.due_date and not chore.done
+    """Ueberfaellig = Faeligkeit verstrichen UND aktueller Zyklus nicht erledigt.
+
+    Nutzt die zyklusbezogene done-Logik (Chore.is_effectively_done): ein
+    klebender done-Flag mit verstrichenem due_date ist effektiv offen und
+    damit ueberfaellig (Bugfix 03.11.2026).
+    """
+    return date.today() > chore.due_date and not chore.is_effectively_done
 
 
 def get_due_soon_threshold(interval_days: int) -> int:
