@@ -255,7 +255,11 @@ def get_chore_stats(db: Session, user_email: str) -> dict:
     on_track = 0
 
     for chore in chores:
-        if chore.done:
+        if chore.is_effectively_done:
+            # Zyklus erledigt (done UND naechste Faeligkeit in der Zukunft)
+            # zaehlt in keine Kategorie. Ein klebender done-Flag mit
+            # verstrichenem due_date ist dagegen effektiv offen und wird
+            # korrekt als overdue erfasst (Bugfix 03.11.2026).
             continue
 
         if chore.due_date < today:
@@ -276,47 +280,58 @@ def get_chore_stats(db: Session, user_email: str) -> dict:
 
 
 def get_chore_bucket_counts(db: Session, user_email: str) -> dict:
-    """Get chore counts by urgency bucket (mirrors choremane /chores/count)."""
+    """Chore-Counts nach Dringlichkeits-Bucket (mirrors choremane /chores/count).
+
+    Semantik seit dem Re-Arm-Fix (03.11.2026): Buckets zaehlen nur
+    EFFEKTIV offene Chores. Ein laufender Zyklus (done=True UND due_date
+    in der Zukunft) gehoert in keinen Bucket — vorher landete er in
+    thisWeek/upcoming. Ein klebender done-Flag mit verstrichenem due_date
+    ist effektiv offen und zaehlt korrekt als overdue.
+
+    Als ORM-Query statt Raw-SQL: dieselbe Modell-Definition (inkl.
+    Schema-Praefix) fuer Postgres UND die SQLite-Testsuite; die
+    Bucket-Zuordnung passiert in Python (Chore-Zahlen sind klein,
+    <100 pro Haushalt).
+    """
     today = date.today()
     tomorrow = today + timedelta(days=1)
     next_week = today + timedelta(days=7)
 
-    query = text("""
-        SELECT COUNT(*),
-               SUM(CASE WHEN due_date < :today THEN 1 ELSE 0 END),
-               SUM(CASE WHEN due_date = :today THEN 1 ELSE 0 END),
-               SUM(CASE WHEN due_date = :tomorrow THEN 1 ELSE 0 END),
-               SUM(CASE WHEN due_date > :tomorrow AND due_date <= :next_week THEN 1 ELSE 0 END),
-               SUM(CASE WHEN due_date > :next_week THEN 1 ELSE 0 END)
-        FROM chores.chores
-        WHERE archived = FALSE
-        AND (is_private = FALSE OR (is_private = TRUE AND owner_email = :email))
-    """)
-    row = db.execute(
-        query,
-        {
-            "email": user_email,
-            "today": today,
-            "tomorrow": tomorrow,
-            "next_week": next_week,
-        },
-    ).fetchone()
+    rows = (
+        db.query(Chore.due_date)
+        .filter(
+            Chore.archived == False,  # noqa: E712
+            (Chore.is_private == False)  # noqa: E712
+            | ((Chore.is_private == True) & (Chore.owner_email == user_email)),  # noqa: E712
+            # Effektiv offen: NICHT (done UND due_date > heute)
+            (Chore.done == False)  # noqa: E712
+            | (Chore.due_date <= today),
+        )
+        .all()
+    )
 
-    total = row[0] or 0
-    overdue = row[1] or 0
-    today_count = row[2] or 0
-    tomorrow_count = row[3] or 0
-    this_week_count = row[4] or 0
-    upcoming_count = row[5] or 0
-
-    return {
-        "all": total,
-        "overdue": overdue,
-        "today": today_count,
-        "tomorrow": tomorrow_count,
-        "thisWeek": this_week_count,
-        "upcoming": upcoming_count,
+    counts = {
+        "all": 0,
+        "overdue": 0,
+        "today": 0,
+        "tomorrow": 0,
+        "thisWeek": 0,
+        "upcoming": 0,
     }
+    for (due,) in rows:
+        counts["all"] += 1
+        if due < today:
+            counts["overdue"] += 1
+        elif due == today:
+            counts["today"] += 1
+        elif due == tomorrow:
+            counts["tomorrow"] += 1
+        elif due <= next_week:
+            counts["thisWeek"] += 1
+        else:
+            counts["upcoming"] += 1
+
+    return counts
 
 
 def calculate_single_chore_score(
