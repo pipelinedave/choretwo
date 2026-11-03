@@ -38,7 +38,10 @@ def _to_response(c, **overrides) -> ChoreResponse:
         "name": c.name,
         "interval_days": c.interval_days,
         "due_date": c.due_date,
-        "done": c.done,
+        # done ist zyklusbezogen: ein verstrichener Zyklus re-armt den
+        # Chore (done=False), auch wenn das DB-Flag noch True ist.
+        # Liste und Detail verwenden dieselbe Logik (Bugfix 03.11.2026).
+        "done": c.is_effectively_done,
         "done_by": c.done_by,
         "last_done": c.last_done,
         "owner_email": c.owner_email,
@@ -46,6 +49,11 @@ def _to_response(c, **overrides) -> ChoreResponse:
         "archived": c.archived,
         "room_id": c.room_id,
         "room": c.room,
+        # new_due_date in ALLEN Responses (nicht nur Detail): die durch die
+        # Recurrence vorgezogene bzw. aktuelle Faeligkeit. Vorher lieferte
+        # die Liste hier null, das Detail das Datum — Liste und Detail
+        # mussten aber dieselben Felder liefern (Bugfix 03.11.2026).
+        "new_due_date": c.due_date,
     }
     data.update(overrides)
     return ChoreResponse(**data)
@@ -118,14 +126,7 @@ async def get_single_chore(
     if not chore:
         raise HTTPException(status_code=404, detail="Chore not found")
 
-    return _to_response(
-        chore,
-        # Bei Done zieht die Recurrence die Fälligkeit nach vorn. Diese
-        # bereits vorgezogene due_date wird zusätzlich als new_due_date
-        # zurückgegeben, damit das Frontend den "Nächste Fälligkeit"-Toast
-        # anzeigen kann (store.markDone liest response.data.new_due_date).
-        new_due_date=chore.due_date,
-    )
+    return _to_response(chore)
 
 
 @router.put("/{chore_id}")
